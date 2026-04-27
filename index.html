@@ -2498,7 +2498,7 @@ let showArchived = false;
 function toggleShowArchived() { showArchived = !showArchived; render(); }
 
 // === VERSION INFO ===
-const APP_VERSION = "v3.6";
+const APP_VERSION = "v3.7";
 
 // === ONBOARDING ===
 let onboardingActive = false;
@@ -2831,6 +2831,14 @@ function getDeadlineInfo(docId) {
   return null;
 }
 function parseDateGuess(s) {
+  if (!s) return null;
+  // Defensive: handle skipped fields (objects with skipped:true), numbers, etc.
+  if (typeof s !== "string") {
+    if (typeof s === "object" && s !== null && s.skipped) return null;
+    if (typeof s === "object" && s !== null && typeof s.value === "string") s = s.value;
+    else if (typeof s === "number") s = String(s);
+    else return null;
+  }
   if (!s) return null;
   // Try ISO format first (YYYY-MM-DD)
   let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
