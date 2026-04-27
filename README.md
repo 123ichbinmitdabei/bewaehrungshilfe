@@ -42,6 +42,18 @@ Alle Briefe füllen sich automatisch mit deinen Stammdaten und Dokumenten-Inhalt
 
 ---
 
+## 📤 Dokumente versenden – mit Belegen
+
+In der Druckansicht jedes Dokuments stehen je nach Gerät verschiedene Versand-Optionen zur Verfügung:
+
+- **📤 Teilen** (auf iPhone, iPad, Android): Öffnet das System-Teilen-Menü mit Dokument *und allen Belegen als einzelne Dateien*. Wähle dann z.B. Mail, WhatsApp, AirDrop, Signal etc.
+- **📦 ZIP mit Belegen** (auf jedem Gerät – Desktop und Mobile): Lädt eine ZIP-Datei mit dem Dokument plus allen Belegen herunter, sortiert in Unterordnern. Die ZIP hängst du dann manuell an deine E-Mail an.
+- **🖨 Drucken / als PDF**: Klassische Druckansicht – Belege werden auf Folge-Seiten angehängt (umschaltbar).
+
+> 💡 **Hintergrund:** E-Mail-Programme nutzen den Standard `mailto:`, der keine Anhänge unterstützt. Daher der Umweg über System-Teilen oder ZIP-Download – beide Wege sind aber komfortabel und funktionieren zuverlässig.
+
+---
+
 ## 🔒 Datenschutz & Sicherheit
 
 Diese App ist **bewusst lokal** – keine Server, keine Cloud, keine Tracker:
@@ -87,19 +99,20 @@ Nach der Installation läuft die App im Vollbild – wie eine richtige App, auch
 - **Datei-Anhänge** für Belege (Fotos, PDFs)
 - **Dark Mode** mit angenehmen Kontrasten
 
-### Export
+### Export & Versand
 - 📄 **PDF / Drucken** mit professionellem Layout
 - 📝 **Word-Datei (.docx)** für 5 Hauptdokumente
+- 📤 **System-Teilen** mit Dokument + allen Belegen (iOS/Android)
+- 📦 **ZIP-Bundle** mit Dokument + Belegen, strukturiert in Unterordnern
 - 💾 **JSON-Backup** aller Daten
 - 📅 **Kalender-Export** (.ics) für Termine
 
 ### Praktisches
-- 🌙 **Theme-Wechsel** (Hell / Dunkel)
+- 🌙 **Theme-Wechsel** (Hell / Dunkel) mit voll lesbaren Buttons
 - 📅 **Heute-Übersicht** mit anstehenden Terminen
 - 🔍 **Suchfunktion** in Tabellen
 - 📦 **Archivierung** alter Dokumente
 - 🔗 **QR-Code-Sharing** der App
-- ⚙️ **Mehrsprachiger Druck** (DE / EN)
 
 ---
 
@@ -108,7 +121,7 @@ Nach der Installation läuft die App im Vollbild – wie eine richtige App, auch
 - **Single HTML File** – keine Build-Tools, kein Framework, kein Backend
 - **PWA** mit Manifest und Service-Worker-Funktionalität
 - **localStorage** als primäre Datenhaltung
-- **lazy-loaded docx-js** (nur bei Word-Export)
+- **Lazy-loaded Libraries** (docx-js, JSZip) – nur wenn benötigt
 - **iOS Safe-Area-Support** für PWA-Vollbild-Modus
 - **iOS-Zoom-Verhinderung** bei Input-Fokus
 - **Browser-Kompatibilitäts-Check** beim Start
@@ -166,5 +179,26 @@ Wenn du Feedback, Anregungen oder Verbesserungsvorschläge hast, melde dich gern
 
 ---
 
-**Aktuelle Version:** v3.5
+## 📜 Changelog
+
+### v3.6 (April 2026)
+- 📤 **System-Teilen mit Belegen** – Dokument + alle Belege als Anhänge in einem Schritt teilen (iOS/Android)
+- 📦 **ZIP-Bundle-Download** – Dokument + Belege strukturiert als ZIP herunterladen (alle Geräte)
+- 🌐 Sprachwechsel-Knopf entfernt (war nicht funktional, nur DE wird aktiv genutzt)
+- ZIP-Versand jetzt auch für Verfahrenskosten und Asservate verfügbar
+
+### v3.5 (April 2026)
+- 🌙 Dark Mode Lesbarkeit gefixt – Header-Buttons sind jetzt voll lesbar
+- 💸 Neues 9. Dokument: Verfahrenskosten & Geldstrafe
+- ✉️ 2 neue Anschreiben: Antrag auf Ratenzahlung + Stundung (§§ 459a, 459g StPO)
+
+### v3.3 / v3.4
+- 📦 Neues Dokument: Beweismittel & Asservate
+- 📨 Antrag auf Herausgabe (§ 111n StPO) mit automatischer Gegenstands-Liste
+- 🔄 Sinnvolle Reihenfolge der Kacheln auf der Startseite
+- 🔍 Erweiterte Asservate-Doku mit Durchsuchungs- und StrEG-Sektion
+
+---
+
+**Aktuelle Version:** v3.6
 **Letztes Update:** April 2026
