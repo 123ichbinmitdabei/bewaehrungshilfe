@@ -2185,46 +2185,7 @@ function rowMatchesSearch(row, term) {
   return Object.values(row).some(v => String(v || "").toLowerCase().includes(lower));
 }
 
-// === LANGUAGE TOGGLE FOR PRINT ===
-const TR = {
-  de: {
-    page: "Seite",
-    of: "von",
-    name: "Name, Vorname",
-    geburtsdatum: "Geburtsdatum",
-    anschrift: "Anschrift",
-    telefon: "Telefon",
-    aktenzeichen: "Aktenzeichen",
-    bewaehrungshelfer: "Bewährungshelfer/in",
-    erstellt_am: "Erstellt am",
-    persoenliche_angaben: "Persönliche Angaben",
-    ort_datum: "Ort, Datum",
-    unterschrift: "Unterschrift",
-    versicherung_wahrheit: "Ich versichere, dass die vorstehenden Angaben vollständig und wahrheitsgemäß sind.",
-    privacy_warning: "Hinweis: Dieses Dokument enthält ggf. sensible persönliche Daten. Bitte achte beim Versand und der Aufbewahrung auf Vertraulichkeit.",
-  },
-  en: {
-    page: "Page",
-    of: "of",
-    name: "Last name, First name",
-    geburtsdatum: "Date of birth",
-    anschrift: "Address",
-    telefon: "Phone",
-    aktenzeichen: "File number",
-    bewaehrungshelfer: "Probation officer",
-    erstellt_am: "Created on",
-    persoenliche_angaben: "Personal Information",
-    ort_datum: "Place, Date",
-    unterschrift: "Signature",
-    versicherung_wahrheit: "I hereby certify that the above information is complete and truthful.",
-    privacy_warning: "Note: This document may contain sensitive personal data. Please ensure confidentiality when sending and storing.",
-  }
-};
-function tr(key) { return (TR[state.printLanguage] || TR.de)[key] || TR.de[key] || key; }
-function togglePrintLanguage() {
-  state.printLanguage = state.printLanguage === "de" ? "en" : "de";
-  render();
-}
+// === LANGUAGE TOGGLE FOR PRINT (removed v3.6 - only DE actually used) ===
 
 // Live filter rows without re-render (preserves input focus)
 function applySearchFilter(secId, term) {
@@ -2283,10 +2244,149 @@ function emailDocument(docId) {
 }
 
 // Web Share API: share a generated PDF/DOCX via system share sheet (mobile)
+// === SHARE / BUNDLE WITH ATTACHMENTS ===
+
+// Lazy-load JSZip from CDN, only when bundling is requested
+let jszipLoading = null;
+function loadJSZipLib() {
+  if (window.JSZip) return Promise.resolve();
+  if (jszipLoading) return jszipLoading;
+  jszipLoading = new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = "https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js";
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error("Konnte ZIP-Bibliothek nicht laden. Bitte Internetverbindung prüfen."));
+    document.head.appendChild(s);
+  });
+  return jszipLoading;
+}
+
+// Collect all attachments for a doc as Blobs with structured filenames
+async function collectDocAttachments(docId) {
+  const ds = state.docs[docId];
+  const result = []; // { folder, filename, blob }
+  if (!ds || !ds.attachments) return result;
+  const doc = DOCS[docId];
+  for (const secId of Object.keys(ds.attachments)) {
+    const sec = doc.sections.find(s => s.id === secId);
+    const secLabel = sec ? sec.title : secId;
+    const map = ds.attachments[secId];
+    for (const rowIdxStr of Object.keys(map)) {
+      const rowIdx = parseInt(rowIdxStr);
+      const atts = map[rowIdxStr] || [];
+      const row = (ds.rows && ds.rows[secId] && ds.rows[secId][rowIdx]) || {};
+      // Build a row label - try common id labels
+      const rowParts = [];
+      if (row.datum) rowParts.push(row.datum);
+      if (row.bezeichnung) rowParts.push(row.bezeichnung.substring(0, 30));
+      if (row.art) rowParts.push(row.art);
+      if (row.betrag) rowParts.push(row.betrag + "EUR");
+      const rowLabel = rowParts.length > 0 ? rowParts.join("_") : `Zeile-${rowIdx + 1}`;
+      const safeRowLabel = rowLabel.replace(/[^a-zA-Z0-9äöüÄÖÜß_-]/g, "_").substring(0, 60);
+      for (let i = 0; i < atts.length; i++) {
+        const att = atts[i];
+        try {
+          const resp = await fetch(att.dataUrl);
+          const blob = await resp.blob();
+          const ext = att.name.includes(".") ? att.name.split(".").pop() : (att.type === "pdf" ? "pdf" : "jpg");
+          const filename = `${String(i + 1).padStart(2, "0")}_${safeRowLabel}.${ext}`;
+          result.push({
+            folder: secLabel.replace(/[^a-zA-Z0-9äöüÄÖÜß_-]/g, "_"),
+            filename: filename,
+            blob: blob,
+            originalName: att.name,
+          });
+        } catch (e) {
+          console.error("Fehler beim Lesen von Beleg:", att.name, e);
+        }
+      }
+    }
+  }
+  return result;
+}
+
+// Build the docx for a doc (returns blob), or null if not supported
+async function buildDocBlob(docId) {
+  await loadDocxLib();
+  if (docId === "ear") return await buildEarDocx();
+  if (docId === "zeit") return await buildZeitDocx();
+  if (docId === "thera") return await buildTheraDocx();
+  if (docId === "schadens") return await buildSchadensDocx();
+  if (docId === "sozial") return await buildSozialDocx();
+  return null; // kosten, asservate, bhtermine, uebersicht: no docx, only print
+}
+
+// Build a ZIP containing the doc + all attachments
+async function buildDocBundleZip(docId) {
+  await loadJSZipLib();
+  const doc = DOCS[docId];
+  const userName = (state.shared.name || "").replace(/[^a-zA-Z0-9äöüÄÖÜß_-]/g, "_");
+  const docTitle = doc.title.replace(/[^a-zA-Z0-9äöüÄÖÜß_-]/g, "_");
+  const baseName = userName ? `${docTitle}_${userName}` : docTitle;
+
+  const zip = new JSZip();
+
+  // 1) Docx of main document (if available)
+  const docBlob = await buildDocBlob(docId);
+  if (docBlob) {
+    zip.file(`${baseName}.docx`, docBlob);
+  } else {
+    // For docs without docx (kosten, asservate): include a Readme as text
+    const note = `Hauptdokument "${doc.title}"\n\nFür dieses Dokument gibt es keinen Word-Export. Bitte nutze die Druck-Funktion in der App und speichere das Ergebnis als PDF, dann lege es in diesen Ordner.`;
+    zip.file(`${baseName}_HINWEIS.txt`, note);
+  }
+
+  // 2) Attachments
+  const atts = await collectDocAttachments(docId);
+  if (atts.length > 0) {
+    const folder = zip.folder("Belege");
+    // Group by section
+    const folderMap = {};
+    atts.forEach(a => {
+      if (!folderMap[a.folder]) folderMap[a.folder] = folder.folder(a.folder);
+      folderMap[a.folder].file(a.filename, a.blob);
+    });
+    // Add an index file
+    let index = `Belege-Übersicht für: ${doc.title}\n`;
+    if (state.shared.name) index += `Name: ${state.shared.name}\n`;
+    if (state.shared.aktenzeichen) index += `Aktenzeichen: ${state.shared.aktenzeichen}\n`;
+    index += `Erstellt: ${todayDE()}\n\n`;
+    index += `Anzahl Belege: ${atts.length}\n\n`;
+    index += atts.map((a, i) => `${i + 1}. ${a.folder}/${a.filename}  (Original: ${a.originalName})`).join("\n");
+    folder.file("00_Inhaltsverzeichnis.txt", index);
+  }
+
+  return await zip.generateAsync({ type: "blob" });
+}
+
+// Download the ZIP bundle for a document
+async function downloadDocBundle(docId) {
+  const btn = event && event.target;
+  const origText = btn ? btn.textContent : "";
+  if (btn) { btn.disabled = true; btn.textContent = "📦 Erstelle ZIP..."; }
+  try {
+    const blob = await buildDocBundleZip(docId);
+    const doc = DOCS[docId];
+    const userName = (state.shared.name || "").replace(/[^a-zA-Z0-9äöüÄÖÜß_-]/g, "_");
+    const docTitle = doc.title.replace(/[^a-zA-Z0-9äöüÄÖÜß_-]/g, "_");
+    const filename = userName ? `${docTitle}_${userName}.zip` : `${docTitle}.zip`;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    if (btn) { btn.textContent = "✓ ZIP heruntergeladen"; setTimeout(() => { btn.disabled = false; btn.textContent = origText; }, 2200); }
+  } catch (e) {
+    console.error(e);
+    alert("ZIP-Erstellung fehlgeschlagen: " + (e.message || "Unbekannter Fehler"));
+    if (btn) { btn.disabled = false; btn.textContent = origText; }
+  }
+}
+
 async function shareDocument(docId) {
   const doc = DOCS[docId];
   if (!navigator.share) {
-    alert("Teilen wird auf diesem Gerät nicht unterstützt. Nutze stattdessen den E-Mail-Knopf 📧 oder erstelle das Dokument als PDF und versende es manuell.");
+    alert("Teilen wird auf diesem Gerät nicht unterstützt.\n\nNutze stattdessen den Knopf „📦 ZIP mit Belegen“ - die ZIP-Datei kannst du dann manuell per Mail anhängen oder über andere Wege versenden.");
     return;
   }
   try {
@@ -2295,26 +2395,58 @@ async function shareDocument(docId) {
       await navigator.share({ title: doc.title, text: text });
       return;
     }
-    await loadDocxLib();
-    let blob;
-    if (docId === "ear") blob = await buildEarDocx();
-    else if (docId === "zeit") blob = await buildZeitDocx();
-    else if (docId === "thera") blob = await buildTheraDocx();
-    else if (docId === "schadens") blob = await buildSchadensDocx();
-    else if (docId === "sozial") blob = await buildSozialDocx();
-    else { alert("Für dieses Dokument gibt es keinen direkten Versand. Nutze die Druckansicht."); return; }
+
+    // Check if doc has attachments
+    const docsWithAttachments = ["schadens", "sozial", "kosten", "asservate"];
+    const hasAtts = docsWithAttachments.includes(docId) && countAllAttachments(docId) > 0;
+
+    // Build files list - main doc + all attachments
+    const files = [];
     const userName = (state.shared.name || "").replace(/[^a-zA-Z0-9äöüÄÖÜß_-]/g, "_");
-    const filename = `${doc.title.replace(/[^a-zA-Z0-9äöüÄÖÜß_-]/g, "_")}${userName ? "_" + userName : ""}.docx`;
-    const file = new File([blob], filename, { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
-    if (navigator.canShare && !navigator.canShare({ files: [file] })) {
-      alert("Datei-Teilen wird auf diesem Gerät nicht unterstützt. Lade das Dokument runter und versende es manuell.");
+    const docTitle = doc.title.replace(/[^a-zA-Z0-9äöüÄÖÜß_-]/g, "_");
+
+    // Main doc as docx if available, else skip (user must use Print)
+    const docBlob = await buildDocBlob(docId);
+    if (docBlob) {
+      const filename = `${docTitle}${userName ? "_" + userName : ""}.docx`;
+      files.push(new File([docBlob], filename, { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }));
+    }
+
+    // Attachments
+    if (hasAtts) {
+      const atts = await collectDocAttachments(docId);
+      for (const a of atts) {
+        const safeName = `${a.folder}_${a.filename}`;
+        files.push(new File([a.blob], safeName, { type: a.blob.type }));
+      }
+    }
+
+    if (files.length === 0) {
+      // Fallback: only text
+      const text = `${doc.title}\n${state.shared.name ? "Name: " + state.shared.name + "\n" : ""}${state.shared.aktenzeichen ? "Aktenzeichen: " + state.shared.aktenzeichen + "\n" : ""}Stand: ${todayDE()}\n\n(Dokument bitte aus der App ausdrucken oder als PDF speichern.)`;
+      await navigator.share({ title: doc.title, text: text });
       return;
     }
-    await navigator.share({ title: doc.title, text: buildEmailBody(doc.title), files: [file] });
+
+    // Check if device can share files
+    if (navigator.canShare && !navigator.canShare({ files: files })) {
+      // Fallback: try ZIP download
+      const fallback = confirm("Datei-Teilen wird auf diesem Gerät leider nicht unterstützt.\n\nMöchtest du stattdessen alles als ZIP-Datei herunterladen?");
+      if (fallback) await downloadDocBundle(docId);
+      return;
+    }
+
+    await navigator.share({
+      title: doc.title,
+      text: buildEmailBody(doc.title) + (hasAtts ? "\n\n(Belege sind als zusätzliche Dateien beigefügt.)" : ""),
+      files: files,
+    });
   } catch (e) {
     if (e.name === "AbortError") return;
     console.error(e);
-    alert("Teilen fehlgeschlagen: " + e.message);
+    // If too-many-files or other share-error, offer ZIP fallback
+    const fallback = confirm("Teilen fehlgeschlagen: " + (e.message || "Unbekannter Fehler") + "\n\nMöchtest du stattdessen alles als ZIP-Datei herunterladen?");
+    if (fallback) await downloadDocBundle(docId);
   }
 }
 
@@ -2366,7 +2498,7 @@ let showArchived = false;
 function toggleShowArchived() { showArchived = !showArchived; render(); }
 
 // === VERSION INFO ===
-const APP_VERSION = "v3.5";
+const APP_VERSION = "v3.6";
 
 // === ONBOARDING ===
 let onboardingActive = false;
@@ -3875,7 +4007,16 @@ function renderHelpView() {
       </ul>
 
       <h2 style="color:var(--primary); font-size:18px; margin:18px 0 10px;">✉️ Briefe & Anträge</h2>
-      <p>Über den <strong>„✉️ Briefe"</strong>-Knopf rechts oben: 5 vorgefertigte Anschreiben (Stundungsantrag, Krankmeldung an BH, Bestätigungs-Anforderung an Therapeut/Einrichtung, Lockerungsantrag) – mit deinen Daten automatisch ausgefüllt. Bearbeitbar, kopierbar, als Text-Datei oder PDF speicherbar.</p>
+      <p>Über den <strong>„✉️ Briefe"</strong>-Knopf rechts oben: 9 vorgefertigte Anschreiben (Stundungsantrag, Krankmeldung an BH, Bestätigungs-Anforderung an Therapeut/Einrichtung, Lockerungsantrag, Antrag auf Herausgabe nach § 111n StPO, Erinnerung Herausgabe, Antrag auf Ratenzahlung Verfahrenskosten, Antrag auf Stundung Verfahrenskosten) – mit deinen Daten automatisch ausgefüllt. Bearbeitbar, kopierbar, als Text-Datei oder PDF speicherbar.</p>
+
+      <h2 style="color:var(--primary); font-size:18px; margin:18px 0 10px;">📤 Dokumente versenden – mit Belegen!</h2>
+      <p>In der Druckansicht jedes Dokuments findest du je nach Gerät <strong>verschiedene Versand-Optionen</strong>:</p>
+      <ul style="padding-left:20px;">
+        <li><strong>📤 Teilen</strong> (auf iPhone, iPad, Android): Öffnet das System-Teilen-Menü mit Dokument <em>und allen Belegen als einzelne Dateien</em>. Wähle dann z.B. Mail, WhatsApp, AirDrop, Signal etc. – die Anhänge sind alle dabei.</li>
+        <li><strong>📦 ZIP mit Belegen</strong> (auf jedem Gerät, Desktop und Mobile): Lädt eine ZIP-Datei mit dem Dokument plus allen Belegen herunter, sortiert in Unterordnern. Die ZIP hängst du dann manuell an deine E-Mail an. Funktioniert auch ohne System-Teilen, z.B. am Computer mit Outlook/Thunderbird/Webmail.</li>
+        <li><strong>🖨 Drucken / als PDF</strong>: Klassische Druckansicht mit Belegen als Folge-Seiten (wenn aktiviert).</li>
+      </ul>
+      <p style="font-size:13px; color:var(--text-soft);">💡 <strong>Hintergrund:</strong> E-Mail-Programme nutzen einen Standard (mailto:), der keine Anhänge unterstützt. Daher dieser Umweg über Teilen-Menü oder ZIP – beide Wege sind aber komfortabel.</p>
 
       <h2 style="color:var(--primary); font-size:18px; margin:18px 0 10px;">📦 Belege verwalten</h2>
       <p>Wenn der Speicher knapp wird (gelbe/rote Anzeige): über „📦 Belege verwalten" siehst du alle Belege sortiert nach Größe und kannst die größten zuerst löschen. Vorher unbedingt sichern!</p>
@@ -4797,7 +4938,9 @@ function renderNav(doc, sec) {
 
 function renderPreviewToolbar() {
   const id = state.activeDocId;
-  const hasAttachments = id === "schadens" || id === "sozial";
+  // Docs with file attachments: schadens (Zahlungsbelege), sozial (Stunden-Belege), kosten (Rechnungen/Belege), asservate (Eigentumsnachweise)
+  const docsWithAttachments = ["schadens", "sozial", "kosten", "asservate"];
+  const hasAttachments = docsWithAttachments.includes(id);
   const attCount = hasAttachments ? countAllAttachments(id) : 0;
   const toggleLabel = state.printWithAttachments ? "✓ Mit Belegen" : "○ Ohne Belege";
   const canShare = id !== "uebersicht";
@@ -4809,8 +4952,8 @@ function renderPreviewToolbar() {
       <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
         <button onclick="closePreview()">← Zurück zum Editor</button>
         ${hasAttachments && attCount > 0 ? `<button onclick="togglePrintAttachments()" title="Belege als zusätzliche Seiten ans Druckdokument anhängen">${toggleLabel} (${attCount})</button>` : ""}
-        <button class="lang-toggle" onclick="togglePrintLanguage()" title="Sprache des Dokuments wechseln">🌐 ${state.printLanguage === "de" ? "DE" : "EN"}</button>
         ${canShare ? `<button onclick="shareDocument('${id}')" title="Dokument direkt per Mail / WhatsApp / AirDrop teilen">📤 Teilen</button>` : ""}
+        ${canShare && hasAttachments && attCount > 0 ? `<button onclick="downloadDocBundle('${id}')" title="Dokument + alle Belege als ZIP-Datei herunterladen">📦 ZIP mit Belegen</button>` : ""}
         <button onclick="confirmAndPrint()">🖨 Drucken / als PDF</button>
       </div>
     </div>
