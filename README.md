@@ -42,6 +42,37 @@ Alle Briefe füllen sich automatisch mit deinen Stammdaten und Dokumenten-Inhalt
 
 ---
 
+## 🆚 Was unterscheidet diese App von anderen Lösungen?
+
+Eine kurze Recherche zur App-Landschaft im Bereich Bewährungshilfe zeigt eine klare Versorgungslücke – diese App füllt sie:
+
+### Was es bereits gibt
+- 🇩🇪 **Apps für Bewährungshelfer:innen** – Fall-Management-Software für die Sozialarbeiter:innen, nicht für Probanden
+- 🧠 **Spezialisierte Therapie-Programme** wie [@myTabu](https://kompetenz-gegen-missbrauch.de/mytabu/) – nur für eine sehr enge Zielgruppe (verurteilte Kindesmissbrauchstäter), mit therapeutischer Begleitung
+- 🇺🇸 **Internationale kommerzielle Tools** (Reconnect, Shadowtrack, MonitorConnect, eSupervision, AIR Verify, FinishProbation) – cloudbasiert, oft mit GPS-Tracking, Drogentest-Verwaltung, Zwangscheck-ins; primär Kontroll-Tools für Behörden
+- 🏛 **Baden-Württemberg-App** – seit Jahren in Entwicklung, nicht öffentlich verfügbar
+
+### Was es bisher NICHT gibt – und was diese App leistet
+
+| Eigenschaft | Diese App | Existierende Lösungen |
+|------------|-----------|----------------------|
+| **Zielgruppe** | Probanden selbst | Bewährungshelfer:innen / Behörden |
+| **Sprache** | Deutsch, deutsche Rechtsbegriffe | Englisch, US-Rechtssystem |
+| **Datenhaltung** | Lokal, kein Account | Cloud, Account-Zwang |
+| **Kosten** | Kostenlos, Open Source | Behörden-Lizenzen, Subscriptions |
+| **Zweck** | Selbsthilfe, Strukturierung | Kontrolle, Überwachung |
+| **Anschreiben** | 9 fertige Vorlagen mit StPO-Bezug | Keine |
+| **Paragraphen-Bezug** | §§ 459a, 459g StPO, § 111n StPO, § 465 StPO etc. | Allgemein / nicht zutreffend |
+| **Verfügbarkeit** | Sofort nutzbar, ohne Anmeldung | Behörde muss zustimmen |
+
+### Warum das wichtig ist
+
+Probanden haben oft **berechtigte Bedenken**, ihre persönlichen Daten Cloud-Diensten oder Behörden-Plattformen anzuvertrauen. Diese App ist bewusst so gebaut, dass **alle Daten ausschließlich auf dem eigenen Gerät** bleiben – kein Server, kein Account, keine Tracker. Damit ist sie ein echtes **Selbsthilfe-Werkzeug** statt eines Kontroll-Instruments.
+
+> 💡 **Quellen zur Recherche:** [DBH-Fachverband Übersicht "Apps in der Bewährungshilfe"](https://www.dbh-online.de/aktuelles/technisierung-der-bewaehrungshilfe-der-einsatz-von-apps-kurzer-uebersicht-0), Capterra, internationale Anbieter-Webseiten.
+
+---
+
 ## 📤 Dokumente versenden – mit Belegen
 
 In der Druckansicht jedes Dokuments stehen je nach Gerät verschiedene Versand-Optionen zur Verfügung:
@@ -161,6 +192,9 @@ cd bewaehrungshilfe
 ### Mitmachen
 Verbesserungs-Vorschläge, Bugs und Ideen gerne als [Issue](https://github.com/123ichbinmitdabei/bewaehrungshilfe/issues) – die App wurde aus der Praxis heraus entwickelt und lebt von echtem Nutzer-Feedback.
 
+### Für Bewährungshilfe-Stellen und Beratungseinrichtungen
+Wenn du in einer Bewährungshilfe-Stelle, Schuldnerberatung, Caritas/Diakonie oder vergleichbaren Einrichtung arbeitest und die App in deiner Beratung weitergeben möchtest: Sehr gerne! Die App ist kostenlos und für genau diesen Zweck gedacht. Bei Fragen oder Verbesserungsvorschlägen aus der Beratungspraxis melde dich über GitHub Issues – Praxis-Feedback ist sehr willkommen.
+
 ---
 
 ## 📄 Lizenz
@@ -173,7 +207,7 @@ Custom License – siehe [LICENSE](LICENSE).
 
 ## 🙏 Danksagung
 
-Diese App entsteht in Zusammenarbeit mit Praktiker:innen aus der Bewährungshilfe, mit Hilfe von KI-gestützter Entwicklung. Sie soll Menschen in einer schwierigen Lebensphase eine konkrete Erleichterung bieten.
+Diese App entsteht in Zusammenarbeit mit Praktiker:innen aus der Bewährungshilfe, mit Hilfe von KI-gestützter Entwicklung. Sie soll Menschen in einer schwierigen Lebensphase eine konkrete Erleichterung bieten – als Selbsthilfe-Werkzeug, nicht als Kontrollinstrument.
 
 Wenn du Feedback, Anregungen oder Verbesserungsvorschläge hast, melde dich gerne über GitHub Issues.
 
