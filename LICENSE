@@ -1,21 +1,109 @@
-MIT License
+Bewährungshilfe-Assistent — Nutzungslizenz
+===========================================
 
 Copyright (c) 2026 123ichbinmitdabei
+Alle Rechte vorbehalten.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+Diese Software (im Folgenden "die Software") wird unter den nachstehenden
+Bedingungen zur Verfügung gestellt. Mit dem Herunterladen, Nutzen,
+Installieren oder Vervielfältigen der Software stimmst du diesen
+Bedingungen zu.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+1. ERLAUBT IST
+---------------
+
+a) Die private, nicht-kommerzielle Nutzung der Software durch Einzelpersonen
+   für ihre persönlichen Belange (z.B. zur Organisation eigener
+   Bewährungs-Unterlagen).
+
+b) Die Weitergabe der unveränderten Software an Dritte zur
+   nicht-kommerziellen Nutzung, sofern diese Lizenz mitgeliefert wird und
+   der Copyright-Hinweis erhalten bleibt.
+
+c) Die nicht-kommerzielle Nutzung durch gemeinnützige Einrichtungen, die
+   Bewährungshilfe, Soziale Arbeit, Resozialisierung oder Rechtsberatung
+   leisten – sofern keine Gebühren für die Nutzung der Software selbst
+   erhoben werden.
+
+d) Die Anfertigung von Sicherungskopien für den persönlichen Gebrauch.
+
+
+2. AUSDRÜCKLICH UNTERSAGT IST
+------------------------------
+
+a) Jede kommerzielle Nutzung durch Dritte. "Kommerziell" bedeutet jede
+   Nutzung, die direkt oder indirekt auf einen geldwerten Vorteil
+   gerichtet ist – einschließlich, aber nicht beschränkt auf Verkauf,
+   Vermietung, kostenpflichtige Bereitstellung, Bündelung mit
+   kostenpflichtigen Diensten oder Werbefinanzierung. Das ausschließliche
+   Recht zur kommerziellen Nutzung verbleibt beim Urheber.
+
+b) Jede Modifikation der Software, die dazu geeignet ist, personenbezogene
+   Daten oder Nutzungsdaten von Anwendern zu sammeln, zu übertragen, zu
+   speichern oder an Dritte weiterzugeben. Dies umfasst insbesondere:
+
+   - Tracking-Skripte, Analytics, Telemetrie jeder Art
+   - Übertragung von Eingaben an externe Server (auch zu Backup-Zwecken,
+     ohne ausdrückliche, informierte Einwilligung der Endnutzer)
+   - Versteckte Datensammlung ("data exfiltration")
+   - Werbe-Identifier, Fingerprinting, Cookies zu Werbezwecken
+   - Integration mit Diensten Dritter, die Daten erheben, ohne dass
+     Endnutzer aktiv und informiert zustimmen können
+
+c) Die Entfernung oder Verschleierung von Hinweisen zu Datenschutz,
+   Lizenz, Urheberschaft oder Haftungsausschluss aus der Software oder
+   ihrer Dokumentation.
+
+d) Die Weiterverbreitung modifizierter Versionen ohne deutlichen Hinweis,
+   dass es sich um eine veränderte Fassung handelt, sowie ohne den
+   Originalverweis auf den Urheber.
+
+
+3. MODIFIKATIONEN UND BEITRÄGE
+-------------------------------
+
+Modifikationen für den persönlichen, nicht-kommerziellen Gebrauch sind
+zulässig, solange sie Punkt 2 nicht verletzen.
+
+Wer Änderungen an der Software einreicht (z.B. via Pull Request), erklärt
+sich damit einverstanden, dass diese Änderungen unter denselben
+Lizenzbedingungen veröffentlicht werden und der Urheber sie in zukünftige
+Versionen aufnehmen kann.
+
+
+4. KOMMERZIELLE LIZENZIERUNG
+-----------------------------
+
+Wer die Software kommerziell nutzen möchte, kann den Urheber unter der im
+Repository genannten Adresse kontaktieren, um eine separate kommerzielle
+Lizenz zu vereinbaren.
+
+
+5. HAFTUNGSAUSSCHLUSS
+----------------------
+
+DIE SOFTWARE WIRD "WIE BESEHEN" ZUR VERFÜGUNG GESTELLT, OHNE JEGLICHE
+GEWÄHRLEISTUNG, WEDER AUSDRÜCKLICH NOCH STILLSCHWEIGEND, EINSCHLIEßLICH,
+ABER NICHT BESCHRÄNKT AUF DIE GEWÄHRLEISTUNG DER MARKTGÄNGIGKEIT, DER
+EIGNUNG FÜR EINEN BESTIMMTEN ZWECK UND DER NICHTVERLETZUNG VON RECHTEN
+DRITTER.
+
+IN KEINEM FALL HAFTEN DIE AUTOREN ODER URHEBER FÜR JEGLICHE ANSPRÜCHE,
+SCHÄDEN ODER SONSTIGE VERPFLICHTUNGEN, OB IN EINER VERTRAGS- ODER
+HAFTUNGSKLAGE, EINER UNERLAUBTEN HANDLUNG ODER ANDERWEITIG, DIE SICH AUS
+ODER IN VERBINDUNG MIT DER SOFTWARE ODER DER NUTZUNG ODER ANDEREN
+GESCHÄFTEN MIT DER SOFTWARE ERGEBEN.
+
+Die Software ersetzt keine Rechtsberatung. Nutzer sind selbst dafür
+verantwortlich, ihre Daten zu sichern und zu schützen.
+
+
+6. SCHLUSSBESTIMMUNGEN
+-----------------------
+
+Sollte eine Bestimmung dieser Lizenz unwirksam sein, bleibt die Wirksamkeit
+der übrigen Bestimmungen unberührt. Es gilt deutsches Recht.
+
+Bei Fragen zur Lizenz: über die Issue-Funktion des Repositories oder die
+im Repository genannte Kontaktmöglichkeit.
