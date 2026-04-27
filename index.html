@@ -59,6 +59,35 @@
   [data-theme="dark"] .row-card { background: #0f172a; }
   [data-theme="dark"] .summary-card { background: linear-gradient(135deg, #1e3a5f, #1a2e4a); }
   [data-theme="dark"] .reset-btn { color: var(--danger); }
+  /* Dark Mode: btn-secondary darker so text bleibt lesbar */
+  [data-theme="dark"] .btn-secondary {
+    background: #334155;
+    color: var(--text);
+    border-color: #475569;
+  }
+  [data-theme="dark"] .btn-secondary:hover {
+    background: #475569;
+    border-color: #64748b;
+  }
+  [data-theme="dark"] .btn-secondary:disabled {
+    background: #1e293b;
+    color: var(--text-soft);
+  }
+  /* Dark Mode: skip-btn darker, sonst weiß auf dunkel */
+  [data-theme="dark"] .skip-btn {
+    background: #334155;
+    color: var(--text-soft);
+    border-color: #475569;
+  }
+  [data-theme="dark"] .skip-btn:hover {
+    background: #475569;
+    color: var(--text);
+  }
+  /* Dark Mode: print-toolbar buttons */
+  [data-theme="dark"] .print-toolbar button {
+    background: #334155;
+    color: var(--primary-light);
+  }
   /* Print view stays light always for consistent printing */
   [data-theme="dark"] .print-view { background: white; color: black; }
   html, body {
@@ -1239,8 +1268,226 @@ const DOCS = {
       ]},
       { id: "review", title: "Übersicht & Erstellen", icon: "✅", type: "review", fields: [] }
     ]
+  },
+  kosten: {
+    id: "kosten",
+    title: "Verfahrenskosten & Geldstrafe",
+    short: "Verfahrenskosten",
+    icon: "💸",
+    desc: "Tracker für Gerichtskosten, Geldstrafe, Anwaltskosten, Gutachterkosten und sonstige Verfahrenskosten – mit Zahlungsverlauf, Antragsstatus und Restbetrag.",
+    storageKey: "kosten_wizard_v1",
+    sections: [
+      { id: "personal", title: "Persönliche Angaben", icon: "👤", type: "info",
+        hint: "Felder mit 🔗 werden automatisch zwischen allen Dokumenten geteilt.",
+        fields: [
+          { id: "name", label: "Name, Vorname", type: "text", shared: true },
+          { id: "geburtsdatum", label: "Geburtsdatum", type: "date", shared: true },
+          { id: "anschrift", label: "Anschrift", type: "text", shared: true },
+          { id: "telefon", label: "Telefon", type: "text", shared: true },
+          { id: "email", label: "E-Mail", type: "text", shared: true },
+        ]
+      },
+      { id: "verfahren", title: "Verfahrensdaten", icon: "⚖️", type: "info",
+        hint: "Daten zum Strafverfahren, das die Kosten ausgelöst hat. Wichtig: Aktenzeichen unbedingt erfassen - jede Behörde nutzt eines.",
+        fields: [
+          { id: "az_sta", label: "Aktenzeichen Staatsanwaltschaft", type: "text" },
+          { id: "az_gericht", label: "Aktenzeichen Gericht", type: "text" },
+          { id: "az_landesjustizkasse", label: "Kassenzeichen Landesjustizkasse", type: "text", placeholder: "Findet sich auf dem Kostenbescheid" },
+          { id: "behoerde_sta", label: "Zuständige Staatsanwaltschaft", type: "text", placeholder: "z.B. Staatsanwaltschaft Frankfurt am Main" },
+          { id: "behoerde_sta_anschrift", label: "Anschrift StA", type: "textarea" },
+          { id: "behoerde_kasse", label: "Zuständige Landesjustizkasse / Gerichtskasse", type: "text", placeholder: "z.B. Landesjustizkasse Hessen" },
+          { id: "behoerde_kasse_anschrift", label: "Anschrift Landesjustizkasse", type: "textarea" },
+          { id: "urteilsdatum", label: "Datum des Urteils / Strafbefehls", type: "date" },
+          { id: "rechtskraft_datum", label: "Datum der Rechtskraft", type: "date" },
+          { id: "tatvorwurf", label: "Tatvorwurf / Verurteilung wegen", type: "textarea", placeholder: "z.B. Verurteilung wegen ..." },
+          { id: "rechtsgrundlage_kosten", label: "Rechtsgrundlage Kostentragung", type: "text", placeholder: "i.d.R. § 465 StPO" },
+        ]
+      },
+      { id: "geldstrafe", title: "Geldstrafe", icon: "⚖️", type: "info",
+        hint: "Geldstrafe = Tagessätze × Höhe pro Tagessatz. Wird von der Staatsanwaltschaft (nicht Landesjustizkasse) verwaltet. Bei Nicht-Zahlung droht Ersatzfreiheitsstrafe (1 Tagessatz = 1 Tag Haft).",
+        fields: [
+          { id: "anzahl_tagessaetze", label: "Anzahl Tagessätze", type: "text", placeholder: "z.B. 90" },
+          { id: "hoehe_tagessatz", label: "Höhe pro Tagessatz (€)", type: "text", placeholder: "z.B. 30,00" },
+          { id: "betrag_gesamt", label: "Geldstrafe gesamt (€)", type: "text", placeholder: "automatisch: Tagessätze × Höhe" },
+          { id: "frist_zahlung", label: "Zahlungsfrist", type: "date" },
+          { id: "rechnung_jukos", label: "JUKOS-Rechnungsnummer", type: "text", placeholder: "Findet sich auf der Rechnung der StA" },
+          { id: "ratenzahlung_bewilligt", label: "Ratenzahlung bewilligt?", type: "text", placeholder: "Ja / Nein - falls ja: Ratenhöhe + Datum erste Rate" },
+          { id: "rate_hoehe", label: "Höhe der Rate (€ pro Monat)", type: "text" },
+          { id: "rate_erste", label: "Erste Rate fällig", type: "date" },
+          { id: "gemeinnuetzige_arbeit", label: "Gemeinnützige Arbeit statt Geldstrafe?", type: "text", placeholder: "Ja / Nein - bei Ja: Anzahl Stunden, Status" },
+          { id: "ersatzfreiheit", label: "Ersatzfreiheitsstrafe drohend?", type: "text", placeholder: "Ja / Nein - falls Geldstrafe nicht zahlbar" },
+        ]
+      },
+      { id: "gerichtskosten", title: "Gerichtskosten", icon: "🏛", type: "info",
+        hint: "Gerichtskosten umfassen Gebühren nach GKG + Auslagen. Werden von der Landesjustizkasse / Gerichtskasse eingezogen, NICHT von der Staatsanwaltschaft.",
+        fields: [
+          { id: "gebuehren", label: "Gerichtsgebühren (€)", type: "text", placeholder: "Anlage 1 GKG, je nach Strafe" },
+          { id: "auslagen", label: "Auslagen (€)", type: "text", placeholder: "Zustellungen, Schreibauslagen etc." },
+          { id: "betrag_gesamt", label: "Gerichtskosten gesamt (€)", type: "text" },
+          { id: "frist_zahlung", label: "Zahlungsfrist", type: "date" },
+          { id: "kostenrechnung_datum", label: "Datum der Kostenrechnung", type: "date" },
+        ]
+      },
+      { id: "anwaltskosten", title: "Anwalts- & Verteidigerkosten", icon: "👔", type: "info",
+        hint: "Pflichtverteidiger werden vom Staat vorgestreckt, dann auf den Verurteilten umgelegt (RVG-Sätze). Wahlverteidiger müssen direkt selbst gezahlt werden - Honorar oft individuell vereinbart.",
+        fields: [
+          { id: "verteidiger_name", label: "Name Verteidiger:in", type: "text" },
+          { id: "verteidiger_kontakt", label: "Kontakt Verteidiger:in", type: "textarea" },
+          { id: "art_verteidigung", label: "Art der Verteidigung", type: "text", placeholder: "Pflichtverteidiger / Wahlverteidiger" },
+          { id: "rvg_kosten", label: "Pflichtverteidiger-Kosten (RVG, €)", type: "text", placeholder: "werden vom Staat umgelegt" },
+          { id: "wahlverteidiger_kosten", label: "Wahlverteidiger-Honorar (€)", type: "text", placeholder: "selbst zu zahlen" },
+          { id: "honorarvereinbarung", label: "Honorarvereinbarung getroffen?", type: "text", placeholder: "Ja / Nein - bei Ja: Pauschale, Stundenhonorar, Erfolgshonorar etc." },
+          { id: "rechtsschutz", label: "Rechtsschutzversicherung übernimmt Kosten?", type: "text", placeholder: "Hinweis: Strafrechtsschutz greift in der Regel NICHT bei vorsätzlichen Straftaten" },
+        ]
+      },
+      { id: "weitere_kosten", title: "Weitere Kosten", icon: "📋", type: "rows",
+        hint: "Sonstige Kosten: Gutachterkosten, Sachverständige, Zeugenauslagen, Dolmetscher, Nebenklage-Anwalt etc. Bei umfangreichen Verfahren können diese sehr hoch werden.",
+        columns: [
+          { id: "art", label: "Art", placeholder: "z.B. Gutachten, Sachverständiger, Dolmetscher, Zeugenauslagen" },
+          { id: "beschreibung", label: "Beschreibung", placeholder: "z.B. Datenforensisches Gutachten zum Mobiltelefon" },
+          { id: "betrag", label: "Betrag (€)", placeholder: "z.B. 13.682,18" },
+          { id: "rechnungsdatum", label: "Datum Rechnung", placeholder: "TT.MM.JJJJ" },
+          { id: "empfaenger", label: "Empfänger / Auftraggeber", placeholder: "z.B. Landesjustizkasse Hessen" },
+          { id: "status", label: "Status", placeholder: "offen / Antrag gestellt / Ratenzahlung bewilligt / bezahlt" },
+        ],
+        hasAttachments: true
+      },
+      { id: "zahlungen", title: "Zahlungsverlauf", icon: "💰", type: "rows",
+        hint: "Trage hier alle geleisteten Zahlungen ein - egal ob für Geldstrafe, Gerichtskosten oder Anwalt. Mit Belegen kannst du immer nachweisen, was bereits gezahlt wurde.",
+        columns: [
+          { id: "datum", label: "Datum", placeholder: "TT.MM.JJJJ" },
+          { id: "betrag", label: "Betrag (€)", placeholder: "z.B. 200,00" },
+          { id: "verwendungszweck", label: "Verwendungszweck", placeholder: "z.B. Geldstrafe Rate 3, Gerichtskosten" },
+          { id: "empfaenger", label: "Empfänger", placeholder: "z.B. Staatsanwaltschaft FFM, Landesjustizkasse Hessen" },
+          { id: "az_zahlung", label: "Aktenzeichen / Kassenzeichen", placeholder: "Verwendungszweck der Zahlung" },
+          { id: "bemerkung", label: "Bemerkung", placeholder: "z.B. Überweisung von Konto X" },
+        ],
+        hasAttachments: true
+      },
+      { id: "antraege", title: "Anträge & Status", icon: "📨", type: "info",
+        hint: "Hier kannst du gestellte Anträge dokumentieren - z.B. Ratenzahlung, Stundung, Erlass, Antrag auf gemeinnützige Arbeit.",
+        fields: [
+          { id: "ratenzahlung_datum", label: "Antrag Ratenzahlung gestellt am", type: "date" },
+          { id: "ratenzahlung_status", label: "Status Ratenzahlungs-Antrag", type: "text", placeholder: "eingereicht / bewilligt mit ___ €/Monat / abgelehnt / Bearbeitung" },
+          { id: "stundung_datum", label: "Antrag Stundung gestellt am", type: "date" },
+          { id: "stundung_status", label: "Status Stundungs-Antrag", type: "text", placeholder: "eingereicht / bewilligt bis ___ / abgelehnt" },
+          { id: "erlass_datum", label: "Antrag Erlass / Niederschlagung gestellt am", type: "date" },
+          { id: "erlass_status", label: "Status Erlass-Antrag", type: "text", placeholder: "eingereicht / bewilligt / abgelehnt - selten erfolgreich, nur bei Härtefall" },
+          { id: "schuldnerberatung", label: "Schuldnerberatung kontaktiert?", type: "text", placeholder: "z.B. Diakonie ___, Caritas ___ - kostenlos" },
+          { id: "schuldnerberatung_kontakt", label: "Kontakt Schuldnerberatung", type: "textarea" },
+        ]
+      },
+      { id: "anmerkung", title: "Anmerkungen", icon: "✍️", type: "freetext", fields: [
+        { id: "notes", label: "Sonstige Notizen, Korrespondenz-Verlauf, Termine", type: "textarea",
+          placeholder: "z.B. „Nachweis über Einkommen für Ratenantrag fehlt noch“, „Wartefrist auf Antwort StA: 4 Wochen“ ..." }
+      ]},
+      { id: "review", title: "Übersicht & Erstellen", icon: "✅", type: "review", fields: [] }
+    ]
+  },
+  asservate: {
+    id: "asservate",
+    title: "Beweismittel & Asservate",
+    short: "Asservate",
+    icon: "📦",
+    desc: "Dokumentation aller Gegenstände, die im Rahmen einer Hausdurchsuchung oder Beschlagnahme mitgenommen wurden. Hilft beim Antrag auf Herausgabe (§ 111n StPO).",
+    storageKey: "asservate_wizard_v1",
+    sections: [
+      { id: "personal", title: "Persönliche Angaben", icon: "👤", type: "info",
+        hint: "Felder mit 🔗 werden automatisch zwischen allen Dokumenten geteilt.",
+        fields: [
+          { id: "name", label: "Name, Vorname", type: "text", shared: true },
+          { id: "geburtsdatum", label: "Geburtsdatum", type: "date", shared: true },
+          { id: "anschrift", label: "Anschrift", type: "text", shared: true },
+          { id: "telefon", label: "Telefon", type: "text", shared: true },
+          { id: "email", label: "E-Mail", type: "text", shared: true },
+        ]
+      },
+      { id: "verfahren", title: "Verfahrensdaten", icon: "⚖️", type: "info",
+        hint: "Diese Angaben findest du auf dem Beschlagnahme-Protokoll oder anderen Schreiben der Behörden. Wichtig für jeden Antrag auf Herausgabe.",
+        fields: [
+          { id: "az_sta", label: "Aktenzeichen Staatsanwaltschaft", type: "text" },
+          { id: "az_polizei", label: "Aktenzeichen Polizei (falls vorhanden)", type: "text" },
+          { id: "az_gericht", label: "Aktenzeichen Gericht (falls vorhanden)", type: "text" },
+          { id: "behoerde", label: "Zuständige Staatsanwaltschaft", type: "text", placeholder: "z.B. Staatsanwaltschaft Frankfurt am Main" },
+          { id: "behoerde_anschrift", label: "Anschrift der Staatsanwaltschaft", type: "textarea" },
+          { id: "sachbearbeiter", label: "Sachbearbeiter:in (falls bekannt)", type: "text" },
+          { id: "rechtsgrundlage", label: "Rechtsgrundlage (falls aus Protokoll bekannt)", type: "text", placeholder: "z.B. § 94 StPO, § 111b StPO" },
+          { id: "vorwurf", label: "Tatvorwurf (Kurzbeschreibung)", type: "textarea", placeholder: "z.B. Verdacht auf ..." },
+          { id: "verfahrensstand", label: "Aktueller Verfahrensstand", type: "text", placeholder: "z.B. Ermittlungsverfahren / Anklage erhoben / Hauptverhandlung / rechtskräftig abgeschlossen / eingestellt" },
+        ]
+      },
+      { id: "durchsuchung", title: "Durchsuchung / Beschlagnahme", icon: "🔍", type: "info",
+        hint: "Details zur durchgeführten Maßnahme. Diese Angaben können später wichtig werden - z.B. zur Prüfung der Rechtmäßigkeit der Maßnahme.",
+        fields: [
+          { id: "datum", label: "Datum der Durchsuchung/Beschlagnahme", type: "date" },
+          { id: "uhrzeit_beginn", label: "Uhrzeit Beginn", type: "text", placeholder: "z.B. 06:30" },
+          { id: "uhrzeit_ende", label: "Uhrzeit Ende", type: "text", placeholder: "z.B. 09:45" },
+          { id: "ort", label: "Ort", type: "text", placeholder: "z.B. eigene Wohnung, Anschrift" },
+          { id: "beschluss_datum", label: "Datum des Durchsuchungsbeschlusses", type: "date" },
+          { id: "beschluss_gericht", label: "Erlassendes Gericht", type: "text", placeholder: "z.B. Amtsgericht Frankfurt am Main" },
+          { id: "beschluss_az", label: "Aktenzeichen Beschluss", type: "text" },
+          { id: "gefahr_im_verzug", label: "Bei Gefahr im Verzug (ohne Beschluss)?", type: "text", placeholder: "Ja / Nein - bei „Ja“ eintragen, wer die Maßnahme angeordnet hat" },
+          { id: "anzahl_beamte", label: "Anzahl der Beamten", type: "text", placeholder: "z.B. 5" },
+          { id: "namen_beamte", label: "Namen / Dienstnummern / Dienststellen der Beamten", type: "textarea", placeholder: "Soweit notiert oder erinnerlich" },
+          { id: "leiter_einsatz", label: "Einsatzleiter:in", type: "text" },
+          { id: "zeugen", label: "Anwesende Zeugen", type: "textarea", placeholder: "Wer war anwesend? Eigene Zeugen, Nachbarn, ..." },
+          { id: "widerspruch", label: "Widerspruch eingelegt?", type: "text", placeholder: "Ja / Nein - falls ja, gegen welche Maßnahmen (z.B. Mitnahme bestimmter Gegenstände)" },
+          { id: "widerspruch_protokolliert", label: "Widerspruch im Protokoll vermerkt?", type: "text", placeholder: "Ja / Nein / unklar" },
+          { id: "schaeden", label: "Entstandene Schäden", type: "textarea", placeholder: "z.B. aufgebrochene Tür, beschädigte Möbel, ..." },
+          { id: "ablauf", label: "Ablauf / Auffälligkeiten", type: "textarea", placeholder: "Gedächtnisprotokoll: was ist passiert? Auffälligkeiten? Wurden Rechte erläutert? Was wurde gefragt?" },
+        ]
+      },
+      { id: "gegenstaende", title: "Beschlagnahmte Gegenstände", icon: "📋", type: "rows",
+        hint: "Liste alle mitgenommenen Gegenstände möglichst detailliert auf. Je genauer die Beschreibung (Marke, Modell, Seriennummer), desto eindeutiger ist die spätere Zuordnung. Belege wie Kaufquittungen, Garantiekarten und Fotos kannst du anhängen - sie dienen als Eigentumsnachweis.",
+        columns: [
+          { id: "bezeichnung", label: "Bezeichnung / Beschreibung", placeholder: "z.B. Mobiltelefon Apple iPhone 13" },
+          { id: "marke", label: "Marke / Hersteller" },
+          { id: "modell", label: "Modell / Typ" },
+          { id: "seriennr", label: "Seriennummer / IMEI" },
+          { id: "farbe", label: "Farbe / Merkmale" },
+          { id: "fundort", label: "Fundort", placeholder: "z.B. Schreibtischschublade, Schlafzimmer" },
+          { id: "kaufpreis", label: "Kaufpreis (€)", placeholder: "z.B. 850,00" },
+          { id: "kaufdatum", label: "Kaufdatum", placeholder: "TT.MM.JJJJ" },
+          { id: "eigentuemer", label: "Eigentümer", placeholder: "z.B. ich, Partner:in, Familie - bei Mit-Eigentum wichtig" },
+          { id: "bemerkung", label: "Bemerkung / Widerspruch", placeholder: "z.B. enthält Familienfotos, dienstlich genutzt, gegen Mitnahme widersprochen" },
+          { id: "status", label: "Status", placeholder: "beschlagnahmt / Antrag gestellt / zurückerhalten am ... / eingezogen / vernichtet" },
+        ],
+        hasAttachments: true
+      },
+      { id: "antrag", title: "Antragsdaten", icon: "📨", type: "info",
+        hint: "Hier kannst du Status und Verlauf von Herausgabe-Anträgen dokumentieren. Diese Daten werden im Anschreiben „Antrag auf Herausgabe“ mitverwendet.",
+        fields: [
+          { id: "antrag_datum", label: "Datum des letzten Antrags", type: "date" },
+          { id: "antrag_versendet", label: "Versendet per", type: "text", placeholder: "z.B. Einschreiben mit Rückschein, Fax, persönlich abgegeben" },
+          { id: "rueckmeldung_datum", label: "Datum der Rückmeldung", type: "date" },
+          { id: "rueckmeldung_inhalt", label: "Inhalt der Rückmeldung", type: "textarea", placeholder: "z.B. „Herausgabe nach Verfahrensende in Aussicht gestellt“, „abgelehnt mit Begründung ...“, ..." },
+          { id: "anwalt", label: "Anwalt/Anwältin (falls beauftragt)", type: "text" },
+          { id: "anwalt_kontakt", label: "Kontakt Anwalt/Anwältin", type: "textarea" },
+        ]
+      },
+      { id: "schaden", title: "Schadensersatz (StrEG)", icon: "💰", type: "info",
+        hint: "Wenn das Verfahren zu deinen Gunsten endet (Freispruch, Einstellung), kannst du nach dem Strafrechtsentschädigungsgesetz (StrEG) Schadensersatz für entstandene Schäden geltend machen. Dazu auch Kosten für aufgebrochene Türen, beschädigtes Mobiliar etc.",
+        fields: [
+          { id: "schaeden_uebersicht", label: "Übersicht entstandener Schäden", type: "textarea", placeholder: "z.B. aufgebrochene Tür, beschädigte Schublade, zerbrochenes Geschirr ..." },
+          { id: "schaeden_betrag", label: "Geschätzter Gesamtbetrag (€)", type: "text" },
+          { id: "rechtsschutz", label: "Rechtsschutzversicherung vorhanden?", type: "text", placeholder: "z.B. Nein / Ja, Anbieter: ..." },
+          { id: "antrag_streg_datum", label: "Datum Antrag nach StrEG (falls gestellt)", type: "date" },
+          { id: "antrag_streg_status", label: "Status StrEG-Antrag", type: "text", placeholder: "z.B. eingereicht / bewilligt / abgelehnt / in Bearbeitung" },
+        ]
+      },
+      { id: "anmerkung", title: "Anmerkungen", icon: "✍️", type: "freetext", fields: [
+        { id: "notes", label: "Sonstige Notizen, Beobachtungen, Korrespondenz-Verlauf", type: "textarea",
+          placeholder: "z.B. „Beim Abholen der Gegenstände auf Vollständigkeit prüfen“, „Foto-Kopien der Beschlagnahmungs-Liste mitbringen“, ..." }
+      ]},
+      { id: "review", title: "Übersicht & Erstellen", icon: "✅", type: "review", fields: [] }
+    ]
   }
 };
+
+// Reihenfolge der Kacheln auf der Startseite - logisch nach Häufigkeit der Nutzung sortiert
+// 1. Übersicht (Deckblatt) → 2. BH-Termine (häufig) → 3. EAR (Standard-Pflicht) → 4-7. Auflagen + Verfahrenskosten
+// → 8. Zeitstrahl (Stammdaten) → 9. Asservate (Sonderfall)
+const DOC_ORDER = ["uebersicht", "bhtermine", "ear", "schadens", "kosten", "sozial", "thera", "zeit", "asservate"];
 
 // Shared fields mapping: which fields share data across documents.
 // Key format: "secId.fieldId" → shared key
@@ -1293,6 +1540,20 @@ const SHARED_FIELD_MAP = {
     "personal.geburtsdatum": "geburtsdatum",
     "personal.aktenzeichen": "aktenzeichen",
     "personal.bewaehrungshelfer": "bewaehrungshelfer",
+  },
+  asservate: {
+    "personal.name": "name",
+    "personal.geburtsdatum": "geburtsdatum",
+    "personal.anschrift": "anschrift",
+    "personal.telefon": "telefon",
+    "personal.email": "email",
+  },
+  kosten: {
+    "personal.name": "name",
+    "personal.geburtsdatum": "geburtsdatum",
+    "personal.anschrift": "anschrift",
+    "personal.telefon": "telefon",
+    "personal.email": "email",
   }
 };
 const SHARED_STORAGE_KEY = "bh_shared_v1";
@@ -1348,7 +1609,9 @@ let state = {
     schadens: { answers: {}, currentIdx: 0, rows: {}, attachments: {} },
     sozial: { answers: {}, currentIdx: 0, rows: {}, attachments: {} },
     uebersicht: { answers: {}, currentIdx: 0 },
-    bhtermine: { answers: {}, currentIdx: 0, rows: {} }
+    bhtermine: { answers: {}, currentIdx: 0, rows: {} },
+    kosten: { answers: {}, currentIdx: 0, rows: {}, attachments: {} },
+    asservate: { answers: {}, currentIdx: 0, rows: {}, attachments: {} }
   }
 };
 let saveStatus = "saved"; // "saved" | "saving" | "error"
@@ -2103,7 +2366,7 @@ let showArchived = false;
 function toggleShowArchived() { showArchived = !showArchived; render(); }
 
 // === VERSION INFO ===
-const APP_VERSION = "v3.0";
+const APP_VERSION = "v3.5";
 
 // === ONBOARDING ===
 let onboardingActive = false;
@@ -3079,7 +3342,12 @@ function attachAutoFormatListeners() {
 function renderHome() {
   let cards = "";
   let archivedCount = 0;
-  Object.values(DOCS).forEach(doc => {
+  // Iterate in custom display order (häufig genutzte oben, Spezial-Themen unten)
+  // Falls neue Docs hinzugefügt werden ohne in DOC_ORDER zu stehen, kommen sie ans Ende
+  const orderedDocIds = [...DOC_ORDER, ...Object.keys(DOCS).filter(id => !DOC_ORDER.includes(id))];
+  orderedDocIds.forEach(docId => {
+    const doc = DOCS[docId];
+    if (!doc) return; // safety: skip if id is in DOC_ORDER but not in DOCS
     const docArchived = isArchived(doc.id);
     if (docArchived) archivedCount++;
     if (docArchived !== showArchived) return; // skip if doesn't match filter
@@ -3362,7 +3630,7 @@ function renderHome() {
       </div>
       <h1>📁 Bewährungshilfe-Assistent</h1>
       <p>Strukturierte Vorlagen für deine Bewährungshelferin. Klick auf eine Karte, um zu starten - du kannst jederzeit pausieren und später weitermachen.</p>
-      <div style="margin-top:14px; font-size:12px; color:var(--text-soft);">${localInfo} · <span style="opacity:0.7;">App ${APP_VERSION}</span></div>
+      <div style="margin-top:14px; font-size:12px; color:var(--text-soft);">${localInfo} · <span style="opacity:0.85; padding:1px 8px; background:var(--primary-soft); border-radius:999px; color:var(--primary); font-weight:600;" title="App-Version – nützlich für Support-Anfragen">${APP_VERSION}</span></div>
       ${renderTodayOverview()}
       ${bewProgress}
       ${calBtn}
@@ -3398,16 +3666,59 @@ function renderHelpView() {
       <h2 style="color:var(--primary); font-size:18px; margin-bottom:10px;">📁 Was ist das?</h2>
       <p>Eine Sammlung von Vorlagen für die wichtigsten Dokumente, die du als Bewährungsproband:in brauchst. Alles läuft <strong>komplett in deinem Browser</strong> – kein Server, keine Anmeldung, keine Datenübertragung. Deine Daten bleiben auf deinem Gerät.</p>
 
-      <h2 style="color:var(--primary); font-size:18px; margin:18px 0 10px;">📋 Die 7 Dokumente</h2>
+      <h2 style="color:var(--primary); font-size:18px; margin:18px 0 10px;">📋 Die 9 Dokumente</h2>
       <ul style="padding-left:20px;">
-        <li><strong>📋 Einnahmen-Ausgaben-Rechnung</strong> – komplette Finanzaufstellung</li>
-        <li><strong>📅 Zeitstrahl / Lebensverlauf</strong> – Wohnungen, Arbeit, Bildung, Therapie, Hilfen</li>
-        <li><strong>🧠 Therapie-Bestätigung</strong> – zum Ausfüllen durch Therapeut/in</li>
-        <li><strong>💶 Schadenswiedergutmachung</strong> – Tracker mit Zahlungsverlauf, Belegen, Fortschrittsberechnung</li>
-        <li><strong>🤝 Sozialstunden-Nachweis</strong> – Stundenliste zum Abstempeln durch Einrichtung</li>
         <li><strong>📊 Status-Übersicht</strong> – auto-generiert, ideal als Deckblatt</li>
         <li><strong>📞 BH-Termine & Gespräche</strong> – Termin-Tracker mit Vorbereitungs-Notizen</li>
+        <li><strong>📋 Einnahmen-Ausgaben-Rechnung</strong> – komplette Finanzaufstellung</li>
+        <li><strong>💶 Schadenswiedergutmachung</strong> – Tracker mit Zahlungsverlauf, Belegen, Fortschrittsberechnung</li>
+        <li><strong>💸 Verfahrenskosten & Geldstrafe</strong> – Tracker für Gerichtskosten, Geldstrafe, Anwalt + Anträge auf Ratenzahlung/Stundung</li>
+        <li><strong>🤝 Sozialstunden-Nachweis</strong> – Stundenliste zum Abstempeln durch Einrichtung</li>
+        <li><strong>🧠 Therapie-Bestätigung</strong> – zum Ausfüllen durch Therapeut/in</li>
+        <li><strong>📅 Zeitstrahl / Lebensverlauf</strong> – Wohnungen, Arbeit, Bildung, Therapie, Hilfen</li>
+        <li><strong>📦 Beweismittel & Asservate</strong> – Doku beschlagnahmter Gegenstände + Antrag auf Herausgabe (§ 111n StPO)</li>
       </ul>
+
+      <h2 style="color:var(--primary); font-size:18px; margin:18px 0 10px;">💸 Verfahrenskosten & Geldstrafe – wie funktioniert das?</h2>
+      <p>Nach einer Verurteilung musst du als Verurteilter grundsätzlich die <strong>Kosten des Verfahrens</strong> tragen (§ 465 StPO). Dieses Dokument hilft dir, alle Kosten und Zahlungen im Überblick zu behalten:</p>
+      <ul style="padding-left:20px;">
+        <li><strong>Geldstrafe</strong> – wird von der <strong>Staatsanwaltschaft</strong> verwaltet, mit JUKOS-Rechnung. Bei Nicht-Zahlung droht Ersatzfreiheitsstrafe (1 Tagessatz = 1 Tag Haft).</li>
+        <li><strong>Gerichtskosten</strong> – Gebühren + Auslagen, verwaltet von der <strong>Landesjustizkasse</strong> (nicht StA!)</li>
+        <li><strong>Anwaltskosten</strong> – Pflichtverteidiger nach RVG, Wahlverteidiger oft individuell vereinbart</li>
+        <li><strong>Weitere Kosten</strong> – Gutachter, Sachverständige, Dolmetscher (können hoch sein)</li>
+        <li><strong>Zahlungsverlauf</strong> – wer hat wann was bekommen, mit Belegen</li>
+        <li><strong>Anträge & Status</strong> – Ratenzahlung, Stundung, Erlass</li>
+      </ul>
+      <p><strong>💡 Wichtige Optionen bei finanzieller Belastung:</strong></p>
+      <ul style="padding-left:20px;">
+        <li><strong>Ratenzahlung</strong> (§ 459a StPO) – bei der StA für Geldstrafe, bei der Landesjustizkasse für Gerichtskosten. Brief-Vorlage in der App.</li>
+        <li><strong>Stundung</strong> (§§ 459a, 459g StPO) – wenn ein konkreter Geldzufluss in Sicht ist. Brief-Vorlage in der App.</li>
+        <li><strong>Erlass / Niederschlagung</strong> (§ 10 KostVfG) – nur in seltenen Härtefällen, schwer zu erreichen</li>
+        <li><strong>Gemeinnützige Arbeit</strong> – Alternative zur Geldstrafe</li>
+        <li><strong>Schuldnerberatung</strong> – kostenlos bei Caritas, Diakonie, Verbraucherzentrale</li>
+      </ul>
+      <p style="background:rgba(217, 119, 6, 0.08); padding:12px; border-radius:6px; font-size:13px;"><strong>⚖️ Wichtig:</strong> Diese App ist <strong>kein Ersatz für anwaltlichen Rat oder eine Schuldnerberatung</strong>. Bei größeren Beträgen, drohender Vollstreckung oder bei Härtefällen solltest du dir Hilfe holen. Die Brief-Vorlagen sind ein guter Startpunkt, ersetzen aber keine individuelle Beratung. <strong>Hinweis zur Verwechslungsgefahr:</strong> Die Schadenswiedergutmachung (eigenes Dokument) bezieht sich auf <em>Geldauflagen an Geschädigte oder gemeinnützige Einrichtungen</em>, nicht auf Verfahrenskosten / Geldstrafe.</p>
+
+      <h2 style="color:var(--primary); font-size:18px; margin:18px 0 10px;">📦 Beweismittel & Asservate – wie funktioniert das?</h2>
+      <p>Wenn bei einer Hausdurchsuchung oder Beschlagnahme Gegenstände mitgenommen wurden, kannst du diese hier <strong>strukturiert dokumentieren</strong>:</p>
+      <ul style="padding-left:20px;">
+        <li><strong>Verfahrensdaten</strong>: Aktenzeichen, zuständige Staatsanwaltschaft, Tatvorwurf, Verfahrensstand</li>
+        <li><strong>Durchsuchung / Beschlagnahme</strong>: Datum, Uhrzeit, Beschluss-Daten, Anzahl/Namen der Beamten, anwesende Zeugen, Widerspruch, entstandene Schäden, Gedächtnisprotokoll zum Ablauf</li>
+        <li><strong>Liste der Gegenstände</strong>: Bezeichnung, Marke, Modell, Seriennummer, Fundort, Eigentümer, Kaufpreis, Status – mit Foto-Belegen</li>
+        <li><strong>Antragsverlauf</strong>: wann wurde was bei wem beantragt, welche Rückmeldung kam, Anwaltskontakt</li>
+        <li><strong>Schadensersatz (StrEG)</strong>: Falls das Verfahren zu deinen Gunsten endet (Freispruch, Einstellung), kannst du nach dem Strafrechtsentschädigungsgesetz Ersatz für Schäden beantragen</li>
+      </ul>
+      <p><strong>💡 Praktische Tipps direkt nach einer Hausdurchsuchung:</strong></p>
+      <ul style="padding-left:20px;">
+        <li><strong>Beschlagnahme-Protokoll fotografieren</strong> - du hast Anspruch darauf (§ 107 StPO)</li>
+        <li><strong>Gedächtnisprotokoll schreiben</strong> - Details vergisst man schneller als man denkt</li>
+        <li><strong>Schäden fotografieren</strong> - aufgebrochene Türen, beschädigte Möbel etc.</li>
+        <li><strong>Kaufbelege sammeln</strong> - aus E-Mails, Online-Shops, Garantiekarten</li>
+        <li><strong>Wenn Widerspruch eingelegt wurde</strong>: prüfen, ob er im Protokoll vermerkt ist</li>
+      </ul>
+      <p>Wenn du die Daten erfasst hast, kannst du im Bereich „✉️ Briefe" das Anschreiben <strong>„Antrag auf Herausgabe (§ 111n StPO)"</strong> nutzen. Die Liste der Gegenstände wird automatisch eingebaut – mit allen Details, die du erfasst hast.</p>
+      <p style="background:rgba(217, 119, 6, 0.08); padding:12px; border-radius:6px; font-size:13px;"><strong>⚖️ Wichtig:</strong> Diese App ist <strong>kein Ersatz für anwaltlichen Rat</strong>. Sie hilft dir, deine Daten zu organisieren und einen formal sauberen Antrag zu formulieren. Bei strittigen Fällen, drohender Einziehung oder Unklarheiten zur Rechtslage solltest du immer eine:n Strafverteidiger:in einschalten – die Staatsanwaltschaft selbst darf nicht rechtlich beraten (§ 6 Abs. 2 RDG).</p>
+      <p style="font-size:13px; color:var(--text-soft);">Die Herausgabe richtet sich nach § 111n StPO. Im laufenden Verfahren ist eine Herausgabe in der Regel nur möglich, wenn die Voraussetzungen offenkundig sind (§ 111n Abs. 4 StPO). Sonst erfolgt die Herausgabe meist erst nach rechtskräftigem Verfahrensende.</p>
 
       <h2 style="color:var(--primary); font-size:18px; margin:18px 0 10px;">🖥 Welches Gerät nutzt du?</h2>
       <p style="font-size:13px; color:var(--text-soft);">Die App läuft auf <strong>jedem Gerät mit modernem Browser</strong>. Klick auf dein Gerät:</p>
@@ -3569,6 +3880,20 @@ function renderHelpView() {
       <h2 style="color:var(--primary); font-size:18px; margin:18px 0 10px;">📦 Belege verwalten</h2>
       <p>Wenn der Speicher knapp wird (gelbe/rote Anzeige): über „📦 Belege verwalten" siehst du alle Belege sortiert nach Größe und kannst die größten zuerst löschen. Vorher unbedingt sichern!</p>
 
+      <h2 style="color:var(--primary); font-size:18px; margin:18px 0 10px;">🔗 Diese App weiterempfehlen</h2>
+      <p>Falls du die App jemand anderem zeigen willst (z.B. deiner Bewährungshelferin oder anderen Bewährungs-Proband:innen):</p>
+      <div style="background:var(--bg); border-radius:10px; padding:14px; margin:10px 0;">
+        <div style="font-size:12px; color:var(--text-soft); text-transform:uppercase; letter-spacing:.5px; margin-bottom:6px;">Aktueller App-Link:</div>
+        <div id="app-url-display" style="font-family:monospace; font-size:13px; padding:8px 10px; background:var(--card); border:1px solid var(--border); border-radius:6px; word-break:break-all; margin-bottom:10px;">${typeof window !== 'undefined' && window.location ? window.location.href.split('#')[0].split('?')[0] : 'https://123ichbinmitdabei.github.io/bewaehrungshilfe/'}</div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button class="btn btn-secondary" onclick="copyAppUrl()">📋 Link kopieren</button>
+          <button class="btn btn-secondary" onclick="generateQrCode()">📲 QR-Code anzeigen</button>
+          <button class="btn btn-secondary" onclick="shareAppUrl()" id="share-app-btn">📤 Teilen</button>
+        </div>
+        <div id="qr-code-container" style="margin-top:14px; display:none; text-align:center;"></div>
+      </div>
+      <p style="font-size:13px; color:var(--text-soft);">Tipp: Mit „📲 QR-Code anzeigen" wird ein QR-Code generiert, den andere mit der Handy-Kamera scannen können.</p>
+
       <h2 style="color:var(--primary); font-size:18px; margin:18px 0 10px;">🔒 Datenschutz</h2>
       <p>Die App läuft komplett offline und sendet nichts an irgendeinen Server. Einzige Ausnahme: wenn du <strong>„📄 Word-Dokument erstellen"</strong> nutzt, wird einmal die docx-Bibliothek von einem öffentlichen CDN geladen (cdnjs.cloudflare.com). Deine eingegebenen Daten verlassen dabei trotzdem nie dein Gerät.</p>
 
@@ -3577,6 +3902,65 @@ function renderHelpView() {
       </div>
     </div>
   `;
+}
+
+// === APP-URL TEILEN / QR-CODE ===
+function getCurrentAppUrl() {
+  if (typeof window === 'undefined' || !window.location) return 'https://123ichbinmitdabei.github.io/bewaehrungshilfe/';
+  // Strip hash and query, but keep path
+  return window.location.href.split('#')[0].split('?')[0];
+}
+function copyAppUrl() {
+  const url = getCurrentAppUrl();
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(() => showSaveToast("Link kopiert"));
+  } else {
+    // Fallback for older browsers
+    const ta = document.createElement('textarea');
+    ta.value = url;
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); showSaveToast("Link kopiert"); }
+    catch (e) { alert("Konnte nicht kopieren. Markiere und kopiere den Link manuell:\n\n" + url); }
+    document.body.removeChild(ta);
+  }
+}
+async function shareAppUrl() {
+  const url = getCurrentAppUrl();
+  if (navigator.share) {
+    try {
+      await navigator.share({
+        title: 'Bewährungshilfe-Assistent',
+        text: 'Eine App zur Vorbereitung von Bewährungshilfe-Terminen',
+        url: url
+      });
+    } catch (e) {
+      if (e.name !== 'AbortError') copyAppUrl();
+    }
+  } else {
+    copyAppUrl();
+  }
+}
+function generateQrCode() {
+  const url = getCurrentAppUrl();
+  const container = document.getElementById('qr-code-container');
+  if (!container) return;
+  if (container.style.display !== 'none' && container.innerHTML.includes('img')) {
+    container.style.display = 'none';
+    container.innerHTML = '';
+    return;
+  }
+  container.style.display = 'block';
+  // QR via api.qrserver.com - free service, no tracking
+  container.innerHTML = `<div style="padding: 14px; background: white; border-radius: 10px; display: inline-block;">
+    <div style="font-size:11px; color:#666; margin-bottom:8px;" id="qr-loading">Lade QR-Code...</div>
+    <img src="https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=10&data=${encodeURIComponent(url)}"
+      alt="QR-Code"
+      style="width:240px; height:240px; display:block; max-width:100%;"
+      onload="document.getElementById('qr-loading').style.display='none';"
+      onerror="this.parentElement.innerHTML='<div style=&quot;color:#dc2626; padding:14px; font-size:13px;&quot;>QR-Code konnte nicht geladen werden. Pr&uuml;fe deine Internetverbindung oder kopiere den Link manuell.</div>';" />
+    <div style="font-size:11px; color:#666; margin-top:8px; text-align:center;">Mit Handy-Kamera scannen, um die App zu &ouml;ffnen</div>
+  </div>`;
 }
 
 // === ANSCHREIBEN-GENERATOR ===
@@ -3610,6 +3994,313 @@ const ANSCHREIBEN_TEMPLATES = {
     desc: "Antrag bei guter Führung",
     empfaenger: ["gericht"],
     body: (d) => `${d.name ? d.name + "\n" : ""}${d.anschrift ? d.anschrift + "\n" : ""}${d.geb ? "Geboren am: " + d.geb + "\n" : ""}\n\nAn das zuständige Gericht\n(über die Bewährungshilfe ${d.bh || "____"})\n\nOrt, ${todayDE()}\n\nBetreff: Antrag auf Lockerung der Bewährungsauflagen\nAktenzeichen: ${d.az || "________"}\n\nSehr geehrte Damen und Herren,\n\nhiermit beantrage ich die Lockerung folgender mir auferlegter Bewährungsauflagen:\n\n• ____\n• ____\n\nBegründung:\n\nSeit Beginn meiner Bewährungszeit am ${d.bewBeginn || "____"} habe ich:\n\n• alle Termine bei der Bewährungshilfe wahrgenommen\n• die mir auferlegten Maßnahmen kontinuierlich erfüllt\n• ____\n• ____\n\nIch bitte daher um wohlwollende Prüfung meines Antrags.\n\nMit freundlichen Grüßen\n\n\n_____________________\n${d.name || "(Unterschrift)"}`,
+  },
+  herausgabe: {
+    title: "Antrag auf Herausgabe (§ 111n StPO)",
+    desc: "Antrag auf Rückgabe beschlagnahmter / sichergestellter Gegenstände an die Staatsanwaltschaft",
+    empfaenger: ["staatsanwaltschaft"],
+    body: (d) => {
+      // Build list of items from asservate doc, falling back to placeholder
+      const rows = (d.asservate_rows || []).filter(r => r.bezeichnung || r.seriennr || r.marke);
+      let liste = "";
+      if (rows.length > 0) {
+        liste = rows.map((r, i) => {
+          const parts = [];
+          if (r.bezeichnung) parts.push(r.bezeichnung);
+          if (r.marke) parts.push("Marke: " + r.marke);
+          if (r.modell) parts.push("Modell: " + r.modell);
+          if (r.seriennr) parts.push("Seriennr./IMEI: " + r.seriennr);
+          if (r.farbe) parts.push("Merkmale: " + r.farbe);
+          if (r.fundort) parts.push("Fundort: " + r.fundort);
+          if (r.eigentuemer) parts.push("Eigentümer: " + r.eigentuemer);
+          if (r.kaufdatum || r.kaufpreis) {
+            const k = [];
+            if (r.kaufdatum) k.push("Kaufdatum: " + r.kaufdatum);
+            if (r.kaufpreis) k.push("Kaufpreis: " + r.kaufpreis + " €");
+            parts.push(k.join(", "));
+          }
+          if (r.bemerkung) parts.push("Bemerkung: " + r.bemerkung);
+          return `${i+1}. ${parts.join("; ")}`;
+        }).join("\n");
+      } else {
+        liste = "1. ____ (Bezeichnung, Marke, Modell, Seriennummer)\n2. ____\n3. ____";
+      }
+
+      const empfaenger = d.behoerde
+        ? d.behoerde + (d.behoerde_anschrift ? "\n" + d.behoerde_anschrift : "")
+        : "An die zuständige Staatsanwaltschaft\n____\n____";
+
+      const azZeile = d.az_sta
+        ? "Aktenzeichen: " + d.az_sta
+        : "Aktenzeichen: ________";
+
+      const sachbearbeiterZeile = d.sachbearbeiter
+        ? "z.Hd. " + d.sachbearbeiter + "\n"
+        : "";
+
+      const beschlagnahmeKontext = d.datum_beschlagnahme || d.ort_beschlagnahme
+        ? `Im Rahmen der ${d.ort_beschlagnahme ? "in " + d.ort_beschlagnahme + " " : ""}durchgeführten Maßnahme${d.datum_beschlagnahme ? " vom " + d.datum_beschlagnahme : ""} wurden bei mir Gegenstände sichergestellt bzw. beschlagnahmt.`
+        : "Im Rahmen einer durchgeführten Maßnahme wurden bei mir Gegenstände sichergestellt bzw. beschlagnahmt.";
+
+      const kontaktZeilen = [
+        d.name,
+        d.anschrift,
+        d.geb ? "Geboren am: " + d.geb : "",
+        d.tel ? "Tel: " + d.tel : "",
+        d.email ? "E-Mail: " + d.email : "",
+      ].filter(Boolean).join("\n");
+
+      return `${kontaktZeilen}
+
+${sachbearbeiterZeile}${empfaenger}
+
+Ort, ${todayDE()}
+
+Betreff: Antrag auf Herausgabe sichergestellter / beschlagnahmter Gegenstände
+${azZeile}
+
+Sehr geehrte Damen und Herren,
+
+${beschlagnahmeKontext}
+
+Hiermit beantrage ich gemäß § 111n StPO die Herausgabe der folgenden Gegenstände, soweit diese für Zwecke des Strafverfahrens nicht mehr benötigt werden:
+
+${liste}
+
+Begründung:
+
+Die genannten Gegenstände stehen in meinem Eigentum bzw. waren in meinem rechtmäßigen Gewahrsam. Eigentumsnachweise (z.B. Kaufbelege, Garantiekarten) lege ich diesem Schreiben bei bzw. reiche ich auf Anforderung gerne nach.
+
+Ich bitte um Mitteilung, ob und wann eine Herausgabe erfolgen kann. Sollten einzelne Gegenstände aktuell noch für das Verfahren benötigt werden, bitte ich um Mitteilung, welche dies betrifft und für welchen voraussichtlichen Zeitraum.
+
+Falls Sie weitere Angaben oder Unterlagen benötigen, stehe ich Ihnen gerne zur Verfügung.
+
+Für Ihre Bemühungen bedanke ich mich im Voraus.
+
+Mit freundlichen Grüßen
+
+
+_____________________
+${d.name || "(Unterschrift)"}
+
+Anlagen:
+• Liste der beschlagnahmten Gegenstände (separat)
+• ggf. Eigentumsnachweise (Kaufbelege, Garantiekarten)
+• ggf. Kopie des Beschlagnahme-Protokolls`;
+    },
+  },
+  herausgabe_erinnerung: {
+    title: "Erinnerung / Sachstandsanfrage Herausgabe",
+    desc: "Nachfrage, wenn auf einen Herausgabe-Antrag länger keine Antwort kommt",
+    empfaenger: ["staatsanwaltschaft"],
+    body: (d) => {
+      const empfaenger = d.behoerde
+        ? d.behoerde + (d.behoerde_anschrift ? "\n" + d.behoerde_anschrift : "")
+        : "An die zuständige Staatsanwaltschaft\n____\n____";
+      const azZeile = d.az_sta ? "Aktenzeichen: " + d.az_sta : "Aktenzeichen: ________";
+      const sachbearbeiterZeile = d.sachbearbeiter ? "z.Hd. " + d.sachbearbeiter + "\n" : "";
+      const kontaktZeilen = [
+        d.name, d.anschrift,
+        d.tel ? "Tel: " + d.tel : "", d.email ? "E-Mail: " + d.email : "",
+      ].filter(Boolean).join("\n");
+
+      return `${kontaktZeilen}
+
+${sachbearbeiterZeile}${empfaenger}
+
+Ort, ${todayDE()}
+
+Betreff: Sachstandsanfrage zum Antrag auf Herausgabe
+${azZeile}
+
+Sehr geehrte Damen und Herren,
+
+am ____ habe ich einen Antrag auf Herausgabe der bei mir sichergestellten / beschlagnahmten Gegenstände gemäß § 111n StPO gestellt.
+
+Bislang habe ich hierzu keine Rückmeldung erhalten. Ich bitte höflich um Mitteilung, in welchem Verfahrensstand sich mein Antrag befindet, und um eine zeitnahe Bearbeitung.
+
+Ein Verzeichnis der betroffenen Gegenstände lege ich diesem Schreiben in Kopie nochmals bei.
+
+Für eine Rückmeldung bin ich Ihnen dankbar.
+
+Mit freundlichen Grüßen
+
+
+_____________________
+${d.name || "(Unterschrift)"}
+
+Anlagen:
+• Kopie des ursprünglichen Herausgabe-Antrags vom ____
+• Liste der beschlagnahmten Gegenstände`;
+    },
+  },
+  kosten_ratenzahlung: {
+    title: "Antrag auf Ratenzahlung (Verfahrenskosten / Geldstrafe)",
+    desc: "Antrag auf Ratenzahlung an Staatsanwaltschaft oder Landesjustizkasse - mit Begründung und Vorschlag zur Ratenhöhe",
+    empfaenger: ["staatsanwaltschaft", "landesjustizkasse"],
+    body: (d) => {
+      // Empfänger bevorzugt StA (für Geldstrafe), sonst Landesjustizkasse
+      const empfaenger = d.k_behoerde_sta
+        ? d.k_behoerde_sta + (d.k_behoerde_sta_anschrift ? "\n" + d.k_behoerde_sta_anschrift : "")
+        : (d.k_behoerde_kasse
+            ? d.k_behoerde_kasse + (d.k_behoerde_kasse_anschrift ? "\n" + d.k_behoerde_kasse_anschrift : "")
+            : "An die zuständige Staatsanwaltschaft / Landesjustizkasse\n____\n____");
+
+      const azZeilen = [];
+      if (d.k_az_sta) azZeilen.push("Aktenzeichen StA: " + d.k_az_sta);
+      if (d.k_az_gericht) azZeilen.push("Aktenzeichen Gericht: " + d.k_az_gericht);
+      if (d.k_az_kasse) azZeilen.push("Kassenzeichen: " + d.k_az_kasse);
+      const azBlock = azZeilen.length > 0 ? azZeilen.join("\n") : "Aktenzeichen: ________";
+
+      const kontaktZeilen = [
+        d.name, d.anschrift,
+        d.geb ? "Geboren am: " + d.geb : "",
+        d.tel ? "Tel: " + d.tel : "",
+        d.email ? "E-Mail: " + d.email : "",
+      ].filter(Boolean).join("\n");
+
+      // Kostenaufstellung
+      const kostenZeilen = [];
+      if (d.k_geldstrafe_gesamt) {
+        let txt = "• Geldstrafe: " + d.k_geldstrafe_gesamt + " €";
+        if (d.k_geldstrafe_tagessaetze && d.k_geldstrafe_hoehe) {
+          txt += " (" + d.k_geldstrafe_tagessaetze + " Tagessätze à " + d.k_geldstrafe_hoehe + " €)";
+        }
+        kostenZeilen.push(txt);
+      }
+      if (d.k_gerichtskosten_gesamt) kostenZeilen.push("• Gerichtskosten: " + d.k_gerichtskosten_gesamt + " €");
+      const kostenBlock = kostenZeilen.length > 0
+        ? "Konkret handelt es sich um:\n\n" + kostenZeilen.join("\n") + "\n\n"
+        : "";
+
+      const urteilsBezug = d.k_urteilsdatum
+        ? "aufgrund des Urteils / Strafbefehls vom " + d.k_urteilsdatum + " "
+        : "";
+
+      return `${kontaktZeilen}
+
+${empfaenger}
+
+Ort, ${todayDE()}
+
+Betreff: Antrag auf Ratenzahlung
+${azBlock}
+
+Sehr geehrte Damen und Herren,
+
+ich beziehe mich auf die mir ${urteilsBezug}auferlegten Verfahrenskosten / die Geldstrafe.
+
+${kostenBlock}Aufgrund meiner aktuellen wirtschaftlichen Situation ist es mir nicht möglich, den Gesamtbetrag in einer Summe zu zahlen.
+
+Ich beantrage daher gemäß §§ 459a, 459g StPO die Bewilligung einer Ratenzahlung.
+
+Konkret schlage ich folgende Ratenhöhe vor:
+
+• Monatliche Rate: ____ €
+• Erste Rate fällig zum: ____
+• Zahlung jeweils zum ____ des Folgemonats
+
+Begründung der wirtschaftlichen Lage:
+
+____________________________________________________
+____________________________________________________
+____________________________________________________
+
+(Hier eintragen: aktuelles Einkommen, monatliche Belastungen, Unterhaltspflichten, sonstige Schulden)
+
+Als Nachweis lege ich bei:
+
+• aktuelle Einnahmen-Ausgaben-Rechnung
+• Einkommensnachweise (Gehaltsabrechnungen / Bescheide)
+• ggf. Mietvertrag, Unterhaltsbescheid
+
+Ich versichere, dass ich die vereinbarten Raten pünktlich und vollständig zahlen werde, und bitte Sie um wohlwollende Prüfung meines Antrags.
+
+Für eine Rückmeldung bin ich Ihnen dankbar.
+
+Mit freundlichen Grüßen
+
+
+_____________________
+${d.name || "(Unterschrift)"}
+
+Anlagen:
+• Einnahmen-Ausgaben-Rechnung
+• Einkommensnachweise
+• ggf. weitere Belege zur wirtschaftlichen Situation`;
+    },
+  },
+  kosten_stundung: {
+    title: "Antrag auf Stundung (Verfahrenskosten / Geldstrafe)",
+    desc: "Antrag auf Stundung der Zahlung - sinnvoll, wenn alsbald ein Geldzufluss erwartet wird (z.B. neue Arbeit, Steuerrückzahlung)",
+    empfaenger: ["staatsanwaltschaft", "landesjustizkasse"],
+    body: (d) => {
+      const empfaenger = d.k_behoerde_sta
+        ? d.k_behoerde_sta + (d.k_behoerde_sta_anschrift ? "\n" + d.k_behoerde_sta_anschrift : "")
+        : (d.k_behoerde_kasse
+            ? d.k_behoerde_kasse + (d.k_behoerde_kasse_anschrift ? "\n" + d.k_behoerde_kasse_anschrift : "")
+            : "An die zuständige Staatsanwaltschaft / Landesjustizkasse\n____\n____");
+
+      const azZeilen = [];
+      if (d.k_az_sta) azZeilen.push("Aktenzeichen StA: " + d.k_az_sta);
+      if (d.k_az_gericht) azZeilen.push("Aktenzeichen Gericht: " + d.k_az_gericht);
+      if (d.k_az_kasse) azZeilen.push("Kassenzeichen: " + d.k_az_kasse);
+      const azBlock = azZeilen.length > 0 ? azZeilen.join("\n") : "Aktenzeichen: ________";
+
+      const kontaktZeilen = [
+        d.name, d.anschrift,
+        d.geb ? "Geboren am: " + d.geb : "",
+        d.tel ? "Tel: " + d.tel : "",
+        d.email ? "E-Mail: " + d.email : "",
+      ].filter(Boolean).join("\n");
+
+      const kostenZeilen = [];
+      if (d.k_geldstrafe_gesamt) kostenZeilen.push("• Geldstrafe: " + d.k_geldstrafe_gesamt + " €");
+      if (d.k_gerichtskosten_gesamt) kostenZeilen.push("• Gerichtskosten: " + d.k_gerichtskosten_gesamt + " €");
+      const kostenBlock = kostenZeilen.length > 0
+        ? "Es geht um:\n\n" + kostenZeilen.join("\n") + "\n\n"
+        : "";
+
+      return `${kontaktZeilen}
+
+${empfaenger}
+
+Ort, ${todayDE()}
+
+Betreff: Antrag auf Stundung
+${azBlock}
+
+Sehr geehrte Damen und Herren,
+
+${kostenBlock}gemäß §§ 459a, 459g StPO beantrage ich die Stundung der Zahlung bis zum ____.
+
+Begründung:
+
+____________________________________________________
+____________________________________________________
+____________________________________________________
+
+(Hier eintragen: konkrete Begründung - z.B. neue Arbeitsstelle ab Datum X, ausstehende Steuererstattung, Erbschaft, Versicherungsleistung etc. Eine Stundung ist nur sinnvoll, wenn ein konkreter Zahlungstermin in absehbarer Zeit benannt werden kann.)
+
+Hinweis: Während der Stundung können Zinsen anfallen. Sollte eine Stundung nicht möglich sein, beantrage ich hilfsweise die Bewilligung einer Ratenzahlung in Höhe von ____ € pro Monat.
+
+Als Nachweis lege ich bei:
+
+• aktuelle Einnahmen-Ausgaben-Rechnung
+• Nachweise zu der genannten Begründung (z.B. Arbeitsvertrag, Bescheid, Schreiben)
+
+Für eine Rückmeldung bin ich Ihnen dankbar.
+
+Mit freundlichen Grüßen
+
+
+_____________________
+${d.name || "(Unterschrift)"}
+
+Anlagen:
+• Einnahmen-Ausgaben-Rechnung
+• Nachweise zur Begründung der Stundung`;
+    },
   }
 };
 let activeAnschreiben = null;
@@ -3650,15 +4341,44 @@ function printAnschreiben() {
 
 function renderAnschreibenView() {
   // Build data dictionary from shared
+  const aAns = state.docs.asservate?.answers || {};
+  const aRows = state.docs.asservate?.rows?.gegenstaende || [];
+  const kAns = state.docs.kosten?.answers || {};
+  const kZahlungen = state.docs.kosten?.rows?.zahlungen || [];
   const d = {
     name: state.shared.name || "",
     geb: state.shared.geburtsdatum || "",
     anschrift: state.shared.anschrift || "",
     tel: state.shared.telefon || "",
+    email: state.shared.email || "",
     az: state.shared.aktenzeichen || "",
     bh: state.shared.bewaehrungshelfer || "",
     bewBeginn: state.shared.bewaehrung_beginn || "",
     gesamt: state.docs.schadens?.answers?.["auflage.gesamt"] || "",
+    // Asservate (für Herausgabe-Antrag)
+    az_sta: aAns["verfahren.az_sta"] || "",
+    az_polizei: aAns["verfahren.az_polizei"] || "",
+    az_gericht: aAns["verfahren.az_gericht"] || "",
+    behoerde: aAns["verfahren.behoerde"] || "",
+    behoerde_anschrift: aAns["verfahren.behoerde_anschrift"] || "",
+    sachbearbeiter: aAns["verfahren.sachbearbeiter"] || "",
+    datum_beschlagnahme: aAns["durchsuchung.datum"] || "",
+    ort_beschlagnahme: aAns["durchsuchung.ort"] || "",
+    asservate_rows: aRows,
+    // Kosten (für Ratenzahlungs-/Stundungs-Antrag)
+    k_az_sta: kAns["verfahren.az_sta"] || "",
+    k_az_gericht: kAns["verfahren.az_gericht"] || "",
+    k_az_kasse: kAns["verfahren.az_landesjustizkasse"] || "",
+    k_behoerde_sta: kAns["verfahren.behoerde_sta"] || "",
+    k_behoerde_sta_anschrift: kAns["verfahren.behoerde_sta_anschrift"] || "",
+    k_behoerde_kasse: kAns["verfahren.behoerde_kasse"] || "",
+    k_behoerde_kasse_anschrift: kAns["verfahren.behoerde_kasse_anschrift"] || "",
+    k_urteilsdatum: kAns["verfahren.urteilsdatum"] || "",
+    k_geldstrafe_gesamt: kAns["geldstrafe.betrag_gesamt"] || "",
+    k_geldstrafe_tagessaetze: kAns["geldstrafe.anzahl_tagessaetze"] || "",
+    k_geldstrafe_hoehe: kAns["geldstrafe.hoehe_tagessatz"] || "",
+    k_gerichtskosten_gesamt: kAns["gerichtskosten.betrag_gesamt"] || "",
+    k_zahlungen: kZahlungen,
   };
 
   // Hint if no name or aktenzeichen yet
@@ -3810,8 +4530,22 @@ function renderWizard() {
       <main class="main">
         <div class="section-head">
           <h2>${sec.icon} ${sec.title}</h2>
-          ${sec.hint ? `<div class="meta">${esc(sec.hint)}</div>` : (sec.type === "money" ? `<div class="meta">Beträge in Euro - monatlicher Durchschnitt. Was nicht zutrifft, mit „Nicht zutreffend“ markieren.</div>` : "")}
+          ${sec.hint ? `<div class="meta">${esc(sec.hint)}</div>` : (sec.type === "money" ? `<div class="meta">Beträge in Euro - monatlicher Durchschnitt. Was nicht zutrifft, mit „Nicht zutreffend" markieren.</div>` : "")}
         </div>
+        ${state.activeDocId === "kosten" ? `
+          <div style="background:rgba(217, 119, 6, 0.08); border:1px solid var(--warn); border-radius:10px; padding:12px 14px; margin-bottom:14px; font-size:13px;">
+            ⚖️ <strong>Wichtiger Hinweis:</strong> Bei größeren Beträgen oder finanziellen Engpässen wende dich an eine <strong>Schuldnerberatung</strong> (kostenlos: Caritas, Diakonie, Verbraucherzentrale) oder einen Anwalt. Diese App hilft dir bei der Übersicht und beim Aufsetzen von Anträgen, ersetzt aber keine individuelle Beratung.
+          </div>
+          <div style="background:var(--primary-soft); border-radius:10px; padding:12px 14px; margin-bottom:14px; font-size:13px;">
+            💡 <strong>Tipp – nicht verwechseln:</strong> Geldauflagen an Geschädigte oder gemeinnützige Einrichtungen gehören in das Dokument <strong>„💶 Schadenswiedergutmachung"</strong>. Hier in <strong>„💸 Verfahrenskosten"</strong> erfasst du Gerichtskosten, Geldstrafe (Tagessätze), Anwaltskosten und Gutachterkosten. Das sind unterschiedliche Sachen, auch wenn beides „nach dem Verfahren zu zahlen" ist.
+          </div>` : ""}
+        ${state.activeDocId === "asservate" ? `
+          <div style="background:rgba(217, 119, 6, 0.08); border:1px solid var(--warn); border-radius:10px; padding:12px 14px; margin-bottom:14px; font-size:13px;">
+            ⚖️ <strong>Wichtiger Hinweis:</strong> Diese App ist <strong>kein Ersatz für anwaltlichen Rat</strong>. Sie hilft dir, deine Daten zu organisieren und einen formal sauberen Antrag auf Herausgabe (§ 111n StPO) zu formulieren. Bei strittigen Fällen, drohender Einziehung oder Unklarheiten zur Rechtslage solltest du eine:n Strafverteidiger:in einschalten. Auch die Staatsanwaltschaft selbst darf rechtlich nicht beraten.
+          </div>
+          <div style="background:var(--primary-soft); border-radius:10px; padding:12px 14px; margin-bottom:14px; font-size:13px;">
+            💡 <strong>Tipp:</strong> Mache von deinem <strong>Beschlagnahme-Protokoll Fotos</strong> und hänge sie bei den jeweiligen Gegenständen an. Such dir auch <strong>Kaufbelege</strong> raus (z.B. aus E-Mails, Online-Shops) - das sind die wichtigsten Eigentumsnachweise. Je früher du das machst, desto einfacher wird der spätere Antrag.
+          </div>` : ""}
         ${body}
         ${renderNav(doc, sec)}
       </main>
@@ -4298,6 +5032,8 @@ function renderPrintView() {
   else if (id === "sozial") { pv.innerHTML = renderPrintSozial(); pv.classList.add("landscape-mode"); }
   else if (id === "uebersicht") pv.innerHTML = renderPrintUebersicht();
   else if (id === "bhtermine") { pv.innerHTML = renderPrintBhtermine(); pv.classList.add("landscape-mode"); }
+  else if (id === "asservate") { pv.innerHTML = renderPrintAsservate(); pv.classList.add("landscape-mode"); }
+  else if (id === "kosten") { pv.innerHTML = renderPrintKosten(); pv.classList.add("landscape-mode"); }
 }
 
 function valOrSkipPrint(secId, fId) {
@@ -5058,7 +5794,69 @@ function renderPrintUebersicht() {
     </table>`;
   }
 
-  const blocks = [earBlock, zeitBlock, theraBlock, schadensBlock, sozialBlock].filter(b => b);
+  // Asservate snapshot
+  const asservateState = countDoneSections("asservate");
+  let asservateBlock = "";
+  if (asservateState.done > 0) {
+    const azSta = getDocAnswer("asservate","verfahren","az_sta");
+    const behoerde = getDocAnswer("asservate","verfahren","behoerde");
+    const rows = getRowsFor("asservate","gegenstaende").filter(r => r.bezeichnung || r.seriennr || r.marke);
+    const erhalten = rows.filter(r => (r.status || "").toLowerCase().includes("erhalten")).length;
+    const offen = rows.filter(r => !(r.status || "").toLowerCase().includes("erhalten") && !(r.status || "").toLowerCase().includes("eingezogen")).length;
+    asservateBlock = `<table>
+      <tr><th colspan="2">📦 Beweismittel & Asservate</th></tr>
+      ${azSta ? `<tr><td>Aktenzeichen StA</td><td>${esc(azSta)}</td></tr>` : ""}
+      ${behoerde ? `<tr><td>Staatsanwaltschaft</td><td>${esc(behoerde)}</td></tr>` : ""}
+      <tr><td>Erfasste Gegenstände</td><td>${rows.length}</td></tr>
+      ${rows.length > 0 ? `<tr><td>Davon zurückerhalten</td><td>${erhalten}</td></tr>` : ""}
+      ${rows.length > 0 ? `<tr><td class="sum">Noch ausstehend</td><td class="sum" style="color:${offen === 0 ? '#5BA572' : '#d97706'}">${offen}</td></tr>` : ""}
+    </table>`;
+  }
+
+  // BH-Termine snapshot
+  const bhtermineState = countDoneSections("bhtermine");
+  let bhtermineBlock = "";
+  if (bhtermineState.done > 0) {
+    const naechsterDatum = getDocAnswer("bhtermine","naechster","datum");
+    const naechsterUhrzeit = getDocAnswer("bhtermine","naechster","uhrzeit");
+    const rows = getRowsFor("bhtermine","termine").filter(r => r.datum || r.themen);
+    const wahrgenommen = rows.filter(r => (r.status || "").toLowerCase().includes("wahrgenommen")).length;
+    const abgesagt = rows.filter(r => (r.status || "").toLowerCase().includes("abgesagt") || (r.status || "").toLowerCase().includes("nicht")).length;
+    bhtermineBlock = `<table>
+      <tr><th colspan="2">📞 BH-Termine & Gespräche</th></tr>
+      <tr><td>Erfasste Termine</td><td>${rows.length}</td></tr>
+      ${rows.length > 0 ? `<tr><td>Davon wahrgenommen</td><td>${wahrgenommen}</td></tr>` : ""}
+      ${abgesagt > 0 ? `<tr><td>Davon abgesagt / nicht wahrgenommen</td><td style="color:#d97706">${abgesagt}</td></tr>` : ""}
+      ${naechsterDatum ? `<tr><td class="sum">Nächster Termin</td><td class="sum">${esc(naechsterDatum)}${naechsterUhrzeit ? `, ${esc(naechsterUhrzeit)}` : ""}</td></tr>` : ""}
+    </table>`;
+  }
+
+  // Verfahrenskosten snapshot
+  const kostenState = countDoneSections("kosten");
+  let kostenBlock = "";
+  if (kostenState.done > 0) {
+    const geldstrafeGesamt = parseMoney(getDocAnswer("kosten","geldstrafe","betrag_gesamt"));
+    const gerichtskostenGesamt = parseMoney(getDocAnswer("kosten","gerichtskosten","betrag_gesamt"));
+    const weitereRows = getRowsFor("kosten","weitere_kosten").filter(r => r.betrag);
+    const weitereSum = weitereRows.reduce((s, r) => s + parseMoney(r.betrag || ""), 0);
+    const zahlungenRows = getRowsFor("kosten","zahlungen").filter(r => r.betrag);
+    const gezahlt = zahlungenRows.reduce((s, r) => s + parseMoney(r.betrag || ""), 0);
+    const gesamt = geldstrafeGesamt + gerichtskostenGesamt + weitereSum;
+    const rest = Math.max(0, gesamt - gezahlt);
+    const pct = gesamt > 0 ? Math.round((gezahlt / gesamt) * 100) : 0;
+    kostenBlock = `<table>
+      <tr><th colspan="2">💸 Verfahrenskosten & Geldstrafe</th></tr>
+      ${geldstrafeGesamt > 0 ? `<tr><td>Geldstrafe</td><td>${moneyOnly(geldstrafeGesamt)} €</td></tr>` : ""}
+      ${gerichtskostenGesamt > 0 ? `<tr><td>Gerichtskosten</td><td>${moneyOnly(gerichtskostenGesamt)} €</td></tr>` : ""}
+      ${weitereSum > 0 ? `<tr><td>Weitere Kosten (${weitereRows.length})</td><td>${moneyOnly(weitereSum)} €</td></tr>` : ""}
+      ${gesamt > 0 ? `<tr><td>Gesamt</td><td><strong>${moneyOnly(gesamt)} €</strong></td></tr>` : ""}
+      <tr><td>Bisher gezahlt</td><td>${moneyOnly(gezahlt)} €${gesamt > 0 ? ` (${pct}%)` : ""}</td></tr>
+      ${gesamt > 0 ? `<tr><td class="sum">Noch offen</td><td class="sum" style="color:${rest === 0 ? '#5BA572' : '#d97706'}">${moneyOnly(rest)} €</td></tr>` : ""}
+    </table>`;
+  }
+
+  // Reihenfolge wie auf der Startseite: BH-Termine zuerst, dann Standard-Pflichten, dann Spezial
+  const blocks = [bhtermineBlock, earBlock, schadensBlock, kostenBlock, sozialBlock, theraBlock, zeitBlock, asservateBlock].filter(b => b);
   const personalRows = [
     ["Name, Vorname", name], ["Geburtsdatum", geb],
     ["Anschrift", adr], ["Telefon", tel],
@@ -5145,6 +5943,295 @@ function renderPrintBhtermine() {
     ${nextTbl || vorbereitungSection ? `<h2>Nächster Termin</h2>${nextTbl}${vorbereitungSection}` : ""}
     ${noteSection}
     <p style="font-size:8pt; font-style:italic; color:#666; margin-top:14pt;">Persönliche Notizen zur eigenen Vorbereitung und Übersicht.</p>
+  `;
+}
+
+// ============================================
+// PRINT VERFAHRENSKOSTEN
+// ============================================
+function renderPrintKosten() {
+  const ans = (s, f) => valOrSkipPrint(s, f);
+  function pairsTable(pairsAll) {
+    const pairs = filterPairs(pairsAll.filter(p => p[0]));
+    if (pairs.length === 0) return "";
+    let t = `<table>`;
+    for (let i=0; i<pairs.length; i+=2) {
+      const L = pairs[i], R = pairs[i+1];
+      if (R) t += `<tr>${tdLabel(L[0],false)}${tdValue(L[1].value)}${tdLabel(R[0],false)}${tdValue(R[1].value)}</tr>`;
+      else t += `<tr>${tdLabel(L[0],false)}${tdValue(L[1].value)}<td colspan="2">&nbsp;</td></tr>`;
+    }
+    return t + `</table>`;
+  }
+  const personalTbl = pairsTable([
+    ["Name, Vorname", ans("personal","name")], ["Geburtsdatum", ans("personal","geburtsdatum")],
+    ["Anschrift", ans("personal","anschrift")], ["Telefon", ans("personal","telefon")],
+    ["E-Mail", ans("personal","email")], ["", { value: "" }],
+  ]);
+  const verfahrenTbl = pairsTable([
+    ["Aktenzeichen StA", ans("verfahren","az_sta")], ["Aktenzeichen Gericht", ans("verfahren","az_gericht")],
+    ["Kassenzeichen Landesjustizkasse", ans("verfahren","az_landesjustizkasse")], ["Datum Urteil/Strafbefehl", ans("verfahren","urteilsdatum")],
+    ["Datum Rechtskraft", ans("verfahren","rechtskraft_datum")], ["Rechtsgrundlage Kostentragung", ans("verfahren","rechtsgrundlage_kosten")],
+    ["Zuständige Staatsanwaltschaft", ans("verfahren","behoerde_sta")], ["", { value: "" }],
+    ["Zuständige Landesjustizkasse", ans("verfahren","behoerde_kasse")], ["", { value: "" }],
+  ]);
+  const tatvorwurf = ans("verfahren","tatvorwurf");
+  const tatvorwurfSec = (!tatvorwurf.skipped && tatvorwurf.value)
+    ? `<p><strong>Tatvorwurf / Verurteilung wegen:</strong><br>${esc(tatvorwurf.value).replace(/\n/g,"<br>")}</p>` : "";
+  const staAnschrift = ans("verfahren","behoerde_sta_anschrift");
+  const staAnschriftSec = (!staAnschrift.skipped && staAnschrift.value)
+    ? `<p><strong>Anschrift StA:</strong><br>${esc(staAnschrift.value).replace(/\n/g,"<br>")}</p>` : "";
+  const kasseAnschrift = ans("verfahren","behoerde_kasse_anschrift");
+  const kasseAnschriftSec = (!kasseAnschrift.skipped && kasseAnschrift.value)
+    ? `<p><strong>Anschrift Landesjustizkasse:</strong><br>${esc(kasseAnschrift.value).replace(/\n/g,"<br>")}</p>` : "";
+
+  const geldstrafeTbl = pairsTable([
+    ["Anzahl Tagessätze", ans("geldstrafe","anzahl_tagessaetze")], ["Höhe pro Tagessatz", ans("geldstrafe","hoehe_tagessatz")],
+    ["Geldstrafe gesamt (€)", ans("geldstrafe","betrag_gesamt")], ["Zahlungsfrist", ans("geldstrafe","frist_zahlung")],
+    ["JUKOS-Rechnungsnr", ans("geldstrafe","rechnung_jukos")], ["Ratenzahlung bewilligt?", ans("geldstrafe","ratenzahlung_bewilligt")],
+    ["Höhe Rate (€/Monat)", ans("geldstrafe","rate_hoehe")], ["Erste Rate fällig", ans("geldstrafe","rate_erste")],
+    ["Gemeinnützige Arbeit", ans("geldstrafe","gemeinnuetzige_arbeit")], ["Ersatzfreiheitsstrafe drohend?", ans("geldstrafe","ersatzfreiheit")],
+  ]);
+
+  const gerichtskostenTbl = pairsTable([
+    ["Gerichtsgebühren (€)", ans("gerichtskosten","gebuehren")], ["Auslagen (€)", ans("gerichtskosten","auslagen")],
+    ["Gerichtskosten gesamt (€)", ans("gerichtskosten","betrag_gesamt")], ["Zahlungsfrist", ans("gerichtskosten","frist_zahlung")],
+    ["Datum Kostenrechnung", ans("gerichtskosten","kostenrechnung_datum")], ["", { value: "" }],
+  ]);
+
+  const anwaltTbl = pairsTable([
+    ["Verteidiger:in", ans("anwaltskosten","verteidiger_name")], ["Art der Verteidigung", ans("anwaltskosten","art_verteidigung")],
+    ["Pflichtverteidiger-Kosten (RVG, €)", ans("anwaltskosten","rvg_kosten")], ["Wahlverteidiger-Honorar (€)", ans("anwaltskosten","wahlverteidiger_kosten")],
+    ["Honorarvereinbarung", ans("anwaltskosten","honorarvereinbarung")], ["Rechtsschutzversicherung", ans("anwaltskosten","rechtsschutz")],
+  ]);
+  const verteidigerKontakt = ans("anwaltskosten","verteidiger_kontakt");
+  const verteidigerKontaktSec = (!verteidigerKontakt.skipped && verteidigerKontakt.value)
+    ? `<p><strong>Kontakt Verteidiger:in:</strong><br>${esc(verteidigerKontakt.value).replace(/\n/g,"<br>")}</p>` : "";
+
+  // Weitere Kosten
+  const weitereRows = (getDocState().rows && getDocState().rows.weitere_kosten) || [];
+  const weitereFiltered = weitereRows.filter(r => r.art || r.beschreibung || r.betrag);
+  let weitereTbl = "";
+  if (weitereFiltered.length > 0) {
+    weitereTbl = `<table>
+      <tr><th>Nr</th><th>Art</th><th>Beschreibung</th><th>Betrag (€)</th><th>Datum</th><th>Empfänger</th><th>Status</th></tr>`;
+    weitereFiltered.forEach((r, i) => {
+      weitereTbl += `<tr>
+        <td>${i+1}</td>
+        <td>${esc(r.art || "")}</td>
+        <td>${esc(r.beschreibung || "")}</td>
+        <td>${esc(r.betrag || "")}</td>
+        <td>${esc(r.rechnungsdatum || "")}</td>
+        <td>${esc(r.empfaenger || "")}</td>
+        <td>${esc(r.status || "")}</td>
+      </tr>`;
+    });
+    weitereTbl += `</table>`;
+  }
+
+  // Zahlungen
+  const zahlungenRows = (getDocState().rows && getDocState().rows.zahlungen) || [];
+  const zahlungenFiltered = zahlungenRows.filter(r => r.datum || r.betrag);
+  let zahlungenTbl = "";
+  let zahlungenSum = 0;
+  if (zahlungenFiltered.length > 0) {
+    zahlungenSum = zahlungenFiltered.reduce((s, r) => s + parseMoney(r.betrag || ""), 0);
+    zahlungenTbl = `<table>
+      <tr><th>Nr</th><th>Datum</th><th>Betrag (€)</th><th>Verwendungszweck</th><th>Empfänger</th><th>Aktenzeichen</th><th>Bemerkung</th></tr>`;
+    zahlungenFiltered.forEach((r, i) => {
+      zahlungenTbl += `<tr>
+        <td>${i+1}</td>
+        <td>${esc(r.datum || "")}</td>
+        <td>${esc(r.betrag || "")}</td>
+        <td>${esc(r.verwendungszweck || "")}</td>
+        <td>${esc(r.empfaenger || "")}</td>
+        <td>${esc(r.az_zahlung || "")}</td>
+        <td>${esc(r.bemerkung || "")}</td>
+      </tr>`;
+    });
+    zahlungenTbl += `<tr><td colspan="2" class="sum">Summe gezahlt</td><td colspan="5" class="sum">${moneyOnly(zahlungenSum)} €</td></tr>`;
+    zahlungenTbl += `</table>`;
+  }
+
+  const antraegeTbl = pairsTable([
+    ["Datum Antrag Ratenzahlung", ans("antraege","ratenzahlung_datum")], ["Status", ans("antraege","ratenzahlung_status")],
+    ["Datum Antrag Stundung", ans("antraege","stundung_datum")], ["Status", ans("antraege","stundung_status")],
+    ["Datum Antrag Erlass", ans("antraege","erlass_datum")], ["Status", ans("antraege","erlass_status")],
+    ["Schuldnerberatung", ans("antraege","schuldnerberatung")], ["", { value: "" }],
+  ]);
+  const sbKontakt = ans("antraege","schuldnerberatung_kontakt");
+  const sbKontaktSec = (!sbKontakt.skipped && sbKontakt.value)
+    ? `<p><strong>Kontakt Schuldnerberatung:</strong><br>${esc(sbKontakt.value).replace(/\n/g,"<br>")}</p>` : "";
+
+  const note = ans("anmerkung", "notes");
+  const noteSection = (!note.skipped && note.value)
+    ? `<h2>Anmerkungen</h2>${note.value.split("\n").map(l => `<p>${esc(l) || "&nbsp;"}</p>`).join("")}`
+    : "";
+
+  return `
+    <h1>Verfahrenskosten & Geldstrafe</h1>
+    <div class="subtitle">Übersicht über Kosten, Zahlungen und Anträge</div>
+    ${personalTbl ? `<h2>Persönliche Angaben</h2>${personalTbl}` : ""}
+    ${verfahrenTbl ? `<h2>Verfahrensdaten</h2>${verfahrenTbl}` : ""}
+    ${tatvorwurfSec}${staAnschriftSec}${kasseAnschriftSec}
+    ${geldstrafeTbl ? `<h2>Geldstrafe</h2>${geldstrafeTbl}` : ""}
+    ${gerichtskostenTbl ? `<h2>Gerichtskosten</h2>${gerichtskostenTbl}` : ""}
+    ${anwaltTbl ? `<h2>Anwalts- & Verteidigerkosten</h2>${anwaltTbl}` : ""}
+    ${verteidigerKontaktSec}
+    ${weitereTbl ? `<h2>Weitere Kosten (${weitereFiltered.length})</h2>${weitereTbl}` : ""}
+    ${zahlungenTbl ? `<h2>Zahlungsverlauf (${zahlungenFiltered.length})</h2>${zahlungenTbl}` : ""}
+    ${antraegeTbl ? `<h2>Anträge & Status</h2>${antraegeTbl}` : ""}
+    ${sbKontaktSec}
+    ${noteSection}
+    <p style="font-size:8pt; font-style:italic; color:#666; margin-top:14pt;">
+      Diese Übersicht ist eine persönliche Dokumentation. Bei finanziellen Schwierigkeiten wende dich an eine
+      Schuldnerberatung (kostenlos: Caritas, Diakonie, Verbraucherzentrale) oder einen Anwalt.
+    </p>
+  `;
+}
+
+// ============================================
+// PRINT ASSERVATE / BEWEISMITTEL
+// ============================================
+function renderPrintAsservate() {
+  const ans = (s, f) => valOrSkipPrint(s, f);
+  function pairsTable(pairsAll) {
+    const pairs = filterPairs(pairsAll.filter(p => p[0]));
+    if (pairs.length === 0) return "";
+    let t = `<table>`;
+    for (let i=0; i<pairs.length; i+=2) {
+      const L = pairs[i], R = pairs[i+1];
+      if (R) t += `<tr>${tdLabel(L[0],false)}${tdValue(L[1].value)}${tdLabel(R[0],false)}${tdValue(R[1].value)}</tr>`;
+      else t += `<tr>${tdLabel(L[0],false)}${tdValue(L[1].value)}<td colspan="2">&nbsp;</td></tr>`;
+    }
+    return t + `</table>`;
+  }
+  const personalTbl = pairsTable([
+    ["Name, Vorname", ans("personal","name")], ["Geburtsdatum", ans("personal","geburtsdatum")],
+    ["Anschrift", ans("personal","anschrift")], ["Telefon", ans("personal","telefon")],
+    ["E-Mail", ans("personal","email")], ["", { value: "" }],
+  ]);
+  const verfahrenTbl = pairsTable([
+    ["Aktenzeichen Staatsanwaltschaft", ans("verfahren","az_sta")],
+    ["Aktenzeichen Polizei", ans("verfahren","az_polizei")],
+    ["Aktenzeichen Gericht", ans("verfahren","az_gericht")],
+    ["Zuständige Staatsanwaltschaft", ans("verfahren","behoerde")],
+    ["Sachbearbeiter:in", ans("verfahren","sachbearbeiter")],
+    ["Rechtsgrundlage", ans("verfahren","rechtsgrundlage")],
+    ["Verfahrensstand", ans("verfahren","verfahrensstand")],
+  ]);
+  const behoerdeAnschrift = ans("verfahren","behoerde_anschrift");
+  const behoerdeAnschriftSec = (!behoerdeAnschrift.skipped && behoerdeAnschrift.value)
+    ? `<p><strong>Anschrift Staatsanwaltschaft:</strong><br>${esc(behoerdeAnschrift.value).replace(/\n/g,"<br>")}</p>` : "";
+  const vorwurf = ans("verfahren","vorwurf");
+  const vorwurfSec = (!vorwurf.skipped && vorwurf.value)
+    ? `<p><strong>Tatvorwurf:</strong><br>${esc(vorwurf.value).replace(/\n/g,"<br>")}</p>` : "";
+
+  // Durchsuchung
+  const durchsuchungTbl = pairsTable([
+    ["Datum", ans("durchsuchung","datum")],
+    ["Uhrzeit Beginn / Ende", { value: [ans("durchsuchung","uhrzeit_beginn").value, ans("durchsuchung","uhrzeit_ende").value].filter(Boolean).join(" – ") }],
+    ["Ort", ans("durchsuchung","ort")],
+    ["Beschluss-Datum", ans("durchsuchung","beschluss_datum")],
+    ["Erlassendes Gericht", ans("durchsuchung","beschluss_gericht")],
+    ["Aktenzeichen Beschluss", ans("durchsuchung","beschluss_az")],
+    ["Bei Gefahr im Verzug", ans("durchsuchung","gefahr_im_verzug")],
+    ["Anzahl Beamte", ans("durchsuchung","anzahl_beamte")],
+    ["Einsatzleiter:in", ans("durchsuchung","leiter_einsatz")],
+    ["Widerspruch eingelegt", ans("durchsuchung","widerspruch")],
+    ["Widerspruch im Protokoll", ans("durchsuchung","widerspruch_protokolliert")],
+  ]);
+  const beamteSec = (() => {
+    const b = ans("durchsuchung","namen_beamte");
+    return (!b.skipped && b.value) ? `<p><strong>Namen / Dienststellen der Beamten:</strong><br>${esc(b.value).replace(/\n/g,"<br>")}</p>` : "";
+  })();
+  const zeugenSec = (() => {
+    const z = ans("durchsuchung","zeugen");
+    return (!z.skipped && z.value) ? `<p><strong>Anwesende Zeugen:</strong><br>${esc(z.value).replace(/\n/g,"<br>")}</p>` : "";
+  })();
+  const schaedenSec = (() => {
+    const s = ans("durchsuchung","schaeden");
+    return (!s.skipped && s.value) ? `<p><strong>Entstandene Schäden:</strong><br>${esc(s.value).replace(/\n/g,"<br>")}</p>` : "";
+  })();
+  const ablaufSec = (() => {
+    const a = ans("durchsuchung","ablauf");
+    return (!a.skipped && a.value) ? `<p><strong>Ablauf / Auffälligkeiten (Gedächtnisprotokoll):</strong><br>${esc(a.value).replace(/\n/g,"<br>")}</p>` : "";
+  })();
+
+  // Gegenstaende table
+  const rows = (getDocState().rows && getDocState().rows.gegenstaende) || [];
+  const filtered = rows.filter(r => r.bezeichnung || r.seriennr || r.marke);
+  let gegenstaendeTbl = "";
+  if (filtered.length > 0) {
+    gegenstaendeTbl = `<table>
+      <tr><th>Nr</th><th>Bezeichnung</th><th>Marke / Modell</th><th>Seriennr / IMEI</th><th>Merkmale</th><th>Fundort</th><th>Kaufpreis (€)</th><th>Eigentümer</th><th>Bemerkung</th><th>Status</th></tr>`;
+    filtered.forEach((r, i) => {
+      const markeModell = [r.marke, r.modell].filter(Boolean).join(" / ");
+      gegenstaendeTbl += `<tr>
+        <td>${i+1}</td>
+        <td>${esc(r.bezeichnung || "")}</td>
+        <td>${esc(markeModell)}</td>
+        <td>${esc(r.seriennr || "")}</td>
+        <td>${esc(r.farbe || "")}</td>
+        <td>${esc(r.fundort || "")}</td>
+        <td>${esc(r.kaufpreis || "")}${r.kaufdatum ? `<br><small>${esc(r.kaufdatum)}</small>` : ""}</td>
+        <td>${esc(r.eigentuemer || "")}</td>
+        <td>${esc(r.bemerkung || "")}</td>
+        <td>${esc(r.status || "")}</td>
+      </tr>`;
+    });
+    gegenstaendeTbl += `</table>`;
+  } else {
+    gegenstaendeTbl = `<p style="font-style:italic; color:#888;">(keine Gegenstände erfasst)</p>`;
+  }
+
+  // Antrag
+  const antragTbl = pairsTable([
+    ["Datum letzter Antrag", ans("antrag","antrag_datum")],
+    ["Versendet per", ans("antrag","antrag_versendet")],
+    ["Datum Rückmeldung", ans("antrag","rueckmeldung_datum")],
+    ["Anwalt/Anwältin", ans("antrag","anwalt")],
+  ]);
+  const rueckmeldung = ans("antrag","rueckmeldung_inhalt");
+  const rueckmeldungSec = (!rueckmeldung.skipped && rueckmeldung.value)
+    ? `<p><strong>Inhalt der Rückmeldung:</strong><br>${esc(rueckmeldung.value).replace(/\n/g,"<br>")}</p>` : "";
+  const anwaltKontakt = ans("antrag","anwalt_kontakt");
+  const anwaltKontaktSec = (!anwaltKontakt.skipped && anwaltKontakt.value)
+    ? `<p><strong>Kontakt Anwalt/Anwältin:</strong><br>${esc(anwaltKontakt.value).replace(/\n/g,"<br>")}</p>` : "";
+
+  // Schaden / StrEG
+  const schadenTbl = pairsTable([
+    ["Geschätzter Gesamtbetrag (€)", ans("schaden","schaeden_betrag")],
+    ["Rechtsschutzversicherung", ans("schaden","rechtsschutz")],
+    ["Datum Antrag StrEG", ans("schaden","antrag_streg_datum")],
+    ["Status StrEG-Antrag", ans("schaden","antrag_streg_status")],
+  ]);
+  const schaedenUebersicht = ans("schaden","schaeden_uebersicht");
+  const schaedenUebersichtSec = (!schaedenUebersicht.skipped && schaedenUebersicht.value)
+    ? `<p><strong>Übersicht entstandener Schäden:</strong><br>${esc(schaedenUebersicht.value).replace(/\n/g,"<br>")}</p>` : "";
+
+  const note = ans("anmerkung", "notes");
+  const noteSection = (!note.skipped && note.value)
+    ? `<h2>Anmerkungen</h2>${note.value.split("\n").map(l => `<p>${esc(l) || "&nbsp;"}</p>`).join("")}`
+    : "";
+
+  return `
+    <h1>Beweismittel & Asservate</h1>
+    <div class="subtitle">Dokumentation der beschlagnahmten / sichergestellten Gegenstände</div>
+    ${personalTbl ? `<h2>Persönliche Angaben</h2>${personalTbl}` : ""}
+    ${verfahrenTbl ? `<h2>Verfahrensdaten</h2>${verfahrenTbl}` : ""}
+    ${behoerdeAnschriftSec}${vorwurfSec}
+    ${durchsuchungTbl ? `<h2>Durchsuchung / Beschlagnahme</h2>${durchsuchungTbl}` : ""}
+    ${beamteSec}${zeugenSec}${schaedenSec}${ablaufSec}
+    <h2>Beschlagnahmte Gegenstände (${filtered.length})</h2>
+    ${gegenstaendeTbl}
+    ${antragTbl ? `<h2>Antragsverlauf</h2>${antragTbl}` : ""}
+    ${rueckmeldungSec}${anwaltKontaktSec}
+    ${(schadenTbl || schaedenUebersichtSec) ? `<h2>Schadensersatz (StrEG)</h2>${schadenTbl}${schaedenUebersichtSec}` : ""}
+    ${noteSection}
+    <p style="font-size:8pt; font-style:italic; color:#666; margin-top:14pt;">
+      Diese Übersicht ist eine persönliche Dokumentation. Sie ersetzt keinen anwaltlichen Rat.
+      Für einen formellen Antrag auf Herausgabe nach § 111n StPO siehe das separate Anschreiben.
+    </p>
   `;
 }
 
