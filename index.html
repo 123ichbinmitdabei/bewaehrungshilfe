@@ -406,6 +406,130 @@
     font-size: 15px; font-family: inherit; background: var(--input-bg); color: var(--text);
   }
   .modal-field input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
+
+  /* === Signature Pad === */
+  .sig-canvas-wrap {
+    position: relative; width: 100%; max-width: 600px; margin: 0 auto;
+    border: 2px dashed var(--border); border-radius: 10px;
+    background: #ffffff; aspect-ratio: 3 / 1; overflow: hidden;
+  }
+  .sig-canvas-wrap canvas {
+    display: block; width: 100%; height: 100%;
+    touch-action: none; cursor: crosshair;
+  }
+  .sig-canvas-line {
+    position: absolute; left: 8%; right: 8%; bottom: 18%;
+    border-bottom: 1px solid #94a3b8; pointer-events: none;
+  }
+  .sig-canvas-hint {
+    position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%);
+    text-align: center; color: #94a3b8; font-size: 14px; pointer-events: none;
+    font-style: italic;
+  }
+  /* Inline display of saved signature in wizard / print */
+  .sig-display {
+    background: #ffffff; border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 10px; margin: 8px 0; display: inline-block;
+    max-width: 100%;
+  }
+  .sig-display img {
+    background: #ffffff;
+  }
+  .sig-meta {
+    font-size: 11px; color: #475569; margin-top: 4px;
+    border-top: 1px solid #e5e7eb; padding-top: 4px;
+  }
+  .sig-remove-btn {
+    margin-top: 6px; font-size: 12px; padding: 4px 10px;
+  }
+  .sig-add-btn {
+    background: var(--primary-soft); color: var(--primary);
+    border: 1px dashed var(--primary); padding: 8px 14px;
+    border-radius: 8px; cursor: pointer; font-size: 14px;
+    font-weight: 600; display: inline-flex; align-items: center; gap: 6px;
+  }
+  .sig-add-btn:hover { background: var(--primary); color: white; }
+  .sig-row-btn {
+    background: transparent; border: 1px dashed #94a3b8;
+    color: var(--text-soft); padding: 4px 10px; border-radius: 6px;
+    cursor: pointer; font-size: 12px; white-space: nowrap;
+  }
+  .sig-row-btn:hover { background: var(--primary-soft); color: var(--primary); border-color: var(--primary); }
+  .sig-row-mini {
+    display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  }
+  .sig-row-mini img {
+    max-height: 32px; max-width: 100px; border: 1px solid #e5e7eb;
+    border-radius: 4px; background: white;
+  }
+  .sig-row-mini-meta {
+    font-size: 10px; color: #64748b;
+  }
+  /* In print: clean up */
+  @media print {
+    .sig-display {
+      border: none; padding: 0; background: transparent;
+      page-break-inside: avoid;
+    }
+    .sig-remove-btn, .sig-add-btn, .sig-row-btn { display: none !important; }
+    .sig-display img {
+      max-height: 80px;
+    }
+  }
+
+  /* Print signatures (proband + counter-signer) */
+  .print-signatures {
+    display: flex; gap: 30px; margin-top: 30px;
+    page-break-inside: avoid;
+  }
+  .print-sig-slot {
+    flex: 1; display: flex; flex-direction: column;
+    align-items: stretch;
+  }
+  .print-sig-img-wrap {
+    height: 60px; display: flex; align-items: flex-end; justify-content: flex-start;
+    padding-bottom: 2px;
+  }
+  .print-sig-img {
+    max-height: 55px; max-width: 100%; display: block;
+  }
+  .print-sig-line {
+    border-bottom: 1px solid #333; width: 100%; margin-bottom: 4px;
+  }
+  .print-sig-label {
+    font-size: 12px; line-height: 1.4;
+  }
+
+  /* Per-row signature in print tables */
+  .print-row-sig {
+    display: flex; align-items: center; gap: 4px;
+  }
+  .print-row-sig img {
+    max-height: 28px; max-width: 80px; display: block;
+  }
+  .print-row-sig div {
+    font-size: 8px; line-height: 1.2;
+  }
+  /* Verification footer page */
+  .verification-footer {
+    margin-top: 20px;
+    border: 1px solid #ddd; padding: 14px;
+    background: #fafafa;
+    page-break-inside: avoid;
+  }
+  .verification-footer h2 {
+    color: var(--primary); font-size: 14pt; margin: 0 0 10pt;
+  }
+  .verification-footer table {
+    width: 100%; border-collapse: collapse; font-size: 10pt;
+  }
+  .verification-footer th {
+    background: #e5e7eb; text-align: left;
+    padding: 6pt; border: 1px solid #ccc; font-weight: 600;
+  }
+  .verification-footer td {
+    padding: 6pt; border: 1px solid #ccc; vertical-align: top;
+  }
   /* Auto-save toast */
   .save-toast {
     position: fixed; bottom: 20px; right: 20px;
@@ -1100,6 +1224,9 @@ const DOCS = {
           { id: "notes", label: "Bemerkungen zum Therapieverlauf", type: "textarea" }
         ]
       },
+      { id: "signatures", title: "Unterschriften", icon: "✍️", type: "signatures",
+        counterRoleLabel: "Bestätigung durch Therapeut:in",
+        counterPlaceholder: "Der/die Therapeut:in kann hier mit Finger oder Stylus auf dem Bildschirm unterschreiben." },
       { id: "review", title: "Übersicht & Erstellen", icon: "✅", type: "review", fields: [] }
     ]
   },
@@ -1145,8 +1272,9 @@ const DOCS = {
         { id: "verwendung", label: "Verwendungszweck / Kassenzeichen", type: "text" },
       ]},
       { id: "zahlungen", title: "Zahlungsverlauf", icon: "📋", type: "rows",
-        hint: "Trage jede Zahlung ein - mit Beleg-Nr. (Überweisungsbeleg, Kontoauszug). Du kannst pro Zeile auch ein Foto/PDF des Belegs hochladen. Die Übersicht berechnet automatisch, was schon gezahlt und was noch offen ist.",
+        hint: "Trage jede Zahlung ein - mit Beleg-Nr. (Überweisungsbeleg, Kontoauszug). Bei Bargeld-Übergabe gibt es 3 Quittungs-Varianten: 1) Digitale Quittung des/der Geschädigten direkt in der Zeile · 2) Klassische Papier-Quittung (mit Unterschrift) abfotografieren und als Beleg anhängen · 3) Überweisungsbeleg/Kontoauszug als PDF anhängen.",
         hasAttachments: true,
+        hasRowSignature: true,
         columns: [
           { id: "datum", label: "Datum", placeholder: "TT.MM.JJJJ" },
           { id: "betrag", label: "Betrag (EUR)", placeholder: "z.B. 200,00" },
@@ -1158,6 +1286,9 @@ const DOCS = {
       { id: "anmerkung", title: "Anmerkungen", icon: "✍️", type: "freetext", fields: [
         { id: "notes", label: "Erläuterungen, Besonderheiten, Stundungen, Änderungen ...", type: "textarea" }
       ]},
+      { id: "signatures", title: "Unterschriften", icon: "✍️", type: "signatures",
+        counterRoleLabel: "Empfangsbestätigung durch Geschädigte:n",
+        counterPlaceholder: "Bei Bargeld-Übergaben kann der/die Geschädigte hier den Empfang quittieren. Hat juristisch Beweiswert (vgl. Quittung)." },
       { id: "review", title: "Übersicht & Erstellen", icon: "✅", type: "review", fields: [] }
     ]
   },
@@ -1200,8 +1331,9 @@ const DOCS = {
         ]
       },
       { id: "stunden", title: "Stunden-Nachweis", icon: "⏱️", type: "rows",
-        hint: "Trage jeden Einsatz ein. Die Spalten 'Bestätigt' und 'Unterschrift' füllt die Einrichtung aus. Du kannst pro Zeile auch ein Foto vom unterschriebenen Stundenzettel hochladen.",
+        hint: "Trage jeden Einsatz ein. Bestätigung der Einrichtung ist auf 3 Wegen möglich: 1) Digital pro Zeile (mit Finger/Stylus auf dem Bildschirm) – siehe Knopf unter jeder Zeile · 2) Auf Papier ausdrucken, von Einrichtung unterschreiben + stempeln lassen, dann abfotografieren und als Beleg anhängen · 3) Sammel-Unterschrift am Ende (siehe Sektion „Unterschriften“).",
         hasAttachments: true,
+        hasRowSignature: true,
         columns: [
           { id: "datum", label: "Datum", placeholder: "TT.MM.JJJJ" },
           { id: "von", label: "von", placeholder: "08:00" },
@@ -1214,6 +1346,9 @@ const DOCS = {
       { id: "anmerkung", title: "Anmerkungen", icon: "✍️", type: "freetext", fields: [
         { id: "notes", label: "Erläuterungen, Krankmeldungen, Besonderheiten ...", type: "textarea" }
       ]},
+      { id: "signatures", title: "Unterschriften", icon: "✍️", type: "signatures",
+        counterRoleLabel: "Bestätigung durch Einrichtung",
+        counterPlaceholder: "Die Einrichtungsleitung oder Ansprechperson kann hier mit Finger oder Stylus auf dem Bildschirm unterschreiben." },
       { id: "review", title: "Übersicht & Erstellen", icon: "✅", type: "review", fields: [] }
     ]
   },
@@ -1266,6 +1401,9 @@ const DOCS = {
       { id: "anmerkung", title: "Anmerkungen", icon: "✍️", type: "freetext", fields: [
         { id: "notes", label: "Allgemeine Notizen, Eindrücke, Fragen ...", type: "textarea" }
       ]},
+      { id: "signatures", title: "Unterschriften", icon: "✍️", type: "signatures",
+        counterRoleLabel: "Bestätigung durch Bewährungshelfer:in",
+        counterPlaceholder: "Optional: Die Bewährungshelferin/der Bewährungshelfer kann hier z.B. einen Termin gegenzeichnen." },
       { id: "review", title: "Übersicht & Erstellen", icon: "✅", type: "review", fields: [] }
     ]
   },
@@ -1603,15 +1741,15 @@ let state = {
   notes: [],           // [{ id, text, category, createdAt, done }]
   pinLocked: false,    // is the app currently locked
   docs: {              // per-doc state
-    ear: { answers: {}, currentIdx: 0 },
-    zeit: { answers: {}, currentIdx: 0, rows: {} },
-    thera: { answers: {}, currentIdx: 0, rows: {}, checks: {} },
-    schadens: { answers: {}, currentIdx: 0, rows: {}, attachments: {} },
-    sozial: { answers: {}, currentIdx: 0, rows: {}, attachments: {} },
+    ear: { answers: {}, currentIdx: 0, signatures: {} },
+    zeit: { answers: {}, currentIdx: 0, rows: {}, signatures: {} },
+    thera: { answers: {}, currentIdx: 0, rows: {}, checks: {}, signatures: {} },
+    schadens: { answers: {}, currentIdx: 0, rows: {}, attachments: {}, signatures: {} },
+    sozial: { answers: {}, currentIdx: 0, rows: {}, attachments: {}, signatures: {} },
     uebersicht: { answers: {}, currentIdx: 0 },
-    bhtermine: { answers: {}, currentIdx: 0, rows: {} },
-    kosten: { answers: {}, currentIdx: 0, rows: {}, attachments: {} },
-    asservate: { answers: {}, currentIdx: 0, rows: {}, attachments: {} }
+    bhtermine: { answers: {}, currentIdx: 0, rows: {}, signatures: {} },
+    kosten: { answers: {}, currentIdx: 0, rows: {}, attachments: {}, signatures: {} },
+    asservate: { answers: {}, currentIdx: 0, rows: {}, attachments: {}, signatures: {} }
   }
 };
 let saveStatus = "saved"; // "saved" | "saving" | "error"
@@ -2360,6 +2498,328 @@ async function buildDocBundleZip(docId) {
 }
 
 // Download the ZIP bundle for a document
+// === DIGITAL SIGNATURE SYSTEM ===
+// Captures signatures via canvas (touch / mouse / stylus) and saves as base64 PNG with timestamp.
+// NOT a qualified electronic signature (eIDAS) - but has evidentiary value for everyday confirmations
+// like volunteer hours, therapy attendance, payment receipts. Same legal status as DHL parcel-tablet signatures.
+
+const SIG_CANVAS_W = 600;
+const SIG_CANVAS_H = 200;
+
+function openSignaturePad(opts) {
+  // opts: { title, subtitle, onSave: (dataUrl, timestamp, signerName) => void, askName: bool, defaultName: string }
+  const existing = document.getElementById("sig-modal");
+  if (existing) existing.remove();
+
+  const modal = document.createElement("div");
+  modal.id = "sig-modal";
+  modal.className = "modal-backdrop";
+  modal.innerHTML = `
+    <div class="modal sig-modal-card" style="max-width:680px;" onclick="event.stopPropagation()">
+      <h3 style="margin:0 0 6px;">${esc(opts.title || "Digitale Unterschrift")}</h3>
+      <p style="margin:0 0 14px; font-size:14px; color:var(--text-soft);">${esc(opts.subtitle || "Unterschreibe mit Finger, Maus oder Stylus im Feld unten.")}</p>
+      ${opts.askName ? `
+        <label style="display:block; margin-bottom:10px;">
+          <span style="font-size:13px; font-weight:600; color:var(--text);">Name der unterschreibenden Person</span>
+          <input type="text" id="sig-name-input" value="${esc(opts.defaultName || "")}" placeholder="z.B. Dr. Müller, Caritas Marburg, Max Mustermann" style="width:100%; margin-top:4px; padding:8px 10px; border:1px solid var(--border); border-radius:8px; font-size:15px; box-sizing:border-box; background:var(--input-bg); color:var(--text);">
+        </label>` : ""}
+      <div class="sig-canvas-wrap">
+        <canvas id="sig-canvas" width="${SIG_CANVAS_W}" height="${SIG_CANVAS_H}"></canvas>
+        <div class="sig-canvas-line"></div>
+        <div class="sig-canvas-hint">Hier unterschreiben</div>
+      </div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:14px;">
+        <button onclick="clearSignaturePad()" class="btn-secondary" style="flex:1; min-width:120px;">🗑 Löschen</button>
+        <button onclick="cancelSignaturePad()" class="btn-secondary" style="flex:1; min-width:120px;">Abbrechen</button>
+        <button onclick="saveSignaturePad()" id="sig-save-btn" style="flex:2; min-width:140px;">✓ Übernehmen</button>
+      </div>
+      <p style="margin:14px 0 0; font-size:12px; color:var(--text-soft);">💡 Tipp: Auf Tablet/Smartphone mit dem Finger oder Stylus unterschreiben - das funktioniert genauso wie bei einem DHL-Paketboten.</p>
+    </div>`;
+  modal.onclick = (e) => { if (e.target === modal) cancelSignaturePad(); };
+  document.body.appendChild(modal);
+  setupSignatureCanvas();
+  // Stash callback in module-level state
+  window._sigCallback = opts.onSave;
+  window._sigAskName = !!opts.askName;
+}
+
+function setupSignatureCanvas() {
+  const canvas = document.getElementById("sig-canvas");
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+  // High-DPI support
+  const dpr = window.devicePixelRatio || 1;
+  if (dpr > 1) {
+    canvas.width = SIG_CANVAS_W * dpr;
+    canvas.height = SIG_CANVAS_H * dpr;
+    canvas.style.width = SIG_CANVAS_W + "px";
+    canvas.style.height = SIG_CANVAS_H + "px";
+    ctx.scale(dpr, dpr);
+  }
+  ctx.lineWidth = 2.2;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.strokeStyle = "#1e293b";
+
+  let drawing = false;
+  let hasInk = false;
+  let lastX = 0, lastY = 0;
+
+  function getXY(e) {
+    const rect = canvas.getBoundingClientRect();
+    let cx, cy;
+    if (e.touches && e.touches[0]) {
+      cx = e.touches[0].clientX; cy = e.touches[0].clientY;
+    } else {
+      cx = e.clientX; cy = e.clientY;
+    }
+    return { x: cx - rect.left, y: cy - rect.top };
+  }
+
+  function start(e) {
+    e.preventDefault();
+    drawing = true;
+    const p = getXY(e);
+    lastX = p.x; lastY = p.y;
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y);
+    // Hide hint on first stroke
+    if (!hasInk) {
+      hasInk = true;
+      const hint = document.querySelector(".sig-canvas-hint");
+      if (hint) hint.style.display = "none";
+    }
+  }
+  function move(e) {
+    if (!drawing) return;
+    e.preventDefault();
+    const p = getXY(e);
+    ctx.lineTo(p.x, p.y);
+    ctx.stroke();
+    lastX = p.x; lastY = p.y;
+  }
+  function end(e) {
+    if (!drawing) return;
+    e.preventDefault();
+    drawing = false;
+  }
+
+  // Mouse
+  canvas.addEventListener("mousedown", start);
+  canvas.addEventListener("mousemove", move);
+  canvas.addEventListener("mouseup", end);
+  canvas.addEventListener("mouseleave", end);
+  // Touch
+  canvas.addEventListener("touchstart", start, { passive: false });
+  canvas.addEventListener("touchmove", move, { passive: false });
+  canvas.addEventListener("touchend", end, { passive: false });
+  canvas.addEventListener("touchcancel", end, { passive: false });
+
+  window._sigHasInk = () => hasInk;
+}
+
+function clearSignaturePad() {
+  const canvas = document.getElementById("sig-canvas");
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const hint = document.querySelector(".sig-canvas-hint");
+  if (hint) hint.style.display = "";
+  window._sigHasInk = () => false;
+}
+
+function cancelSignaturePad() {
+  const m = document.getElementById("sig-modal");
+  if (m) m.remove();
+  window._sigCallback = null;
+}
+
+function saveSignaturePad() {
+  const canvas = document.getElementById("sig-canvas");
+  if (!canvas) return;
+  if (!window._sigHasInk || !window._sigHasInk()) {
+    alert("Bitte zuerst unterschreiben.");
+    return;
+  }
+  let signerName = "";
+  if (window._sigAskName) {
+    const inp = document.getElementById("sig-name-input");
+    signerName = inp ? inp.value.trim() : "";
+    if (!signerName) {
+      alert("Bitte den Namen der unterschreibenden Person eintragen.");
+      if (inp) inp.focus();
+      return;
+    }
+  }
+  // Compress: render to smaller JPEG (saves ~70% vs PNG, no visible quality loss)
+  // Target: 400x133px (3:1 ratio matches canvas), JPEG quality 0.8
+  const TARGET_W = 400;
+  const TARGET_H = 133;
+  const tmp = document.createElement("canvas");
+  tmp.width = TARGET_W;
+  tmp.height = TARGET_H;
+  const tctx = tmp.getContext("2d");
+  tctx.fillStyle = "#ffffff";
+  tctx.fillRect(0, 0, TARGET_W, TARGET_H);
+  tctx.imageSmoothingEnabled = true;
+  tctx.imageSmoothingQuality = "high";
+  tctx.drawImage(canvas, 0, 0, TARGET_W, TARGET_H);
+  const dataUrl = tmp.toDataURL("image/jpeg", 0.8);
+  const timestamp = new Date().toISOString();
+  // Gather a lightweight device fingerprint to strengthen evidentiary value
+  const device = collectDeviceFingerprint();
+  const cb = window._sigCallback;
+  cancelSignaturePad();
+  if (typeof cb === "function") cb(dataUrl, timestamp, signerName, device);
+}
+
+// Collect a lightweight device fingerprint for stronger signature evidence
+// Note: We deliberately avoid invasive fingerprinting. Just enough info to
+// distinguish "signed on the user's iPad in their kitchen" from "signed on a different device".
+function collectDeviceFingerprint() {
+  try {
+    const ua = (navigator.userAgent || "").substring(0, 120);
+    const lang = navigator.language || "";
+    const w = (window.screen && window.screen.width) || 0;
+    const h = (window.screen && window.screen.height) || 0;
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+    const offset = new Date().getTimezoneOffset();
+    return {
+      userAgentShort: shortenUA(ua),
+      language: lang,
+      screen: w + "x" + h,
+      timezone: tz,
+      tzOffset: offset,
+    };
+  } catch (e) {
+    return null;
+  }
+}
+
+// Boil down browser UA to a friendly device name like "iPhone Safari", "Windows Chrome"
+function shortenUA(ua) {
+  if (!ua) return "";
+  let device = "";
+  if (/iPhone/.test(ua)) device = "iPhone";
+  else if (/iPad/.test(ua)) device = "iPad";
+  else if (/Android/.test(ua)) device = "Android";
+  else if (/Macintosh/.test(ua)) device = "Mac";
+  else if (/Windows/.test(ua)) device = "Windows";
+  else if (/Linux/.test(ua)) device = "Linux";
+  let browser = "";
+  if (/Edg\//.test(ua)) browser = "Edge";
+  else if (/Chrome\//.test(ua)) browser = "Chrome";
+  else if (/Firefox\//.test(ua)) browser = "Firefox";
+  else if (/Safari\//.test(ua)) browser = "Safari";
+  return [device, browser].filter(Boolean).join(" ") || "Unbekannt";
+}
+
+// Format signature timestamp as "28.04.2026, 14:32"
+function fmtSigTimestamp(iso) {
+  if (!iso) return "";
+  try {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return "";
+    const dd = String(d.getDate()).padStart(2, "0");
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const yyyy = d.getFullYear();
+    const hh = String(d.getHours()).padStart(2, "0");
+    const mi = String(d.getMinutes()).padStart(2, "0");
+    return `${dd}.${mm}.${yyyy}, ${hh}:${mi} Uhr`;
+  } catch (e) { return ""; }
+}
+
+// Render a signature inline (in wizard or print)
+function renderSignatureBlock(sig, opts) {
+  // sig: { dataUrl, timestamp, signerName, device } or null
+  // opts: { showRemove: bool, onRemove: string (JS expression), maxHeight: number, showDevice: bool }
+  if (!sig || !sig.dataUrl) return "";
+  const maxH = opts && opts.maxHeight ? opts.maxHeight : 80;
+  const showDevice = !opts || opts.showDevice !== false;
+  const deviceStr = (showDevice && sig.device && sig.device.userAgentShort) ? ` · auf ${esc(sig.device.userAgentShort)}` : "";
+  return `
+    <div class="sig-display">
+      <img src="${sig.dataUrl}" alt="Unterschrift" style="max-height:${maxH}px; max-width:100%; display:block;">
+      <div class="sig-meta">
+        ${sig.signerName ? `<strong>${esc(sig.signerName)}</strong> · ` : ""}Digital unterzeichnet am ${esc(fmtSigTimestamp(sig.timestamp))}${deviceStr}
+      </div>
+      ${opts && opts.showRemove && opts.onRemove ? `<button class="btn-secondary sig-remove-btn" onclick="${opts.onRemove}">🗑 Unterschrift entfernen</button>` : ""}
+    </div>`;
+}
+
+// === SIGNATURE STATE HELPERS ===
+
+// Each doc gets a `signatures` map in its state:
+//   ds.signatures = {
+//     gesamt: { dataUrl, timestamp, signerName },           // Document-level "by signer" (Therapeut, Einrichtung, Geschädigter)
+//     gesamt_proband: { dataUrl, timestamp, signerName },   // Document-level "by user" (proband)
+//     row_<sectionId>_<rowIdx>: { dataUrl, timestamp, signerName }  // Per-row
+//   }
+
+function ensureSignaturesObj(docId) {
+  const ds = state.docs[docId];
+  if (!ds.signatures) ds.signatures = {};
+  return ds.signatures;
+}
+
+function getSignature(docId, key) {
+  const ds = state.docs[docId];
+  if (!ds || !ds.signatures) return null;
+  return ds.signatures[key] || null;
+}
+
+function setSignature(docId, key, sig) {
+  const sigs = ensureSignaturesObj(docId);
+  sigs[key] = sig;
+  debouncedSave();
+}
+
+function removeSignature(docId, key) {
+  const ds = state.docs[docId];
+  if (!ds || !ds.signatures) return;
+  delete ds.signatures[key];
+  debouncedSave();
+  render();
+}
+
+// Open pad for document-level signature (e.g. Therapeut on Therapie doc)
+function signDocument(docId, key, opts) {
+  // opts: { title, subtitle, askName, defaultName }
+  openSignaturePad({
+    title: opts.title || "Unterschrift",
+    subtitle: opts.subtitle || "",
+    askName: opts.askName !== false,
+    defaultName: opts.defaultName || "",
+    onSave: (dataUrl, timestamp, signerName, device) => {
+      setSignature(docId, key, { dataUrl, timestamp, signerName, device });
+      render();
+    }
+  });
+}
+
+// Open pad for per-row signature (e.g. each Sozialstunden row)
+function signRow(docId, sectionId, rowIdx, opts) {
+  const key = `row_${sectionId}_${rowIdx}`;
+  openSignaturePad({
+    title: opts.title || "Unterschrift für diese Zeile",
+    subtitle: opts.subtitle || "",
+    askName: true,
+    defaultName: opts.defaultName || "",
+    onSave: (dataUrl, timestamp, signerName, device) => {
+      setSignature(docId, key, { dataUrl, timestamp, signerName, device });
+      render();
+    }
+  });
+}
+
+function getRowSignature(docId, sectionId, rowIdx) {
+  return getSignature(docId, `row_${sectionId}_${rowIdx}`);
+}
+
+function removeRowSignature(docId, sectionId, rowIdx) {
+  removeSignature(docId, `row_${sectionId}_${rowIdx}`);
+}
+
 async function downloadDocBundle(docId) {
   const btn = event && event.target;
   const origText = btn ? btn.textContent : "";
@@ -2498,7 +2958,7 @@ let showArchived = false;
 function toggleShowArchived() { showArchived = !showArchived; render(); }
 
 // === VERSION INFO ===
-const APP_VERSION = "v3.7";
+const APP_VERSION = "v3.8";
 
 // === ONBOARDING ===
 let onboardingActive = false;
@@ -3200,6 +3660,21 @@ function renderBelegeView() {
   const totalSize = all.reduce((s, x) => s + (x.att.size || 0), 0);
   const totalSizeMb = (totalSize / 1024 / 1024).toFixed(2);
 
+  // Also tally signatures
+  let sigCount = 0, sigSize = 0;
+  Object.keys(state.docs).forEach(docId => {
+    const sigs = state.docs[docId] && state.docs[docId].signatures;
+    if (!sigs) return;
+    Object.values(sigs).forEach(sig => {
+      if (sig && sig.dataUrl) {
+        sigCount++;
+        // Estimate base64 dataUrl size
+        sigSize += Math.round(sig.dataUrl.length * 0.75);
+      }
+    });
+  });
+  const sigSizeKb = (sigSize / 1024).toFixed(0);
+
   let listHtml = "";
   if (all.length === 0) {
     listHtml = `<div style="text-align:center; padding:40px; color:var(--text-soft);">Keine Belege vorhanden.</div>`;
@@ -3234,7 +3709,8 @@ function renderBelegeView() {
     <div style="background:var(--card); border:1px solid var(--border); border-radius:14px; padding:20px; margin-top:14px;">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:8px;">
         <div>
-          <strong>${all.length} Beleg(e)</strong> · Gesamt: <strong>${totalSizeMb} MB</strong>
+          <strong>${all.length} Beleg(e)</strong> · Gesamt Belege: <strong>${totalSizeMb} MB</strong>
+          ${sigCount > 0 ? `<br><span style="font-size:13px; color:var(--text-soft);">+ ${sigCount} digitale Unterschrift(en) · ca. ${sigSizeKb} KB</span>` : ""}
         </div>
         <div style="font-size:12px; color:var(--text-soft);">Sortiert nach Größe (größte zuerst)</div>
       </div>
@@ -3335,6 +3811,13 @@ function sectionStatus(sec) {
   if (sec.type === "checkboxes") {
     const checks = getChecks(sec.id);
     return Object.values(checks).some(v => v) ? "done" : "empty";
+  }
+  if (sec.type === "signatures") {
+    const docId = state.activeDocId;
+    const sigs = state.docs[docId] && state.docs[docId].signatures;
+    if (!sigs) return "empty";
+    if (sigs.gesamt_proband || sigs.gesamt) return "done";
+    return "empty";
   }
   if (!sec.fields) return "empty";
   const total = sec.fields.length; if (total === 0) return "empty";
@@ -4026,6 +4509,17 @@ function renderHelpView() {
       </ul>
       <p style="font-size:13px; color:var(--text-soft);">💡 <strong>Hintergrund:</strong> E-Mail-Programme nutzen einen Standard (mailto:), der keine Anhänge unterstützt. Daher dieser Umweg über Teilen-Menü oder ZIP – beide Wege sind aber komfortabel.</p>
 
+      <h2 style="color:var(--primary); font-size:18px; margin:18px 0 10px;">✍️ Bestätigungen / Unterschriften – drei Wege</h2>
+      <p>Bei <strong>Sozialstunden, Therapie, Schadenswiedergutmachung und BH-Terminen</strong> kannst du Bestätigungen auf drei Wegen einsammeln – ganz wie es der Einrichtung, Therapeut:in oder Geschädigten am liebsten ist:</p>
+      <ol style="padding-left:20px;">
+        <li><strong>Digital direkt in der App</strong> – mit Finger oder Stylus auf dem Bildschirm. Schnell, papierlos, mit Zeitstempel und Geräte-Info dokumentiert. Pro Zeile (z.B. einzelner Einsatz) oder als Sammel-Unterschrift am Ende.</li>
+        <li><strong>Klassisch auf Papier + Foto</strong> – ausdrucken, unterschreiben/stempeln lassen, abfotografieren und als Beleg an die Zeile anhängen. Ideal wenn die Einrichtung lieber „handschriftlich + Stempel" macht.</li>
+        <li><strong>Stempel-Foto</strong> – manche Einrichtungen (Caritas, Diakonie etc.) haben einen offiziellen Stempel der mehr zählt als die Unterschrift. Stempel auf Papier abdrücken, fotografieren, als Beleg anhängen.</li>
+      </ol>
+      <p>Im Ausdruck und Word-Dokument erscheinen <strong>digitale Unterschriften als Bild mit Zeitstempel und Gerät</strong>. Wenn nicht digital signiert wurde, bleiben die Unterschriftslinien für handschriftliche Eintragungen frei. Beides nebeneinander geht auch.</p>
+      <p style="font-size:13px; color:var(--text-soft);">⚖️ <strong>Rechtlicher Hinweis:</strong> Eine digitale Unterschrift in dieser App ist <em>keine qualifizierte elektronische Signatur</em> im Sinne der eIDAS-Verordnung. Sie hat aber Beweiswert (vergleichbar mit einer Unterschrift auf einem DHL-Paket-Tablet). Für förmliche Anträge bei Gericht ist weiterhin eine handschriftliche Papier-Unterschrift erforderlich.</p>
+      <p style="font-size:13px; color:var(--text-soft);">📋 <strong>Verifikations-Seite:</strong> Am Ende des Ausdrucks erscheint eine Übersicht aller digital erfassten Unterschriften – mit Zeitpunkt, Gerät und Zeitzone. Damit kann die empfangende Stelle (Bewährungshilfe, Gericht) die Echtheit einordnen.</p>
+
       <h2 style="color:var(--primary); font-size:18px; margin:18px 0 10px;">📦 Belege verwalten</h2>
       <p>Wenn der Speicher knapp wird (gelbe/rote Anzeige): über „📦 Belege verwalten" siehst du alle Belege sortiert nach Größe und kannst die größten zuerst löschen. Vorher unbedingt sichern!</p>
 
@@ -4646,6 +5140,7 @@ function renderWizard() {
   else if (sec.type === "freetext") body = renderFieldsSection(sec, "freetext");
   else if (sec.type === "rows") body = renderRowsSection(sec);
   else if (sec.type === "checkboxes") body = renderCheckboxSection(sec);
+  else if (sec.type === "signatures") body = renderSignaturesSection(sec, doc);
 
   return `
     <div class="header">
@@ -4825,11 +5320,36 @@ function renderRowsSection(sec) {
           </div>
         </div>`;
     }
+    let signatureHtml = "";
+    if (sec.hasRowSignature) {
+      const docId = state.activeDocId;
+      const rowSig = getRowSignature(docId, sec.id, idx);
+      if (rowSig) {
+        signatureHtml = `
+          <div class="attachments-area" style="background:transparent; padding:6px 0;">
+            <div class="sig-row-mini">
+              <img src="${rowSig.dataUrl}" alt="Unterschrift">
+              <div>
+                ${rowSig.signerName ? `<strong style="font-size:12px;">${esc(rowSig.signerName)}</strong><br>` : ""}
+                <span class="sig-row-mini-meta">${esc(fmtSigTimestamp(rowSig.timestamp))}</span>
+              </div>
+              <button class="sig-row-btn" onclick="removeRowSignature('${docId}', '${sec.id}', ${idx})">✕ Unterschrift löschen</button>
+            </div>
+          </div>`;
+      } else {
+        const rowDateLabel = row.datum ? "vom " + row.datum : "Eintrag #" + (idx + 1);
+        signatureHtml = `
+          <div class="attachments-area" style="background:transparent; padding:6px 0;">
+            <button class="sig-row-btn" onclick="signRow('${docId}', '${sec.id}', ${idx}, { title: 'Unterschrift ${esc(rowDateLabel)}', subtitle: 'Bitte Name eintragen und unterschreiben.', defaultName: '' })">✍️ Diese Zeile unterzeichnen lassen</button>
+          </div>`;
+      }
+    }
     html += `
       <div class="row-card${visible ? '' : ' search-hidden'}">
         <div class="row-num">#${idx + 1}${pastMarker}</div>
         <div class="row-grid">${cols}</div>
         ${attachmentsHtml}
+        ${signatureHtml}
         <div class="row-actions">
           <button class="row-delete" onclick="deleteRow('${sec.id}', ${idx})">🗑 Eintrag entfernen</button>
         </div>
@@ -4852,6 +5372,39 @@ function renderCheckboxSection(sec) {
       </label>`;
   });
   html += `</div>`;
+  return html;
+}
+
+// Render the signatures section - shows the document-level signatures (proband + counter-signer)
+function renderSignaturesSection(sec, doc) {
+  const docId = doc.id || state.activeDocId;
+  const probandSig = getSignature(docId, "gesamt_proband");
+  const counterSig = getSignature(docId, "gesamt");
+  const probandName = state.shared && state.shared.name ? state.shared.name : "";
+  const counterRoleLabel = sec.counterRoleLabel || "Bestätigt durch";
+  const counterPlaceholder = sec.counterPlaceholder || "z.B. Therapeut, Einrichtungsleitung";
+
+  let html = `
+    <div style="padding:14px; background:var(--bg); border-radius:10px; margin-bottom:16px; font-size:14px; line-height:1.5;">
+      Auf dieser Seite kannst du Unterschriften hinzufügen, die im Ausdruck und im Word-Dokument erscheinen.
+      <br><br>
+      💡 <strong>Hinweis:</strong> Eine digitale Unterschrift hier ist <em>keine qualifizierte elektronische Signatur</em> im juristischen Sinne, hat aber Beweiswert (vergleichbar mit einer Unterschrift auf einem DHL-Paket-Tablet). Für förmliche Anträge bei Gericht ist weiterhin eine handschriftliche Papier-Unterschrift erforderlich.
+    </div>
+
+    <div style="display:grid; gap:18px;">
+      <div>
+        <h3 style="margin:0 0 8px; font-size:15px; color:var(--primary);">Unterschrift Proband:in${probandName ? " (" + esc(probandName) + ")" : ""}</h3>
+        ${probandSig ? renderSignatureBlock(probandSig, { showRemove: true, onRemove: `removeSignature('${docId}', 'gesamt_proband')` })
+          : `<button class="sig-add-btn" onclick="signDocument('${docId}', 'gesamt_proband', { title: 'Deine Unterschrift', subtitle: 'Bitte unterschreibe im Feld unten.', askName: true, defaultName: ${JSON.stringify(probandName)} })">✍️ Jetzt unterschreiben</button>`}
+      </div>
+
+      <div>
+        <h3 style="margin:0 0 8px; font-size:15px; color:var(--primary);">${esc(counterRoleLabel)}</h3>
+        ${counterSig ? renderSignatureBlock(counterSig, { showRemove: true, onRemove: `removeSignature('${docId}', 'gesamt')` })
+          : `<button class="sig-add-btn" onclick="signDocument('${docId}', 'gesamt', { title: ${JSON.stringify(counterRoleLabel)}, subtitle: 'Bitte den Namen eintragen und unterschreiben.', askName: true, defaultName: '' })">✍️ ${esc(counterRoleLabel)}</button>`}
+        <p style="font-size:12px; color:var(--text-soft); margin-top:6px;">${esc(counterPlaceholder)}</p>
+      </div>
+    </div>`;
   return html;
 }
 
@@ -5170,6 +5723,117 @@ function closePreview() { state.view = "wizard"; render(); window.scrollTo(0,0);
 // ============================================
 // PRINT VIEW (HTML rendering of each doc)
 // ============================================
+
+// Render document-level signatures section for print (proband + counter-signer)
+function renderPrintSignatures(docId, opts) {
+  // opts: { counterRoleLabel, probandLabel, hideIfEmpty }
+  opts = opts || {};
+  const probandSig = getSignature(docId, "gesamt_proband");
+  const counterSig = getSignature(docId, "gesamt");
+  const counterRoleLabel = opts.counterRoleLabel || "Bestätigt durch";
+  const probandLabel = opts.probandLabel || "Proband:in";
+  const probandName = (state.shared && state.shared.name) || "";
+
+  if (opts.hideIfEmpty && !probandSig && !counterSig) return "";
+
+  const renderSlot = (sig, fallbackLabel, fallbackName) => {
+    if (sig && sig.dataUrl) {
+      const deviceStr = (sig.device && sig.device.userAgentShort) ? ` · ${esc(sig.device.userAgentShort)}` : "";
+      return `
+        <div class="print-sig-slot">
+          <div class="print-sig-img-wrap">
+            <img src="${sig.dataUrl}" alt="Unterschrift" class="print-sig-img">
+          </div>
+          <div class="print-sig-line"></div>
+          <div class="print-sig-label">
+            ${sig.signerName ? `<strong>${esc(sig.signerName)}</strong><br>` : (fallbackName ? `<strong>${esc(fallbackName)}</strong><br>` : "")}
+            <span style="font-size:10px; color:#666;">Digital unterzeichnet am ${esc(fmtSigTimestamp(sig.timestamp))}${deviceStr}</span><br>
+            <span style="font-size:11px;">${esc(fallbackLabel)}</span>
+          </div>
+        </div>`;
+    }
+    // Empty slot for handwritten signature
+    return `
+      <div class="print-sig-slot">
+        <div class="print-sig-img-wrap"><!-- space for handwritten --></div>
+        <div class="print-sig-line"></div>
+        <div class="print-sig-label">
+          ${fallbackName ? `<strong>${esc(fallbackName)}</strong><br>` : ""}
+          <span style="font-size:11px;">${esc(fallbackLabel)}</span><br>
+          <span style="font-size:10px; color:#888;">(Ort, Datum, Unterschrift)</span>
+        </div>
+      </div>`;
+  };
+
+  return `
+    <div class="print-signatures">
+      ${renderSlot(probandSig, probandLabel, probandName)}
+      ${renderSlot(counterSig, counterRoleLabel, "")}
+    </div>`;
+}
+
+// Render an inline mini-signature block for a row (used in Sozial/Schadens print tables)
+function renderPrintRowSignature(docId, sectionId, rowIdx) {
+  const sig = getRowSignature(docId, sectionId, rowIdx);
+  if (!sig || !sig.dataUrl) return "";
+  return `
+    <div class="print-row-sig">
+      <img src="${sig.dataUrl}" alt="Unterschrift">
+      <div>
+        ${sig.signerName ? `<div style="font-weight:600; font-size:9px;">${esc(sig.signerName)}</div>` : ""}
+        <div style="font-size:8px; color:#666;">Digital ${esc(fmtSigTimestamp(sig.timestamp))}</div>
+      </div>
+    </div>`;
+}
+
+// Render a verification summary page listing all digital signatures with metadata
+// Useful for someone receiving the print: they see at a glance which signatures
+// were captured digitally, when, on what device, and can compare with the visible signatures.
+function renderPrintVerificationFooter(docId) {
+  const ds = state.docs[docId];
+  if (!ds || !ds.signatures) return "";
+  const sigs = ds.signatures;
+  const entries = Object.keys(sigs).map(key => ({ key, sig: sigs[key] })).filter(e => e.sig && e.sig.dataUrl);
+  if (entries.length === 0) return "";
+
+  function describeKey(key) {
+    if (key === "gesamt_proband") return "Gesamt-Unterschrift Proband:in";
+    if (key === "gesamt") return "Gesamt-Unterschrift bestätigende Person";
+    const m = key.match(/^row_([^_]+)_(\d+)$/);
+    if (m) return `Zeile ${parseInt(m[2]) + 1} (${m[1]})`;
+    return key;
+  }
+
+  let rows = "";
+  entries.forEach((e, i) => {
+    const sig = e.sig;
+    const dev = sig.device || {};
+    rows += `<tr>
+      <td>${i + 1}</td>
+      <td>${esc(describeKey(e.key))}</td>
+      <td>${esc(sig.signerName || "(ohne Name)")}</td>
+      <td>${esc(fmtSigTimestamp(sig.timestamp))}</td>
+      <td style="font-size:9pt;">${esc((dev.userAgentShort || "") + (dev.timezone ? " · " + dev.timezone : ""))}</td>
+    </tr>`;
+  });
+
+  return `
+    <div class="pagebreak"></div>
+    <div class="verification-footer">
+      <h2>📋 Verifikation digitaler Unterschriften</h2>
+      <p style="font-size:10pt; color:#555; margin-bottom:10pt;">
+        Diese Übersicht zeigt alle in diesem Dokument enthaltenen digitalen Unterschriften zum Zeitpunkt des Ausdrucks. Jede Zeile dokumentiert, wann und auf welchem Gerät unterzeichnet wurde - vergleichbar mit dem Logbuch eines DHL-Paket-Tablets.
+      </p>
+      <table>
+        <tr><th>Nr</th><th>Bereich</th><th>Unterzeichnet von</th><th>Zeitpunkt</th><th>Gerät / Zeitzone</th></tr>
+        ${rows}
+      </table>
+      <p style="font-size:9pt; font-style:italic; color:#888; margin-top:10pt;">
+        Diese Übersicht ist <strong>kein Beweismittel im Sinne einer qualifizierten elektronischen Signatur</strong> (eIDAS), sondern eine technische Dokumentation der erfassten Unterschriften zum Beweis-/Nachweiszweck im Alltag (vergleichbar einer Quittung).
+      </p>
+    </div>`;
+}
+
 function renderPrintView() {
   const pv = document.getElementById("printView");
   pv.classList.add("show");
@@ -5338,10 +6002,7 @@ function renderPrintEAR() {
     <h2>${saldoNum}. Zusammenfassung / Saldo</h2>
     ${saldoTable}
     ${noteSection}
-    <div class="signature">
-      <div>Ort, Datum</div>
-      <div>Unterschrift</div>
-    </div>
+    ${renderPrintSignatures("ear", { counterRoleLabel: "Bestätigung (optional)", probandLabel: "Eintragen durch (Proband:in)", hideIfEmpty: false })}
     <p style="font-size:8pt; font-style:italic; color:#666; margin-top:8pt;">Ich versichere, dass die vorstehenden Angaben vollständig und wahrheitsgemäß sind.</p>
   `;
 }
@@ -5425,7 +6086,7 @@ function renderPrintZeit() {
     <h1>Zeitstrahl / Lebensverlauf</h1>
     <div class="subtitle">Strukturierte Übersicht für die Bewährungshilfe</div>
     ${body}
-    <div class="signature"><div>Ort, Datum</div><div>Unterschrift</div></div>
+    ${renderPrintSignatures("zeit", { counterRoleLabel: "Bestätigung (optional)", probandLabel: "Eintragen durch (Proband:in)" })}
     <p style="font-size:8pt; font-style:italic; color:#666; margin-top:8pt;">Ich versichere, dass die vorstehenden Angaben nach bestem Wissen vollständig und wahrheitsgemäß sind.</p>
   `;
 }
@@ -5553,11 +6214,11 @@ function renderPrintThera() {
   if (spSection) {
     sections.push(`<h2>${sections.length + 1}. Schweigepflichtentbindung</h2>${spSection}`);
   }
-  const therBestNum = sections.length + 1; // computed below for Therapeut signature heading
-  sections.push(`<div class="signature"><div>Ort, Datum</div><div>Unterschrift Patient/in</div></div>`);
-  sections.push(`<h2>${therBestNum + 1}. Bestätigung durch die/den Therapeut/in</h2>
-    <p>Ich bestätige hiermit die in dieser Übersicht aufgeführten Angaben sowie die Wahrnehmung der oben angegebenen Termine.</p>
-    <div class="signature"><div>Ort, Datum</div><div>Unterschrift / Stempel Therapeut/in</div></div>`);
+  const therBestNum = sections.length + 1;
+  sections.push(`<h2>${therBestNum}. Bestätigung & Unterschriften</h2>
+    <p style="font-size:11pt;">Ich bestätige hiermit die in dieser Übersicht aufgeführten Angaben sowie die Wahrnehmung der oben angegebenen Termine.</p>
+    ${renderPrintSignatures("thera", { counterRoleLabel: "Therapeut:in (Unterschrift / Stempel)", probandLabel: "Patient:in" })}`);
+  sections.push(renderPrintVerificationFooter("thera"));
 
   return `
     ${briefkopf}
@@ -5613,14 +6274,15 @@ function renderPrintSchadens() {
   const filtered = zahlungenRows.map((r, origIdx) => ({ ...r, _origIdx: origIdx })).filter(r => r.datum || r.betrag);
   let zahlungTbl = "", gezahlt = 0;
   if (filtered.length > 0) {
-    zahlungTbl = `<table><tr><th>Nr</th><th>Datum</th><th>Betrag (EUR)</th><th>Beleg-Nr / Referenz</th><th>Art</th><th>Bemerkung</th><th>Beleg</th></tr>`;
+    zahlungTbl = `<table><tr><th>Nr</th><th>Datum</th><th>Betrag (EUR)</th><th>Beleg-Nr / Referenz</th><th>Art</th><th>Bemerkung</th><th>Beleg</th><th>Quittung Geschädigte:r</th></tr>`;
     filtered.forEach((r, displayIdx) => {
       const n = parseMoney(r.betrag || ""); gezahlt += n;
       const atts = getAttachments("zahlungen", r._origIdx);
       const attMark = atts.length > 0 ? `📎 ${atts.length}` : "";
-      zahlungTbl += `<tr><td>${displayIdx + 1}</td><td>${esc(r.datum || "")}</td><td>${r.betrag ? moneyOnly(n) : ""}</td><td>${esc(r.beleg || "")}</td><td>${esc(r.art || "")}</td><td>${esc(r.bemerkung || "")}</td><td style="text-align:center;">${attMark}</td></tr>`;
+      const rowSigHtml = renderPrintRowSignature("schadens", "zahlungen", r._origIdx);
+      zahlungTbl += `<tr><td>${displayIdx + 1}</td><td>${esc(r.datum || "")}</td><td>${r.betrag ? moneyOnly(n) : ""}</td><td>${esc(r.beleg || "")}</td><td>${esc(r.art || "")}</td><td>${esc(r.bemerkung || "")}</td><td style="text-align:center;">${attMark}</td><td style="height:36pt; vertical-align:middle;">${rowSigHtml || "&nbsp;"}</td></tr>`;
     });
-    zahlungTbl += `<tr><td class="sum" colspan="2">Summe</td><td class="sum">${moneyOnly(gezahlt)}</td><td class="sum" colspan="4">${filtered.length} Zahlung(en)</td></tr></table>`;
+    zahlungTbl += `<tr><td class="sum" colspan="2">Summe</td><td class="sum">${moneyOnly(gezahlt)}</td><td class="sum" colspan="5">${filtered.length} Zahlung(en)</td></tr></table>`;
   } else {
     zahlungTbl = `<p style="font-style:italic; color:#888;">(noch keine Zahlungen erfasst)</p>`;
   }
@@ -5680,8 +6342,9 @@ function renderPrintSchadens() {
     <h2>4. Zahlungsverlauf</h2>${zahlungTbl}
     ${progress ? `<h2>5. Fortschritt / Restbetrag</h2>${progress}` : ""}
     ${noteSection}
-    <div class="signature"><div>Ort, Datum</div><div>Unterschrift</div></div>
+    ${renderPrintSignatures("schadens", { counterRoleLabel: "Empfangsbestätigung Geschädigte:r", probandLabel: "Bewährter / Bewährte" })}
     <p style="font-size:8pt; font-style:italic; color:#666; margin-top:8pt;">Belege (Überweisungsnachweise, Quittungen) sind diesem Nachweis ${state.printWithAttachments && filtered.some(r => getAttachments("zahlungen", r._origIdx).length > 0) ? "auf den folgenden Seiten" : "separat"} beigefügt.</p>
+    ${renderPrintVerificationFooter("schadens")}
     ${attachmentPages}
   `;
 }
@@ -5730,6 +6393,7 @@ function renderPrintSozial() {
     stundenSum += h;
     const atts = getAttachments("stunden", r._origIdx);
     const attMark = atts.length > 0 ? `📎 ${atts.length}` : "";
+    const rowSigHtml = renderPrintRowSignature("sozial", "stunden", r._origIdx);
     stTbl += `<tr>
       <td>${i + 1}</td>
       <td>${esc(r.datum || "")}</td>
@@ -5739,7 +6403,7 @@ function renderPrintSozial() {
       <td>${esc(r.stunden || "")}</td>
       <td>${esc(r.taetigkeit || "")}</td>
       <td style="text-align:center;">${attMark}</td>
-      <td style="height:36pt;">&nbsp;</td>
+      <td style="height:36pt; vertical-align:middle;">${rowSigHtml || "&nbsp;"}</td>
     </tr>`;
   });
   // Add empty rows for further entries
@@ -5801,7 +6465,8 @@ function renderPrintSozial() {
     ${stTbl}
     ${progress ? `<div class="pagebreak"></div><h2>5. Fortschritt</h2>${progress}` : ""}
     ${noteSection}
-    <div class="signature"><div>Ort, Datum</div><div>Unterschrift Bewährter/Bewährte</div></div>
+    ${renderPrintSignatures("sozial", { counterRoleLabel: "Bestätigung durch Einrichtung", probandLabel: "Bewährter / Bewährte" })}
+    ${renderPrintVerificationFooter("sozial")}
     ${attachmentPages}
   `;
 }
@@ -6093,7 +6758,9 @@ function renderPrintBhtermine() {
     <h2>Termine</h2>${termineTbl}
     ${nextTbl || vorbereitungSection ? `<h2>Nächster Termin</h2>${nextTbl}${vorbereitungSection}` : ""}
     ${noteSection}
+    ${renderPrintSignatures("bhtermine", { counterRoleLabel: "Bewährungshelfer:in (optional)", probandLabel: "Bewährter / Bewährte" })}
     <p style="font-size:8pt; font-style:italic; color:#666; margin-top:14pt;">Persönliche Notizen zur eigenen Vorbereitung und Übersicht.</p>
+    ${renderPrintVerificationFooter("bhtermine")}
   `;
 }
 
@@ -6507,6 +7174,73 @@ function docxSignature(width) {
   });
 }
 
+// Convert base64 dataUrl to Uint8Array for docx ImageRun
+function dataUrlToBytes(dataUrl) {
+  if (!dataUrl) return null;
+  const m = dataUrl.match(/^data:[^;]+;base64,(.+)$/);
+  if (!m) return null;
+  const b64 = m[1];
+  const bin = atob(b64);
+  const arr = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  return arr;
+}
+
+// New: signature block with optional digital signatures (proband + counter)
+function docxSignatureBlock(width, docId, opts) {
+  // opts: { counterRoleLabel, probandLabel }
+  opts = opts || {};
+  const { D, border, cellMargins } = docxBase();
+  const half = Math.floor(width / 2);
+  const probandSig = getSignature(docId, "gesamt_proband");
+  const counterSig = getSignature(docId, "gesamt");
+  const probandName = (state.shared && state.shared.name) || "";
+  const probandLabel = opts.probandLabel || "Proband:in";
+  const counterRoleLabel = opts.counterRoleLabel || "Bestätigt durch";
+
+  function buildCell(sig, fallbackLabel, fallbackName, cellWidth) {
+    const cellChildren = [];
+    if (sig && sig.dataUrl) {
+      try {
+        const bytes = dataUrlToBytes(sig.dataUrl);
+        if (bytes) {
+          cellChildren.push(new D.Paragraph({
+            children: [new D.ImageRun({
+              data: bytes,
+              transformation: { width: 180, height: 60 }
+            })]
+          }));
+        }
+      } catch (e) { /* fall through */ }
+    }
+    // The signature line itself
+    cellChildren.push(docxP(sig && sig.signerName ? sig.signerName : (fallbackName || ""),
+      { size: 20, bold: !!(sig && sig.signerName), after: 0 }));
+    if (sig && sig.timestamp) {
+      cellChildren.push(docxP(`Digital unterzeichnet am ${fmtSigTimestamp(sig.timestamp)}`,
+        { size: 16, color: "666666", italics: true, after: 0 }));
+    }
+    cellChildren.push(docxP(fallbackLabel, { size: 18, color: "666666", after: 0 }));
+    if (!sig) {
+      cellChildren.push(docxP("(Ort, Datum, Unterschrift)", { size: 16, color: "888888", italics: true }));
+    }
+    return new D.TableCell({
+      borders: { top: border, bottom: { style: D.BorderStyle.NONE }, left: { style: D.BorderStyle.NONE }, right: { style: D.BorderStyle.NONE }},
+      width: { size: cellWidth, type: D.WidthType.DXA }, margins: cellMargins,
+      children: cellChildren
+    });
+  }
+
+  return new D.Table({
+    width: { size: width, type: D.WidthType.DXA },
+    columnWidths: [half, width - half],
+    rows: [new D.TableRow({ children: [
+      buildCell(probandSig, probandLabel, probandName, half),
+      buildCell(counterSig, counterRoleLabel, "", width - half)
+    ]})]
+  });
+}
+
 // ---- E-A-R ----
 async function buildEarDocx() {
   const { D, PAGE_W, PAGE_H, MARGIN, COLOR_SUB, COLOR_ZEILE } = docxBase();
@@ -6681,7 +7415,7 @@ async function buildEarDocx() {
     noteVal.value.split("\n").forEach(l => children.push(docxP(l || " ")));
   }
   children.push(new D.Paragraph({ spacing: { before: 480 }, children: [new D.TextRun({ text: "" })] }));
-  children.push(docxSignature(CONTENT_W));
+  children.push(docxSignatureBlock(CONTENT_W, "ear", { counterRoleLabel: "Bestätigung (optional)", probandLabel: "Eintragen durch (Proband:in)" }));
   children.push(docxP("Ich versichere, dass die vorstehenden Angaben vollständig und wahrheitsgemäß sind.", { size: 18, italics: true, color: "666666" }));
 
   const doc = new D.Document({
@@ -6796,7 +7530,7 @@ async function buildZeitDocx() {
     noteVal.value.split("\n").forEach(l => children.push(docxP(l || " ")));
   }
   children.push(new D.Paragraph({ spacing: { before: 360 }, children: [new D.TextRun({ text: "" })] }));
-  children.push(docxSignature(LAND_CONTENT_W));
+  children.push(docxSignatureBlock(LAND_CONTENT_W, "zeit", { counterRoleLabel: "Bestätigung (optional)", probandLabel: "Eintragen durch (Proband:in)" }));
   children.push(docxP("Ich versichere, dass die vorstehenden Angaben nach bestem Wissen vollständig und wahrheitsgemäß sind.", { size: 18, italics: true, color: "666666" }));
 
   const doc = new D.Document({
@@ -7180,7 +7914,7 @@ async function buildSchadensDocx() {
     noteVal.value.split("\n").forEach(l => children.push(docxP(l || " ")));
   }
   children.push(new D.Paragraph({ spacing: { before: 480 }, children: [new D.TextRun({ text: "" })] }));
-  children.push(docxSignature(CONTENT_W));
+  children.push(docxSignatureBlock(CONTENT_W, "schadens", { counterRoleLabel: "Empfangsbestätigung Geschädigte:r", probandLabel: "Bewährter / Bewährte" }));
   children.push(docxP("Belege (Überweisungsnachweise, Quittungen) sind diesem Nachweis beigefügt.", { size: 18, italics: true, color: "666666" }));
 
   const doc = new D.Document({
@@ -7382,7 +8116,7 @@ async function buildSozialDocx() {
     noteVal.value.split("\n").forEach(l => children.push(docxP(l || " ")));
   }
   children.push(new D.Paragraph({ spacing: { before: 360 }, children: [new D.TextRun({ text: "" })] }));
-  children.push(docxSignature(LAND_CONTENT_W));
+  children.push(docxSignatureBlock(LAND_CONTENT_W, "sozial", { counterRoleLabel: "Bestätigung durch Einrichtung", probandLabel: "Bewährter / Bewährte" }));
 
   const doc = new D.Document({
     creator: "Bewährungshilfe-Assistent",
