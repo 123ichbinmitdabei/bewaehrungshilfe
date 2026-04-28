@@ -2797,6 +2797,25 @@ function signDocument(docId, key, opts) {
   });
 }
 
+// Safe dispatcher to avoid quote-escaping issues in inline onclick attributes.
+// Stores opts in a global registry, called by short ID-based handlers.
+window._sigOpts = {};
+function _registerSigOpts(opts) {
+  const id = "sig_" + Math.random().toString(36).substring(2, 11);
+  window._sigOpts[id] = opts;
+  return id;
+}
+function dispatchSignDoc(optsId) {
+  const opts = window._sigOpts[optsId];
+  if (!opts) { console.error("Sig opts not found:", optsId); return; }
+  signDocument(opts.docId, opts.key, opts);
+}
+function dispatchSignRow(optsId) {
+  const opts = window._sigOpts[optsId];
+  if (!opts) { console.error("Sig opts not found:", optsId); return; }
+  signRow(opts.docId, opts.sectionId, opts.rowIdx, opts);
+}
+
 // Open pad for per-row signature (e.g. each Sozialstunden row)
 function signRow(docId, sectionId, rowIdx, opts) {
   const key = `row_${sectionId}_${rowIdx}`;
@@ -2958,7 +2977,7 @@ let showArchived = false;
 function toggleShowArchived() { showArchived = !showArchived; render(); }
 
 // === VERSION INFO ===
-const APP_VERSION = "v3.8";
+const APP_VERSION = "v3.9";
 
 // === ONBOARDING ===
 let onboardingActive = false;
@@ -3531,25 +3550,90 @@ function getTodayOverview() {
   const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
   const inWeek = new Date(today); inWeek.setDate(inWeek.getDate() + 7);
 
-  // 1. BH-Termin heute oder bald?
+  // Helper: classify a date relative to today and produce a label
+  function classifyDate(d) {
+    if (!d) return null;
+    const dd = new Date(d); dd.setHours(0,0,0,0);
+    const diffDays = Math.round((dd - today) / (1000*60*60*24));
+    if (diffDays === 0) return { kind: "danger", label: "Heute", days: 0 };
+    if (diffDays === 1) return { kind: "warn", label: "Morgen", days: 1 };
+    if (diffDays > 1 && diffDays <= 7) return { kind: "info", label: `In ${diffDays} Tagen`, days: diffDays };
+    if (diffDays < 0 && diffDays >= -7) return { kind: "danger", label: `Vor ${Math.abs(diffDays)} Tag${Math.abs(diffDays) !== 1 ? "en" : ""} (vergangen)`, days: diffDays };
+    return null; // Outside the 7-day window
+  }
+
+  // 1. BH-Termin: nächster (gespeichertes Feld)
   const naechsterDatum = state.docs.bhtermine?.answers?.["naechster.datum"];
   if (naechsterDatum) {
     const d = parseDateGuess(naechsterDatum);
-    if (d) {
-      d.setHours(0,0,0,0);
+    const cls = d ? classifyDate(d) : null;
+    if (cls && cls.days >= 0) {
       const uhrzeit = state.docs.bhtermine.answers?.["naechster.uhrzeit"] || "";
-      if (d.getTime() === today.getTime()) {
-        items.push({ kind: "danger", icon: "📅", text: `Heute BH-Termin${uhrzeit ? " um " + uhrzeit : ""}` });
-      } else if (d.getTime() === tomorrow.getTime()) {
-        items.push({ kind: "warn", icon: "📅", text: `Morgen BH-Termin${uhrzeit ? " um " + uhrzeit : ""}` });
-      } else if (d > today && d <= inWeek) {
-        const days = Math.round((d - today) / (1000*60*60*24));
-        items.push({ kind: "info", icon: "📅", text: `BH-Termin in ${days} Tagen` });
-      }
+      items.push({ kind: cls.kind, icon: "📅", text: `${cls.label} BH-Termin${uhrzeit ? " um " + uhrzeit : ""}` });
     }
   }
 
-  // 2. Schadens: Frist nahe?
+  // 2. BH-Termine aus Tabelle (gespeicherte Termine)
+  const bhRows = state.docs.bhtermine?.rows?.termine || [];
+  bhRows.forEach(row => {
+    if (!row.datum) return;
+    const d = parseDateGuess(row.datum);
+    const cls = d ? classifyDate(d) : null;
+    if (!cls || cls.days < 0) return;
+    // Skip if already covered by "naechster.datum"
+    if (naechsterDatum && row.datum === naechsterDatum) return;
+    const uhr = row.uhrzeit || "";
+    items.push({ kind: cls.kind, icon: "📅", text: `${cls.label} BH-Termin${uhr ? " um " + uhr : ""}${row.themen ? ": " + row.themen.substring(0, 40) : ""}` });
+  });
+
+  // 3. Therapie-Termine
+  const theraRows = state.docs.thera?.rows?.termine || [];
+  theraRows.forEach(row => {
+    if (!row.datum) return;
+    const d = parseDateGuess(row.datum);
+    const cls = d ? classifyDate(d) : null;
+    if (!cls || cls.days < 0) return;
+    const uhr = row.uhrzeit || row.von || "";
+    items.push({ kind: cls.kind, icon: "🧠", text: `${cls.label} Therapie-Termin${uhr ? " um " + uhr : ""}` });
+  });
+
+  // 4. Sozialstunden-Einsätze
+  const sozialRows = state.docs.sozial?.rows?.stunden || [];
+  sozialRows.forEach(row => {
+    if (!row.datum) return;
+    const d = parseDateGuess(row.datum);
+    const cls = d ? classifyDate(d) : null;
+    if (!cls || cls.days < 0) return;
+    const uhr = row.von || "";
+    const taet = row.taetigkeit ? ": " + row.taetigkeit.substring(0, 40) : "";
+    items.push({ kind: cls.kind, icon: "🤝", text: `${cls.label} Sozialstunden-Einsatz${uhr ? " ab " + uhr : ""}${taet}` });
+  });
+
+  // 5. Schadens: anstehende Zahlungen (Ratenzahlung)
+  const schadensRows = state.docs.schadens?.rows?.zahlungen || [];
+  schadensRows.forEach(row => {
+    if (!row.datum) return;
+    const d = parseDateGuess(row.datum);
+    const cls = d ? classifyDate(d) : null;
+    if (!cls || cls.days < 0) return;
+    // Only show as upcoming if no payment has been made yet for this row (no betrag set)
+    if (row.betrag) return; // Already paid - don't remind
+    const betrag = row.bemerkung ? " " + row.bemerkung.substring(0, 30) : "";
+    items.push({ kind: cls.kind, icon: "💶", text: `${cls.label} Schadens-Zahlung${betrag}` });
+  });
+
+  // 6. Verfahrenskosten: anstehende Zahlungen
+  const kostenRows = state.docs.kosten?.rows?.zahlungen || [];
+  kostenRows.forEach(row => {
+    if (!row.datum) return;
+    const d = parseDateGuess(row.datum);
+    const cls = d ? classifyDate(d) : null;
+    if (!cls || cls.days < 0) return;
+    if (row.betrag) return; // Already paid
+    items.push({ kind: cls.kind, icon: "💸", text: `${cls.label} Verfahrenskosten-Zahlung` });
+  });
+
+  // 7. Schadens: Frist nahe?
   const schadensFrist = state.docs.schadens?.answers?.["auflage.frist"];
   if (schadensFrist) {
     const fristD = parseDateGuess(schadensFrist);
@@ -3560,14 +3644,14 @@ function getTodayOverview() {
       const gezahlt = rows.reduce((s, r) => s + parseMoney(r.betrag || ""), 0);
       const rest = Math.max(0, gesamt - gezahlt);
       if (rest > 0 && days >= 0 && days <= 30) {
-        items.push({ kind: days <= 7 ? "danger" : "warn", icon: "💶", text: `Schadenswiedergutmachung: ${moneyOnly(rest)} € offen, Frist in ${days} Tag${days !== 1 ? "en" : ""}` });
+        items.push({ kind: days <= 7 ? "danger" : "warn", icon: "💶", text: `Schadens-Auflage: ${moneyOnly(rest)} € offen, Frist in ${days} Tag${days !== 1 ? "en" : ""}` });
       } else if (rest > 0 && days < 0) {
         items.push({ kind: "danger", icon: "💶", text: `Schadens-Frist überschritten: ${moneyOnly(rest)} € noch offen` });
       }
     }
   }
 
-  // 3. Sozial: Frist nahe?
+  // 8. Sozial: Frist nahe?
   const sozialFrist = state.docs.sozial?.answers?.["auflage.frist"];
   if (sozialFrist) {
     const fristD = parseDateGuess(sozialFrist);
@@ -3578,14 +3662,29 @@ function getTodayOverview() {
       const stundenSum = rows.reduce((s, r) => s + parseMoney(r.stunden || ""), 0);
       const rest = Math.max(0, stundenGesamt - stundenSum);
       if (rest > 0 && days >= 0 && days <= 30) {
-        items.push({ kind: days <= 7 ? "danger" : "warn", icon: "⏱", text: `Sozialstunden: ${rest.toLocaleString("de-DE")} h offen, Frist in ${days} Tag${days !== 1 ? "en" : ""}` });
+        items.push({ kind: days <= 7 ? "danger" : "warn", icon: "⏱", text: `Sozial-Auflage: ${rest.toLocaleString("de-DE")} h offen, Frist in ${days} Tag${days !== 1 ? "en" : ""}` });
       } else if (rest > 0 && days < 0) {
         items.push({ kind: "danger", icon: "⏱", text: `Sozial-Frist überschritten: ${rest.toLocaleString("de-DE")} h noch offen` });
       }
     }
   }
 
-  // 4. Offene Notizen
+  // 9. Verfahrenskosten: Zahlungsfristen (offene Bescheide)
+  const kostenFrist1 = state.docs.kosten?.answers?.["geldstrafe.frist"];
+  const kostenFrist2 = state.docs.kosten?.answers?.["gerichtskosten.frist"];
+  [["geldstrafe", kostenFrist1, "Geldstrafe"], ["gerichtskosten", kostenFrist2, "Gerichtskosten"]].forEach(([_, frist, label]) => {
+    if (!frist) return;
+    const fristD = parseDateGuess(frist);
+    if (!fristD) return;
+    const days = daysUntil(fristD);
+    if (days >= 0 && days <= 14) {
+      items.push({ kind: days <= 3 ? "danger" : "warn", icon: "💸", text: `${label}: Zahlungsfrist in ${days} Tag${days !== 1 ? "en" : ""}` });
+    } else if (days < 0 && days >= -14) {
+      items.push({ kind: "danger", icon: "💸", text: `${label}: Zahlungsfrist seit ${Math.abs(days)} Tag${Math.abs(days) !== 1 ? "en" : ""} überschritten` });
+    }
+  });
+
+  // 10. Offene Notizen für nächsten BH-Termin
   const openBh = state.notes.filter(n => !n.done && n.category === "bh");
   if (openBh.length > 0 && naechsterDatum) {
     const d = parseDateGuess(naechsterDatum);
@@ -3593,6 +3692,11 @@ function getTodayOverview() {
       items.push({ kind: "info", icon: "📝", text: `${openBh.length} offene Notiz(en) für nächsten BH-Termin` });
     }
   }
+
+  // Sort: most urgent first (danger > warn > info), then by closest date
+  const kindOrder = { danger: 0, warn: 1, info: 2 };
+  items.sort((a, b) => (kindOrder[a.kind] ?? 9) - (kindOrder[b.kind] ?? 9));
+
   return items;
 }
 function renderTodayOverview() {
@@ -5338,9 +5442,15 @@ function renderRowsSection(sec) {
           </div>`;
       } else {
         const rowDateLabel = row.datum ? "vom " + row.datum : "Eintrag #" + (idx + 1);
+        const rowOptsId = _registerSigOpts({
+          docId, sectionId: sec.id, rowIdx: idx,
+          title: "Unterschrift " + rowDateLabel,
+          subtitle: "Bitte Name eintragen und unterschreiben.",
+          defaultName: ""
+        });
         signatureHtml = `
           <div class="attachments-area" style="background:transparent; padding:6px 0;">
-            <button class="sig-row-btn" onclick="signRow('${docId}', '${sec.id}', ${idx}, { title: 'Unterschrift ${esc(rowDateLabel)}', subtitle: 'Bitte Name eintragen und unterschreiben.', defaultName: '' })">✍️ Diese Zeile unterzeichnen lassen</button>
+            <button class="sig-row-btn" onclick="dispatchSignRow('${rowOptsId}')">✍️ Diese Zeile unterzeichnen lassen</button>
           </div>`;
       }
     }
@@ -5384,6 +5494,22 @@ function renderSignaturesSection(sec, doc) {
   const counterRoleLabel = sec.counterRoleLabel || "Bestätigt durch";
   const counterPlaceholder = sec.counterPlaceholder || "z.B. Therapeut, Einrichtungsleitung";
 
+  // Register safe handlers (avoid quote-escaping issues in onclick)
+  const probandOptsId = _registerSigOpts({
+    docId, key: "gesamt_proband",
+    title: "Deine Unterschrift",
+    subtitle: "Bitte unterschreibe im Feld unten.",
+    askName: true,
+    defaultName: probandName
+  });
+  const counterOptsId = _registerSigOpts({
+    docId, key: "gesamt",
+    title: counterRoleLabel,
+    subtitle: "Bitte den Namen eintragen und unterschreiben.",
+    askName: true,
+    defaultName: ""
+  });
+
   let html = `
     <div style="padding:14px; background:var(--bg); border-radius:10px; margin-bottom:16px; font-size:14px; line-height:1.5;">
       Auf dieser Seite kannst du Unterschriften hinzufügen, die im Ausdruck und im Word-Dokument erscheinen.
@@ -5395,13 +5521,13 @@ function renderSignaturesSection(sec, doc) {
       <div>
         <h3 style="margin:0 0 8px; font-size:15px; color:var(--primary);">Unterschrift Proband:in${probandName ? " (" + esc(probandName) + ")" : ""}</h3>
         ${probandSig ? renderSignatureBlock(probandSig, { showRemove: true, onRemove: `removeSignature('${docId}', 'gesamt_proband')` })
-          : `<button class="sig-add-btn" onclick="signDocument('${docId}', 'gesamt_proband', { title: 'Deine Unterschrift', subtitle: 'Bitte unterschreibe im Feld unten.', askName: true, defaultName: ${JSON.stringify(probandName)} })">✍️ Jetzt unterschreiben</button>`}
+          : `<button class="sig-add-btn" onclick="dispatchSignDoc('${probandOptsId}')">✍️ Jetzt unterschreiben</button>`}
       </div>
 
       <div>
         <h3 style="margin:0 0 8px; font-size:15px; color:var(--primary);">${esc(counterRoleLabel)}</h3>
         ${counterSig ? renderSignatureBlock(counterSig, { showRemove: true, onRemove: `removeSignature('${docId}', 'gesamt')` })
-          : `<button class="sig-add-btn" onclick="signDocument('${docId}', 'gesamt', { title: ${JSON.stringify(counterRoleLabel)}, subtitle: 'Bitte den Namen eintragen und unterschreiben.', askName: true, defaultName: '' })">✍️ ${esc(counterRoleLabel)}</button>`}
+          : `<button class="sig-add-btn" onclick="dispatchSignDoc('${counterOptsId}')">✍️ ${esc(counterRoleLabel)}</button>`}
         <p style="font-size:12px; color:var(--text-soft); margin-top:6px;">${esc(counterPlaceholder)}</p>
       </div>
     </div>`;
