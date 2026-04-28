@@ -1,6 +1,6 @@
 # 📁 Bewährungshilfe-Assistent
 
-> Eine kostenlose, lokale Web-App für Menschen in der Bewährungszeit. Hilft beim Strukturieren und Erstellen aller wichtigen Dokumente und Anschreiben – inklusive digitaler Unterschriften.
+> Eine kostenlose, lokale Web-App für Menschen in der Bewährungszeit. Hilft beim Strukturieren und Erstellen aller wichtigen Dokumente und Anschreiben – mit digitalen Unterschriften, Termin-Management, Kalender-Export und Erinnerungssystem.
 
 🌐 **Live-Version:** https://123ichbinmitdabei.github.io/bewaehrungshilfe/
 
@@ -10,19 +10,19 @@
 
 ## ✨ Was kann die App?
 
-Strukturierte Vorlagen für 9 zentrale Dokumente, dazu 9 vorgefertigte Anschreiben für typische Behördenkontakte – plus ein **digitales Unterschriften-System**, das Bestätigungen direkt auf dem Bildschirm einsammelt.
+Strukturierte Vorlagen für 9 zentrale Dokumente, dazu 9 vorgefertigte Anschreiben für typische Behördenkontakte – plus ein **digitales Unterschriften-System**, eine **Heute-Übersicht** mit Action-Buttons, und **Kalender-Export** für alle Termine.
 
 ### 📋 Die 9 Dokumente
 
 | Icon | Dokument | Zweck |
 |------|----------|-------|
 | 📊 | **Status-Übersicht** | Auto-generiertes Deckblatt mit Snapshot aller Bereiche |
-| 📞 | **BH-Termine & Gespräche** | Termin-Tracker mit Vorbereitungs-Notizen |
+| 📞 | **BH-Termine & Gespräche** | Termin-Tracker mit Vorbereitungs-Notizen, Notiz-Spalte, Pro-Zeile-Unterschrift |
 | 📋 | **Einnahmen-Ausgaben-Rechnung** | Komplette Finanzaufstellung |
-| 💶 | **Schadenswiedergutmachung** | Tracker mit Zahlungsverlauf, Belegen, Fortschritt |
+| 💶 | **Schadenswiedergutmachung** | Tracker mit Zahlungsverlauf, Belegen, Quittungen |
 | 💸 | **Verfahrenskosten & Geldstrafe** | Tracker für Gerichtskosten, Geldstrafe, Anwalt + Anträge |
-| 🤝 | **Sozialstunden-Nachweis** | Stundenliste mit Bestätigung pro Einsatz |
-| 🧠 | **Therapie-Bestätigung** | Zum Ausfüllen durch Therapeut/in |
+| 🤝 | **Sozialstunden-Nachweis** | Stundenliste mit Bestätigung pro Einsatz, Notizen, Belegen |
+| 🧠 | **Therapie-Bestätigung** | Termine mit Notizen (Hausaufgabe etc.), Pro-Termin-Unterschrift |
 | 📅 | **Zeitstrahl / Lebensverlauf** | Wohnungen, Arbeit, Bildung, Therapie, Hilfen |
 | 📦 | **Beweismittel & Asservate** | Doku beschlagnahmter Gegenstände + Antrag auf Herausgabe |
 
@@ -40,19 +40,81 @@ Strukturierte Vorlagen für 9 zentrale Dokumente, dazu 9 vorgefertigte Anschreib
 
 ---
 
-## ✍️ Digitale Unterschriften – drei Wege (NEU in v3.8)
+## 📅 Heute-Übersicht mit Schnell-Aktionen
 
-Bei Sozialstunden, Therapie, Schadenswiedergutmachung und BH-Terminen kannst du Bestätigungen auf drei Wegen einsammeln – ganz wie es der unterzeichnenden Person am liebsten ist:
+Auf der Startseite sammelt die App alle anstehenden Termine und Fristen aus allen Dokumenten:
 
-1. **Digital direkt in der App** – mit Finger oder Stylus auf dem Bildschirm. Schnell, papierlos, mit Zeitstempel und Geräte-Info dokumentiert. Pro Zeile (z.B. einzelner Einsatz) oder als Sammel-Unterschrift am Ende.
-2. **Klassisch auf Papier + Foto** – ausdrucken, unterschreiben/stempeln lassen, abfotografieren und als Beleg an die Zeile anhängen. Ideal wenn die Einrichtung lieber „handschriftlich + Stempel" macht.
-3. **Stempel-Foto** – manche Einrichtungen haben einen offiziellen Stempel der mehr zählt als die Unterschrift. Stempel auf Papier abdrücken, fotografieren, als Beleg anhängen.
+- 📅 BH-Termine, 🧠 Therapie-Termine, 🤝 Sozialstunden-Einsätze
+- 💶 Schadens-Zahlungen, 💸 Verfahrenskosten-Zahlungen
+- ⏱ Auflage-Fristen mit Restbetrag/Reststunden
 
-Im Ausdruck und Word-Dokument erscheinen digitale Unterschriften als Bild mit Zeitstempel und Geräte-Information. Wenn nicht digital signiert wurde, bleiben die Unterschriftslinien für handschriftliche Eintragungen frei. Beides nebeneinander geht auch.
+Sortiert nach Dringlichkeit (🔴 heute > 🟡 morgen > 🔵 nächste Tage) - mit direkten Action-Buttons:
 
-**📋 Verifikations-Seite:** Am Ende des Ausdrucks erscheint eine Übersicht aller digital erfassten Unterschriften – mit Zeitpunkt, Gerät und Zeitzone. Damit kann die empfangende Stelle (Bewährungshilfe, Gericht) die Echtheit nachvollziehen.
+| Button | Wirkung |
+|--------|---------|
+| ✅ **Erledigt** | Status setzen, bei Sozial: Stunden-Auto-Berechnung möglich |
+| ⏭️ **Verpasst** | Status setzen, danach Frage nach Ersatz-Termin |
+| ✕ **Abgesagt** | Status setzen, danach Frage nach Ersatz-Termin |
+| 📅 **Verschieben** | Dialog mit neuem Datum + Wahl: neue Zeile oder Eintrag ändern |
+| 📲 **Kalender** | Termin als .ics in den Handy-Kalender exportieren |
+
+Bei Zahlungen statt „Erledigt": **💶 Bezahlt** (fragt nach Betrag) und **⏭️ Verschoben** (mit Folge-Dialog für neues Fälligkeitsdatum).
+
+---
+
+## 📲 Kalender-Export
+
+Termine direkt in den Handy-Kalender (Apple, Google, Outlook):
+
+- **Pro Zeile in der Tabelle:** kleiner „📲 Kalender"-Knopf neben dem Eintrag
+- **Sammel-Export:** „📲 Alle Termine exportieren" über jeder Termin-Tabelle (z.B. alle 24 Therapie-Termine auf einmal)
+- **Aus der Heute-Übersicht:** für anstehende Termine direkt
+
+Die `.ics`-Dateien enthalten Erinnerungen 1 Tag und 1 Stunde vorher. Bei Sozialstunden wird die Einrichtung als Ort eingetragen.
+
+---
+
+## ✍️ Digitale Unterschriften – drei Wege
+
+Bei Sozialstunden, Therapie, Schadenswiedergutmachung und BH-Terminen kannst du Bestätigungen auf drei Wegen einsammeln:
+
+1. **Digital direkt in der App** – mit Finger oder Stylus auf dem Bildschirm. Mit Zeitstempel und Geräte-Info dokumentiert.
+2. **Klassisch auf Papier + Foto** – ausdrucken, unterschreiben/stempeln lassen, abfotografieren und als Beleg an die Zeile anhängen.
+3. **Stempel-Foto** – manche Einrichtungen haben einen offiziellen Stempel der mehr zählt als die Unterschrift.
+
+Pro Zeile UND/ODER als Sammel-Unterschrift am Ende möglich. Im Druck und Word-Dokument erscheinen digitale Unterschriften als Bild mit Zeitstempel. Wenn nicht digital signiert wurde, bleiben die Unterschriftslinien für handschriftliche Eintragungen frei.
+
+**📋 Verifikations-Seite:** Am Ende des Ausdrucks erscheint eine Übersicht aller digital erfassten Unterschriften – mit Zeitpunkt, Gerät und Zeitzone.
 
 > ⚖️ **Rechtlicher Hinweis:** Eine digitale Unterschrift in dieser App ist *keine qualifizierte elektronische Signatur* im Sinne der eIDAS-Verordnung. Sie hat aber Beweiswert (vergleichbar mit einer Unterschrift auf einem DHL-Paket-Tablet). Für förmliche Anträge bei Gericht ist weiterhin eine handschriftliche Papier-Unterschrift erforderlich.
+
+---
+
+## 📝 Notizen pro Termin / Eintrag
+
+Jeder Termin oder Einsatz hat ein eigenes mehrzeiliges Notiz-Feld:
+
+- **Therapie-Termine:** „Notiz / Hausaufgabe / Themen" – z.B. „Hausaufgabe: täglich 5 Min Atemübung"
+- **Sozialstunden:** „Notiz / Bemerkung" – z.B. „Hecke geschnitten, Werkstatt aufgeräumt"
+- **BH-Termine:** „Eigene Notiz" – persönliche Eindrücke und Bemerkungen
+
+Notizen erscheinen im Druck (klein neben dem jeweiligen Eintrag) und im Word-Export.
+
+---
+
+## 💾 Backup & Wiederherstellung
+
+> **Ja, ALLES wird gesichert.** Auch Bilder, Unterschriften, Termine, Notizen und Status.
+
+Klick auf „💾 Sichern" lädt eine JSON-Datei runter, die enthält:
+- ✅ Alle Stammdaten und Antworten
+- ✅ Alle Tabellen (Termine, Stunden, Zahlungen)
+- ✅ **Alle Belege (Fotos, PDFs als Base64)**
+- ✅ **Alle digitalen Unterschriften (Bild + Zeitstempel + Geräte-Info)**
+- ✅ Alle Notizen und Status-Einträge
+- ✅ Theme-Einstellung
+
+Klick auf „📥 Laden" stellt das komplette Backup wieder her. Funktioniert auch zwischen Geräten – Backup auf dem Handy machen, am PC einspielen.
 
 ---
 
@@ -60,32 +122,10 @@ Im Ausdruck und Word-Dokument erscheinen digitale Unterschriften als Bild mit Ze
 
 In der Druckansicht jedes Dokuments stehen je nach Gerät verschiedene Versand-Optionen zur Verfügung:
 
-- **📤 Teilen** (auf iPhone, iPad, Android): Öffnet das System-Teilen-Menü mit Dokument *und allen Belegen als einzelne Dateien*. Wähle dann z.B. Mail, WhatsApp, AirDrop, Signal etc.
-- **📦 ZIP mit Belegen** (auf jedem Gerät): Lädt eine ZIP-Datei mit dem Dokument plus allen Belegen herunter, sortiert in Unterordnern. Die ZIP hängst du dann manuell an deine E-Mail an.
-- **🖨 Drucken / als PDF**: Klassische Druckansicht – Belege werden auf Folge-Seiten angehängt.
-
----
-
-## 🆚 Was unterscheidet diese App von anderen Lösungen?
-
-Im deutschen Bewährungshilfe-Markt gibt es **keine vergleichbare Endnutzer-App**. Was es gibt:
-
-- 🇩🇪 **Apps für Bewährungshelfer:innen** – Fall-Management-Software, nicht für Probanden
-- 🧠 **Spezialisierte Therapie-Programme** wie [@myTabu](https://kompetenz-gegen-missbrauch.de/mytabu/) – nur für eine sehr enge Zielgruppe
-- 🇺🇸 **Internationale kommerzielle Tools** (Reconnect, Shadowtrack, MonitorConnect, eSupervision) – cloudbasiert, oft mit GPS-Tracking, primär Kontroll-Tools für Behörden
-
-Diese App ist anders:
-
-| Eigenschaft | Diese App | Existierende Lösungen |
-|------------|-----------|----------------------|
-| **Zielgruppe** | Probanden selbst | Bewährungshelfer:innen / Behörden |
-| **Sprache** | Deutsch, deutsche Rechtsbegriffe | Englisch, US-Rechtssystem |
-| **Datenhaltung** | Lokal, kein Account | Cloud, Account-Zwang |
-| **Kosten** | Kostenlos, Open Source | Behörden-Lizenzen, Subscriptions |
-| **Zweck** | Selbsthilfe, Strukturierung | Kontrolle, Überwachung |
-| **Anschreiben** | 9 Vorlagen mit StPO-Bezug | Keine |
-| **Digitale Unterschriften** | Direkt im Dokument | Keine |
-| **Verfügbarkeit** | Sofort, ohne Anmeldung | Behörde muss zustimmen |
+- **📤 Teilen** (auf iPhone, iPad, Android): System-Teilen-Menü mit Dokument *und allen Belegen als einzelne Dateien*
+- **📦 ZIP mit Belegen** (auf jedem Gerät): ZIP-Datei mit Dokument plus allen Belegen
+- **🖨 Drucken / als PDF**: Klassische Druckansicht – Belege werden auf Folge-Seiten angehängt
+- **📝 Word-Dokument (.docx)**: Mit eingebetteten Unterschriften
 
 ---
 
@@ -97,7 +137,7 @@ Diese App ist anders:
 - ✅ **Optionaler PIN-Schutz**
 - ✅ **Sicher exportierbar** als JSON-Backup
 - ✅ **Open Source** – jeder kann den Code prüfen
-- ✅ **Unterschriften komprimiert gespeichert** (~5 KB pro Unterschrift)
+- ✅ **Unterschriften komprimiert gespeichert** (~5 KB pro Unterschrift, JPEG 0.8)
 
 ---
 
@@ -126,22 +166,33 @@ Nach der Installation läuft die App im Vollbild – wie eine richtige App, auch
 - Schritt-für-Schritt-Ausfüllen mit Fortschritts-Anzeige
 - **Geteilte Stammdaten** zwischen allen Dokumenten
 - Datei-Anhänge für Belege (Fotos, PDFs)
+- Mehrzeilige Notiz-Felder pro Eintrag
 - Dark Mode
 
+### Heute-Übersicht
+- Sammelt anstehende Termine aus allen Dokumenten
+- Action-Buttons: Erledigt / Verpasst / Abgesagt / Verschieben / Kalender
+- Erinnerung an Auflage-Fristen
+- Sortierung nach Dringlichkeit
+
 ### Digitale Unterschriften ✍️
-- **Mit Finger oder Stylus** auf dem Bildschirm
+- Mit Finger oder Stylus auf dem Bildschirm
 - Zeitstempel + Geräte-Info automatisch erfasst
-- Pro Zeile (Sozialstunden, Schadens-Zahlungen) oder als Gesamt-Unterschrift
-- Verifikations-Seite im Ausdruck mit Übersicht aller Unterschriften
-- Hybrid mit handschriftlich/Papier kombinierbar
+- Pro Zeile (Sozial, Therapie, BH, Schadens) und/oder als Gesamt-Unterschrift
+- Verifikations-Seite im Ausdruck
+
+### Termin-Management
+- Reschedule-Dialog mit zwei Modi (Verlauf erhalten oder direkt ändern)
+- Ersatz-Termin nach Verpasst/Abgesagt mit einem Klick
+- Auto-Berechnung der Sozialstunden aus von/bis/Pause
 
 ### Export & Versand
-- 📄 **PDF / Drucken** mit professionellem Layout
-- 📝 **Word-Datei (.docx)** – Unterschriften als Bilder eingebettet
-- 📤 **System-Teilen** mit Dokument + allen Belegen (iOS/Android)
-- 📦 **ZIP-Bundle** mit Dokument + Belegen
-- 💾 **JSON-Backup** aller Daten
-- 📅 **Kalender-Export** (.ics) für Termine
+- 📄 PDF / Drucken
+- 📝 Word-Datei (.docx) mit eingebetteten Unterschriften
+- 📤 System-Teilen mit Dokument + allen Belegen (iOS/Android)
+- 📦 ZIP-Bundle mit Dokument + Belegen
+- 💾 JSON-Backup aller Daten (komplett: Bilder, Unterschriften, alles)
+- 📅 Kalender-Export (.ics) pro Termin oder gesammelt
 
 ---
 
@@ -181,19 +232,36 @@ Custom License – siehe [LICENSE](LICENSE).
 
 ## 📜 Changelog
 
+### v3.11 (April 2026) – Termin-Management komplett
+- 📅 **Verschieben-Funktion**: neuer Dialog mit Wahl zwischen „neue Zeile" und „direkt ändern"
+- 🔁 **Ersatz-Termin** automatisch nach Verpasst/Abgesagt anbieten
+- 📲 **Kalender-Export erweitert**: pro Zeile + Sammel-Export für alle Termine in jeder Tabelle
+- 💶 **Verschoben-Zahlungen**: Folge-Dialog für neues Fälligkeitsdatum
+- ✨ Polish: Hilfe-Sektion erweitert, robuste Quote-Behandlung
+
+### v3.10 (April 2026) – Heute-Übersicht mit Aktionen
+- ✅ Action-Buttons direkt in der Heute-Übersicht: Erledigt / Verpasst / Abgesagt
+- 🤝 Sozial-Spezial: Auto-Berechnung der Stunden aus von/bis/Pause möglich
+- 🧹 Erledigte Termine verschwinden aus der Übersicht (bleiben in der Tabelle)
+- 💾 Sofortiges Speichern bei Status-Änderung
+
+### v3.9 (April 2026) – Notizen + Pro-Zeile-Unterschrift überall
+- 📝 Notiz-Felder (Textareas) für Therapie, Sozialstunden, BH-Termine
+- ✍️ Pro-Zeile-Unterschrift jetzt auch für Therapie und BH-Termine
+- 📅 Heute-Übersicht zeigt alle Termin-Arten (Therapie, Sozial, BH, Zahlungen)
+- 🐛 Wichtiger Bugfix: Quote-sichere Inline-Handler
+
 ### v3.8 (April 2026) – Digitale Unterschriften
-- ✍️ **Digitales Unterschrifts-System** mit Canvas (Touch/Maus/Stylus)
-- 📐 Hybrid: Digital ODER handschriftlich – beides nebeneinander möglich
-- 🕐 Zeitstempel + Geräte-Info (Browser, Zeitzone) automatisch erfasst
+- ✍️ Digitales Unterschrifts-System mit Canvas (Touch/Maus/Stylus)
+- 📐 Hybrid: Digital ODER handschriftlich
+- 🕐 Zeitstempel + Geräte-Info automatisch erfasst
 - 📋 Verifikations-Seite am Ende jedes Ausdrucks
 - 📝 Unterschriften als Bilder im Word-Export eingebettet
-- 🗜 Komprimierung (JPEG 0.8 / 400×133px) für ~70% weniger Speicherplatz
-- 🛠 Bugfix: weiße Seite beim Laden bei bestimmten State-Konstellationen behoben
+- 🗜 Komprimierung (JPEG 0.8 / 400×133px)
 
 ### v3.6 (April 2026)
 - 📤 System-Teilen mit Belegen (iOS/Android)
 - 📦 ZIP-Bundle-Download mit Dokument + Belegen
-- 🌐 Sprachwechsel-Knopf entfernt
 
 ### v3.5 (April 2026)
 - 🌙 Dark Mode Lesbarkeit gefixt
@@ -206,5 +274,5 @@ Custom License – siehe [LICENSE](LICENSE).
 
 ---
 
-**Aktuelle Version:** v3.8
+**Aktuelle Version:** v3.11
 **Letztes Update:** April 2026
