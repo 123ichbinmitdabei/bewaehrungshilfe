@@ -272,7 +272,13 @@
     resize: vertical; min-height: 56px;
   }
   .row-grid .field-mini-wide textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary-soft); }
-  .row-card .row-actions { display: flex; justify-content: flex-end; margin-top: 10px; }
+  .row-card .row-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; gap: 8px; flex-wrap: wrap; }
+  .row-calendar-btn {
+    background: var(--primary-soft); border: 1px solid var(--primary-light); color: var(--primary);
+    font-size: 12px; padding: 5px 10px; border-radius: 6px; cursor: pointer;
+    font-weight: 500;
+  }
+  .row-calendar-btn:hover { background: var(--primary); color: white; }
   .row-delete {
     background: none; border: none; color: var(--danger);
     font-size: 12px; cursor: pointer; padding: 4px 8px;
@@ -741,6 +747,10 @@
   .today-act-btn.missed:hover { background: var(--warn); color: white; }
   .today-act-btn.cancelled { border-color: var(--text-soft); color: var(--text-soft); }
   .today-act-btn.cancelled:hover { background: var(--text-soft); color: white; }
+  .today-act-btn.reschedule { border-color: var(--primary); color: var(--primary); }
+  .today-act-btn.reschedule:hover { background: var(--primary); color: white; }
+  .today-act-btn.calendar { border-color: var(--primary-light); color: var(--primary); }
+  .today-act-btn.calendar:hover { background: var(--primary-soft); }
   /* Belege manager */
   .belege-list { display: flex; flex-direction: column; gap: 8px; }
   .belege-row {
@@ -2350,6 +2360,272 @@ function exportNextBhTerminToCalendar() {
   downloadIcs(`BH-Termin_${pad(date.getDate())}.${pad(date.getMonth()+1)}.${date.getFullYear()}.ics`, ics);
 }
 
+// === GENERIC: Build a single VEVENT block from a row ===
+// Used both for per-row export and for bulk export.
+// Returns a string like "BEGIN:VEVENT\r\n...END:VEVENT" or null if no valid date.
+function buildIcsEvent(opts) {
+  // opts: { date, hour, minute, durationMinutes, summary, description, location, uid }
+  if (!opts.date) return null;
+  const dtstamp = toIcsDate(new Date());
+  const dtstart = toIcsDate(opts.date, opts.hour ?? 12, opts.minute ?? 0);
+  const endDate = new Date(opts.date);
+  endDate.setMinutes(endDate.getMinutes() + (opts.durationMinutes || 60));
+  // For end time, if start hour was given:
+  let endH = (opts.hour ?? 12) + Math.floor(((opts.minute ?? 0) + (opts.durationMinutes || 60)) / 60);
+  let endM = ((opts.minute ?? 0) + (opts.durationMinutes || 60)) % 60;
+  if (endH >= 24) endH = 23, endM = 59;
+  const dtend = toIcsDate(opts.date, endH, endM);
+  const lines = [
+    "BEGIN:VEVENT",
+    `UID:${opts.uid}`,
+    `DTSTAMP:${dtstamp}`,
+    `DTSTART:${dtstart}`,
+    `DTEND:${dtend}`,
+    `SUMMARY:${escapeIcs(opts.summary)}`,
+    opts.description ? `DESCRIPTION:${escapeIcs(opts.description)}` : "",
+    opts.location ? `LOCATION:${escapeIcs(opts.location)}` : "",
+    "BEGIN:VALARM", "ACTION:DISPLAY", `DESCRIPTION:${escapeIcs(opts.summary)}`, "TRIGGER:-PT1H", "END:VALARM",
+    "BEGIN:VALARM", "ACTION:DISPLAY", `DESCRIPTION:${escapeIcs(opts.summary)}`, "TRIGGER:-P1D", "END:VALARM",
+    "END:VEVENT"
+  ].filter(Boolean);
+  return lines.join("\r\n");
+}
+
+// Parse "HH:MM" or "HH" into [hour, minute]
+function parseTimeStr(s) {
+  if (!s) return [null, null];
+  const m = String(s).match(/^(\d{1,2})[:.]?(\d{0,2})$/);
+  if (!m) return [null, null];
+  const h = parseInt(m[1]); const mi = parseInt(m[2] || "0");
+  if (isNaN(h) || h > 23 || isNaN(mi) || mi > 59) return [null, null];
+  return [h, mi];
+}
+
+// Build VEVENT for a row in any tabel - returns null if no date
+function buildEventFromRow(docId, sectionId, rowIdx, row) {
+  const date = parseDateGuess(row.datum);
+  if (!date) return null;
+  const [h, mi] = parseTimeStr(row.uhrzeit || row.von || "");
+  let durationMin = 60;
+  // Sozialstunden: try to infer from von/bis
+  if (sectionId === "stunden" && row.von && row.bis) {
+    const [vH, vM] = parseTimeStr(row.von);
+    const [bH, bM] = parseTimeStr(row.bis);
+    if (vH !== null && bH !== null) {
+      const total = (bH * 60 + bM) - (vH * 60 + vM);
+      if (total > 0) durationMin = total;
+    }
+  }
+  // Therapy: use dauer field if present
+  if (sectionId === "termine" && docId === "thera" && row.dauer) {
+    const dm = String(row.dauer).match(/(\d+)/);
+    if (dm) durationMin = parseInt(dm[1]);
+  }
+  // Build summary based on doc type
+  let summary = "";
+  let description = "";
+  let location = "";
+  if (docId === "thera") {
+    summary = "Therapie-Termin";
+    if (row.art) summary += ` (${row.art})`;
+    if (row.notiz) description = row.notiz;
+  } else if (docId === "sozial") {
+    summary = "Sozialstunden-Einsatz";
+    if (row.taetigkeit) summary += ": " + row.taetigkeit;
+    const einrichtung = state.docs.sozial?.answers?.["einrichtung.name"] || "";
+    if (einrichtung) location = einrichtung;
+    if (row.notiz) description = row.notiz;
+  } else if (docId === "bhtermine") {
+    const bh = state.shared.bewaehrungshelfer || "Bewährungshelfer/in";
+    summary = `Termin bei ${bh}`;
+    if (row.art) summary += ` (${row.art})`;
+    description = [row.themen, row.vereinbarungen, row.notiz].filter(Boolean).join("\n\n");
+  } else if (docId === "schadens") {
+    summary = "Schadens-Zahlung fällig";
+    if (row.bemerkung) description = row.bemerkung;
+  } else if (docId === "kosten") {
+    summary = "Verfahrenskosten-Zahlung fällig";
+    if (row.bemerkung) description = row.bemerkung;
+  } else {
+    summary = DOCS[docId]?.title || "Termin";
+  }
+  const uid = `${docId}-${sectionId}-${rowIdx}-${date.getTime()}@bewaehrungshilfe-app`;
+  return buildIcsEvent({
+    date, hour: h, minute: mi,
+    durationMinutes: durationMin,
+    summary, description, location, uid
+  });
+}
+
+// Export a single row to .ics
+function exportRowToCalendar(docId, sectionId, rowIdx) {
+  const row = state.docs[docId]?.rows?.[sectionId]?.[rowIdx];
+  if (!row || !row.datum) { alert("Dieser Eintrag hat kein Datum, das exportiert werden kann."); return; }
+  const event = buildEventFromRow(docId, sectionId, rowIdx, row);
+  if (!event) { alert("Eintrag konnte nicht in ein Kalenderereignis umgewandelt werden."); return; }
+  const ics = [
+    "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Bewährungshilfe-Assistent//DE",
+    "CALSCALE:GREGORIAN", "METHOD:PUBLISH",
+    event,
+    "END:VCALENDAR"
+  ].join("\r\n");
+  const date = parseDateGuess(row.datum);
+  const fname = `${docId}-Termin_${pad(date.getDate())}.${pad(date.getMonth()+1)}.${date.getFullYear()}.ics`;
+  downloadIcs(fname, ics);
+}
+
+// Export all upcoming appointments of a doc as one .ics
+function exportAllToCalendar(docId, sectionId) {
+  const rows = state.docs[docId]?.rows?.[sectionId] || [];
+  const today = new Date(); today.setHours(0,0,0,0);
+  const events = [];
+  rows.forEach((row, idx) => {
+    if (!row.datum) return;
+    const d = parseDateGuess(row.datum);
+    if (!d) return;
+    // Only export future + today
+    if (d < today) return;
+    // Skip clearly cancelled / missed (keine "toten" Termine im Kalender)
+    if (row.status && /abgesagt|verpasst|verschoben/i.test(row.status)) return;
+    const ev = buildEventFromRow(docId, sectionId, idx, row);
+    if (ev) events.push(ev);
+  });
+  if (events.length === 0) { alert("Keine zukünftigen Termine zum Exportieren gefunden.\n\nNur Termine mit Datum heute oder später (und Status nicht „abgesagt/verpasst/verschoben“) werden exportiert."); return; }
+  const ics = [
+    "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Bewährungshilfe-Assistent//DE",
+    "CALSCALE:GREGORIAN", "METHOD:PUBLISH",
+    ...events,
+    "END:VCALENDAR"
+  ].join("\r\n");
+  const fname = `${docId}-Termine_${events.length}.ics`;
+  downloadIcs(fname, ics);
+  showSaveToast(`✓ ${events.length} Termin(e) exportiert`);
+}
+
+// === RESCHEDULE / REPLACEMENT APPOINTMENTS ===
+
+// Open a small dialog to pick new date+time, then either create a new row or update existing
+// mode: "create_new" | "update_existing"
+function openRescheduleDialog(opts) {
+  // opts: { docId, sectionId, rowIdx, originalRow, mode, onConfirm: ({newDate, newTime, mode}) => void, title, intro }
+  const existing = document.getElementById("reschedule-modal");
+  if (existing) existing.remove();
+
+  const presetDate = opts.originalRow?.datum || "";
+  const presetTime = opts.originalRow?.uhrzeit || opts.originalRow?.von || "";
+
+  const modal = document.createElement("div");
+  modal.id = "reschedule-modal";
+  modal.className = "modal-backdrop";
+  modal.innerHTML = `
+    <div class="modal" style="max-width:480px;" onclick="event.stopPropagation()">
+      <h3 style="margin:0 0 8px;">${esc(opts.title || "Termin verschieben")}</h3>
+      <p style="margin:0 0 16px; font-size:14px; color:var(--text-soft); line-height:1.5;">${esc(opts.intro || "Trage das neue Datum und die neue Uhrzeit ein.")}</p>
+
+      <label style="display:block; margin-bottom:12px;">
+        <span style="font-size:13px; font-weight:600; color:var(--text);">Neues Datum</span>
+        <input type="text" id="resched-date" value="${esc(presetDate)}" placeholder="TT.MM.JJJJ" style="width:100%; margin-top:4px; padding:10px; border:1px solid var(--border); border-radius:8px; font-size:15px; box-sizing:border-box; background:var(--input-bg); color:var(--text);">
+      </label>
+
+      <label style="display:block; margin-bottom:12px;">
+        <span style="font-size:13px; font-weight:600; color:var(--text);">Neue Uhrzeit</span>
+        <input type="text" id="resched-time" value="${esc(presetTime)}" placeholder="z.B. 14:30" style="width:100%; margin-top:4px; padding:10px; border:1px solid var(--border); border-radius:8px; font-size:15px; box-sizing:border-box; background:var(--input-bg); color:var(--text);">
+      </label>
+
+      ${opts.mode === "choose" ? `
+        <div style="background:var(--bg); border-radius:10px; padding:12px; margin-bottom:14px;">
+          <p style="margin:0 0 10px; font-size:13px; font-weight:600;">Wie soll der Termin verschoben werden?</p>
+          <label style="display:flex; gap:8px; align-items:flex-start; margin-bottom:10px; cursor:pointer;">
+            <input type="radio" name="resched-mode" value="create_new" checked style="margin-top:3px;">
+            <div>
+              <div style="font-weight:600; font-size:14px;">📝 Neue Zeile anlegen (empfohlen)</div>
+              <div style="font-size:12px; color:var(--text-soft);">Alter Eintrag bleibt mit Status „verschoben" erhalten, neuer Termin wird zusätzlich angelegt. Gut für Nachvollziehbarkeit.</div>
+            </div>
+          </label>
+          <label style="display:flex; gap:8px; align-items:flex-start; cursor:pointer;">
+            <input type="radio" name="resched-mode" value="update_existing" style="margin-top:3px;">
+            <div>
+              <div style="font-weight:600; font-size:14px;">✏️ Alten Eintrag direkt ändern</div>
+              <div style="font-size:12px; color:var(--text-soft);">Datum/Uhrzeit werden im bestehenden Eintrag überschrieben. Einfacher, aber Verlauf geht verloren.</div>
+            </div>
+          </label>
+        </div>` : ""}
+
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button class="btn-secondary" onclick="closeRescheduleDialog()" style="flex:1; min-width:120px;">Abbrechen</button>
+        <button onclick="submitRescheduleDialog()" id="resched-submit" style="flex:2; min-width:140px;">✓ Übernehmen</button>
+      </div>
+    </div>`;
+  modal.onclick = (e) => { if (e.target === modal) closeRescheduleDialog(); };
+  document.body.appendChild(modal);
+  // Stash callback
+  window._rescheduleCallback = opts.onConfirm;
+  window._rescheduleMode = opts.mode || "create_new";
+  setTimeout(() => { document.getElementById("resched-date")?.focus(); }, 50);
+}
+
+function closeRescheduleDialog() {
+  const m = document.getElementById("reschedule-modal");
+  if (m) m.remove();
+  window._rescheduleCallback = null;
+}
+
+function submitRescheduleDialog() {
+  const dateEl = document.getElementById("resched-date");
+  const timeEl = document.getElementById("resched-time");
+  const newDate = dateEl ? autoFormatDate(dateEl.value.trim()) : "";
+  const newTime = timeEl ? autoFormatTime(timeEl.value.trim()) : "";
+  if (!newDate) { alert("Bitte ein Datum eintragen."); dateEl?.focus(); return; }
+  // Validate date
+  if (!parseDateGuess(newDate)) { alert("Datumsformat nicht erkannt. Bitte als TT.MM.JJJJ eingeben."); dateEl?.focus(); return; }
+  let mode = window._rescheduleMode || "create_new";
+  if (mode === "choose") {
+    const radio = document.querySelector('input[name="resched-mode"]:checked');
+    mode = radio ? radio.value : "create_new";
+  }
+  const cb = window._rescheduleCallback;
+  closeRescheduleDialog();
+  if (typeof cb === "function") cb({ newDate, newTime, mode });
+}
+
+// Apply a reschedule action to the underlying state
+function applyReschedule(docId, sectionId, rowIdx, originalStatus, opts) {
+  // opts: { newDate, newTime, mode }
+  const ds = state.docs[docId];
+  if (!ds || !ds.rows || !ds.rows[sectionId]) return;
+  const rows = ds.rows[sectionId];
+  const oldRow = rows[rowIdx];
+  if (!oldRow) return;
+
+  if (opts.mode === "update_existing") {
+    // Overwrite the existing row's date and time
+    oldRow.datum = opts.newDate;
+    if (opts.newTime) {
+      // Use 'uhrzeit' for thera/bhtermine, 'von' for sozial
+      if (sectionId === "stunden") oldRow.von = opts.newTime;
+      else oldRow.uhrzeit = opts.newTime;
+    }
+    // Don't set status (since this is now the active appointment again)
+    delete oldRow.status;
+  } else {
+    // create_new: mark old row with old status, create a new row
+    oldRow.status = originalStatus;
+    // Create a new row as a fresh appointment
+    const newRow = { datum: opts.newDate };
+    if (opts.newTime) {
+      if (sectionId === "stunden") newRow.von = opts.newTime;
+      else newRow.uhrzeit = opts.newTime;
+    }
+    // Inherit certain fields where useful
+    if (oldRow.art) newRow.art = oldRow.art;
+    if (sectionId === "stunden" && oldRow.taetigkeit) newRow.taetigkeit = oldRow.taetigkeit;
+    if (sectionId === "stunden" && oldRow.bis) newRow.bis = oldRow.bis;
+    if (sectionId === "stunden" && oldRow.pause) newRow.pause = oldRow.pause;
+    rows.push(newRow);
+  }
+  saveAndRefresh(docId);
+}
+
 // === SEARCH FILTER ===
 function setRowSearch(secId, value) {
   const key = `${state.activeDocId}.${secId}`;
@@ -3019,7 +3295,7 @@ let showArchived = false;
 function toggleShowArchived() { showArchived = !showArchived; render(); }
 
 // === VERSION INFO ===
-const APP_VERSION = "v3.10";
+const APP_VERSION = "v3.11";
 
 // === ONBOARDING ===
 let onboardingActive = false;
@@ -3812,6 +4088,8 @@ function renderTodayActions(action) {
         <button class="today-act-btn done" onclick="confirmAppointment('${ref}', 'done', event)" title="Termin als erledigt / wahrgenommen markieren">✅ Erledigt</button>
         <button class="today-act-btn missed" onclick="confirmAppointment('${ref}', 'missed', event)" title="Termin verpasst / nicht erschienen">⏭️ Verpasst</button>
         <button class="today-act-btn cancelled" onclick="confirmAppointment('${ref}', 'cancelled', event)" title="Termin wurde abgesagt">✕ Abgesagt</button>
+        <button class="today-act-btn reschedule" onclick="reschedule('${ref}', event)" title="Termin verschieben (neues Datum)">📅 Verschieben</button>
+        <button class="today-act-btn calendar" onclick="exportActionToCalendar('${ref}', event)" title="In den Kalender exportieren">📲 Kalender</button>
       </div>`;
   }
   if (action.type === "payment") {
@@ -3819,6 +4097,7 @@ function renderTodayActions(action) {
       <div class="today-actions">
         <button class="today-act-btn done" onclick="confirmPayment('${ref}', 'paid', event)" title="Zahlung getätigt - Betrag jetzt eintragen">💶 Bezahlt</button>
         <button class="today-act-btn missed" onclick="confirmPayment('${ref}', 'postponed', event)" title="Zahlung verschoben">⏭️ Verschoben</button>
+        <button class="today-act-btn calendar" onclick="exportActionToCalendar('${ref}', event)" title="In den Kalender exportieren">📲 Kalender</button>
       </div>`;
   }
   return "";
@@ -3871,7 +4150,73 @@ function confirmAppointment(refId, status, ev) {
 
   // Regular: just set status
   row.status = statusText;
+
+  // After missed/cancelled, offer to schedule a replacement appointment
+  if (status === "missed" || status === "cancelled") {
+    // Save first (so the cancelled status is persisted even if user backs out of replacement dialog)
+    saveAndRefresh(docId);
+    // Slight delay so the toast appears first, then the dialog
+    setTimeout(() => {
+      const which = status === "missed" ? "verpasst" : "abgesagt";
+      if (confirm(`Möchtest du gleich einen Ersatz-Termin anlegen?\n\nDer ${which}e Termin bleibt mit Status „${which === "verpasst" ? "verpasst" : "abgesagt"}" erhalten und ein neuer Termin wird zusätzlich angelegt.`)) {
+        openRescheduleDialog({
+          docId, sectionId, rowIdx,
+          originalRow: row,
+          mode: "create_new",
+          title: "Ersatz-Termin anlegen",
+          intro: `Trage Datum und Uhrzeit für den Ersatz-Termin ein. Der ${which}e Termin am ${row.datum || ""} bleibt mit dem Status erhalten, der neue Termin wird zusätzlich angelegt.`,
+          onConfirm: (opts) => {
+            // Create a new row only - don't touch the old (already has status)
+            const ds = state.docs[docId];
+            const newRow = { datum: opts.newDate };
+            if (opts.newTime) {
+              if (sectionId === "stunden") newRow.von = opts.newTime;
+              else newRow.uhrzeit = opts.newTime;
+            }
+            if (row.art) newRow.art = row.art;
+            if (sectionId === "stunden" && row.taetigkeit) newRow.taetigkeit = row.taetigkeit;
+            if (sectionId === "stunden" && row.bis) newRow.bis = row.bis;
+            if (sectionId === "stunden" && row.pause) newRow.pause = row.pause;
+            ds.rows[sectionId].push(newRow);
+            saveAndRefresh(docId);
+          }
+        });
+      }
+    }, 250);
+    return;
+  }
+
   saveAndRefresh(docId);
+}
+
+// Open reschedule dialog from action button
+function reschedule(refId, ev) {
+  if (ev) ev.stopPropagation();
+  const action = _getActionRef(refId);
+  if (!action) return;
+  const { docId, sectionId, rowIdx } = action;
+  const rows = state.docs[docId]?.rows?.[sectionId];
+  if (!rows || !rows[rowIdx]) return;
+  const row = rows[rowIdx];
+  openRescheduleDialog({
+    docId, sectionId, rowIdx,
+    originalRow: row,
+    mode: "choose",
+    title: "Termin verschieben",
+    intro: `Termin am ${row.datum || "(ohne Datum)"} verschieben. Du kannst entweder eine neue Zeile anlegen (Verlauf wird dokumentiert) oder den bestehenden Eintrag direkt ändern.`,
+    onConfirm: (opts) => {
+      const oldStatus = "verschoben (alter Termin)";
+      applyReschedule(docId, sectionId, rowIdx, oldStatus, opts);
+    }
+  });
+}
+
+// Calendar export from an action button
+function exportActionToCalendar(refId, ev) {
+  if (ev) ev.stopPropagation();
+  const action = _getActionRef(refId);
+  if (!action) return;
+  exportRowToCalendar(action.docId, action.sectionId, action.rowIdx);
 }
 
 // Sozial special: prompt user about auto-calculating stunden
@@ -3938,10 +4283,32 @@ function confirmPayment(refId, status, ev) {
       row.status = "bezahlt";
     }
   } else if (status === "postponed") {
-    if (!confirm(`Zahlung wirklich als „verschoben" markieren?\n\nDer Eintrag bleibt erhalten, aber verschwindet aus der Erinnerungsliste. Du kannst später ein neues Datum eintragen.`)) {
+    if (!confirm(`Zahlung wirklich als „verschoben" markieren?\n\nDer Eintrag bleibt erhalten und du kannst gleich ein neues Fälligkeits-Datum eintragen.`)) {
       return;
     }
     row.status = "verschoben";
+    saveAndRefresh(docId);
+    // Offer to schedule new payment date
+    setTimeout(() => {
+      if (confirm("Möchtest du gleich ein neues Fälligkeits-Datum eintragen?")) {
+        openRescheduleDialog({
+          docId, sectionId, rowIdx,
+          originalRow: row,
+          mode: "create_new",
+          title: "Neues Fälligkeits-Datum",
+          intro: `Trage das neue Fälligkeits-Datum für diese Zahlung ein. Der alte Eintrag bleibt mit Status „verschoben" erhalten.`,
+          onConfirm: (opts) => {
+            const ds = state.docs[docId];
+            const newRow = { datum: opts.newDate };
+            if (row.bemerkung) newRow.bemerkung = row.bemerkung;
+            if (row.art) newRow.art = row.art;
+            ds.rows[sectionId].push(newRow);
+            saveAndRefresh(docId);
+          }
+        });
+      }
+    }, 250);
+    return;
   }
   saveAndRefresh(docId);
 }
@@ -4863,6 +5230,26 @@ function renderHelpView() {
       </ul>
       <p style="font-size:13px; color:var(--text-soft);">💡 <strong>Hintergrund:</strong> E-Mail-Programme nutzen einen Standard (mailto:), der keine Anhänge unterstützt. Daher dieser Umweg über Teilen-Menü oder ZIP – beide Wege sind aber komfortabel.</p>
 
+      <h2 style="color:var(--primary); font-size:18px; margin:18px 0 10px;">📅 Termine schnell bestätigen</h2>
+      <p>Auf der Startseite werden alle anstehenden Termine und Fristen aus deinen Dokumenten gesammelt angezeigt. Bei jedem Termin sind Action-Buttons direkt dabei:</p>
+      <ul style="padding-left:20px;">
+        <li>✅ <strong>Erledigt</strong> – Termin wurde wahrgenommen. Bei Sozialstunden fragt die App, ob die Stunden automatisch aus „von/bis/Pause" berechnet werden sollen.</li>
+        <li>⏭️ <strong>Verpasst</strong> – Termin nicht erschienen. Mit Bestätigungsdialog (kein Fehlklick). Danach fragt die App, ob du gleich einen Ersatz-Termin anlegen willst.</li>
+        <li>✕ <strong>Abgesagt</strong> – Termin wurde abgesagt. Wie „Verpasst", inkl. Ersatz-Termin-Möglichkeit.</li>
+        <li>📅 <strong>Verschieben</strong> – öffnet einen Dialog für neues Datum + Uhrzeit. Du wählst zwischen „neue Zeile anlegen" (alter Termin bleibt mit Status „verschoben") oder „alten Eintrag direkt ändern".</li>
+        <li>📲 <strong>Kalender</strong> – exportiert den Termin als <code>.ics</code>-Datei für Apple/Google-Kalender, mit Erinnerungen 1 Tag und 1 Stunde vorher.</li>
+      </ul>
+      <p>Bei Zahlungen (Schadens, Verfahrenskosten) statt „Erledigt": <strong>💶 Bezahlt</strong> (fragt nach Betrag) und <strong>⏭️ Verschoben</strong> (mit Folge-Dialog für neues Fälligkeitsdatum).</p>
+
+      <h2 style="color:var(--primary); font-size:18px; margin:18px 0 10px;">📲 Kalender-Export</h2>
+      <p>Du kannst jeden Termin direkt in deinen Handy-Kalender (Apple, Google, Outlook) übernehmen. Drei Wege:</p>
+      <ul style="padding-left:20px;">
+        <li><strong>Pro Zeile in der Tabelle</strong> – jeder Termin/Einsatz mit Datum hat einen kleinen „📲 Kalender"-Knopf neben dem „Eintrag entfernen"-Knopf</li>
+        <li><strong>Sammel-Export</strong> – über jeder Termin-/Zahlungs-Tabelle steht „📲 Alle Termine exportieren". Lädt eine .ics-Datei mit allen zukünftigen Terminen auf einmal</li>
+        <li><strong>Aus der Heute-Übersicht</strong> – jeder anstehende Termin hat den Knopf direkt</li>
+      </ul>
+      <p style="font-size:13px; color:var(--text-soft);">💡 Tipp: Beim ersten Mal Sammel-Export nutzen, danach pro Zeile wenn neue Termine dazukommen.</p>
+
       <h2 style="color:var(--primary); font-size:18px; margin:18px 0 10px;">✍️ Bestätigungen / Unterschriften – drei Wege</h2>
       <p>Bei <strong>Sozialstunden, Therapie, Schadenswiedergutmachung und BH-Terminen</strong> kannst du Bestätigungen auf drei Wegen einsammeln – ganz wie es der Einrichtung, Therapeut:in oder Geschädigten am liebsten ist:</p>
       <ol style="padding-left:20px;">
@@ -5595,6 +5982,25 @@ function renderRowsSection(sec) {
   const searchTerm = getRowSearch(sec.id);
   // Show search bar if there are 4+ rows
   let html = "";
+
+  // Detect if this section holds appointments/payments worth calendar-exporting
+  const docId = state.activeDocId;
+  const isAppointmentSection = (
+    (docId === "thera" && sec.id === "termine") ||
+    (docId === "sozial" && sec.id === "stunden") ||
+    (docId === "bhtermine" && sec.id === "termine") ||
+    (docId === "schadens" && sec.id === "zahlungen") ||
+    (docId === "kosten" && sec.id === "zahlungen")
+  );
+
+  // Bulk calendar export button when there are at least 1 row with date
+  if (isAppointmentSection && rows.some(r => r.datum)) {
+    html += `
+      <div style="display:flex; justify-content:flex-end; margin-bottom:10px;">
+        <button class="btn-secondary" onclick="exportAllToCalendar('${docId}', '${sec.id}')" style="font-size:13px; padding:6px 14px;" title="Alle zukünftigen Einträge mit Datum als .ics-Datei exportieren">📲 Alle Termine exportieren</button>
+      </div>`;
+  }
+
   if (rows.length >= 4) {
     const matchCount = rows.filter(r => rowMatchesSearch(r, searchTerm)).length;
     html += `
@@ -5709,6 +6115,11 @@ function renderRowsSection(sec) {
           </div>`;
       }
     }
+    // Per-row calendar export button (only if row has a date and is in an appointment section)
+    const calendarBtn = (isAppointmentSection && row.datum)
+      ? `<button class="row-calendar-btn" onclick="exportRowToCalendar('${docId}', '${sec.id}', ${idx})" title="Diesen Eintrag als .ics in den Kalender exportieren">📲 Kalender</button>`
+      : "";
+
     html += `
       <div class="row-card${visible ? '' : ' search-hidden'}">
         <div class="row-num">#${idx + 1}${pastMarker}</div>
@@ -5716,6 +6127,7 @@ function renderRowsSection(sec) {
         ${attachmentsHtml}
         ${signatureHtml}
         <div class="row-actions">
+          ${calendarBtn}
           <button class="row-delete" onclick="deleteRow('${sec.id}', ${idx})">🗑 Eintrag entfernen</button>
         </div>
       </div>`;
