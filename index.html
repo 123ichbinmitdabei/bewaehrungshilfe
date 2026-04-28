@@ -259,6 +259,19 @@
     font-size: 14px; font-family: inherit; width: 100%;
   }
   .row-grid .field-mini input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary-soft); }
+  /* Wide textarea fields (e.g. notes) span full row width */
+  .row-grid .field-mini-wide {
+    grid-column: 1 / -1;
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .row-grid .field-mini-wide label { font-size: 11px; color: var(--text-soft); text-transform: uppercase; letter-spacing: .3px; }
+  .row-grid .field-mini-wide textarea {
+    border: 1px solid var(--border); border-radius: 6px; padding: 7px 10px;
+    font-size: 14px; font-family: inherit; width: 100%;
+    background: var(--input-bg); color: var(--text);
+    resize: vertical; min-height: 56px;
+  }
+  .row-grid .field-mini-wide textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary-soft); }
   .row-card .row-actions { display: flex; justify-content: flex-end; margin-top: 10px; }
   .row-delete {
     background: none; border: none; color: var(--danger);
@@ -1200,12 +1213,15 @@ const DOCS = {
         ]
       },
       { id: "termine", title: "Termine / Sitzungen", icon: "📅", type: "rows",
-        hint: "Trage alle Termine ein, die auf dem Blatt erscheinen sollen - so brauchst du nicht jedes Mal ein neues Blatt. Die Spalten 'Wahrgenommen' und 'Unterschrift/Stempel' füllt dein/e Therapeut/in nach jeder Sitzung aus.",
+        hint: "Trage alle Termine ein. Pro Termin kannst du eine Notiz hinzufügen (z.B. „Hausaufgabe“, „Was besprochen“, „Verhaltensziel“) und dein/e Therapeut/in kann direkt mit Finger oder Stylus auf dem Bildschirm unterschreiben (Knopf unter jeder Zeile).",
+        hasRowSignature: true,
+        hasAttachments: true,
         columns: [
           { id: "datum", label: "Datum", placeholder: "TT.MM.JJJJ" },
           { id: "uhrzeit", label: "Uhrzeit" },
           { id: "dauer", label: "Dauer" },
           { id: "art", label: "Art (Einzel/Gruppe)" },
+          { id: "notiz", label: "Notiz / Hausaufgabe / Themen", type: "textarea", placeholder: "z.B. Was wurde besprochen, was nehme ich mit, was ist die Hausaufgabe ..." },
         ]
       },
       { id: "schweigepflicht", title: "Schweigepflichtentbindung", icon: "🔒", type: "checkboxes",
@@ -1331,7 +1347,7 @@ const DOCS = {
         ]
       },
       { id: "stunden", title: "Stunden-Nachweis", icon: "⏱️", type: "rows",
-        hint: "Trage jeden Einsatz ein. Bestätigung der Einrichtung ist auf 3 Wegen möglich: 1) Digital pro Zeile (mit Finger/Stylus auf dem Bildschirm) – siehe Knopf unter jeder Zeile · 2) Auf Papier ausdrucken, von Einrichtung unterschreiben + stempeln lassen, dann abfotografieren und als Beleg anhängen · 3) Sammel-Unterschrift am Ende (siehe Sektion „Unterschriften“).",
+        hint: "Trage jeden Einsatz ein. Pro Einsatz: Tätigkeit kurz benennen + freie Notiz (z.B. „Holz gehackt“, „Im Garten geholfen“, „Mit Bewohner X spazieren“). Die Einrichtung kann direkt unten in der Zeile unterschreiben (Knopf), oder du druckst aus und lässt es klassisch auf Papier unterzeichnen + abfotografieren.",
         hasAttachments: true,
         hasRowSignature: true,
         columns: [
@@ -1340,7 +1356,8 @@ const DOCS = {
           { id: "bis", label: "bis", placeholder: "12:00" },
           { id: "pause", label: "Pause (Min)", placeholder: "30" },
           { id: "stunden", label: "Stunden netto", placeholder: "3,5" },
-          { id: "taetigkeit", label: "Tätigkeit" },
+          { id: "taetigkeit", label: "Tätigkeit (kurz)" },
+          { id: "notiz", label: "Notiz / Bemerkung", type: "textarea", placeholder: "z.B. Was konkret getan, Besonderheiten, Probleme ..." },
         ]
       },
       { id: "anmerkung", title: "Anmerkungen", icon: "✍️", type: "freetext", fields: [
@@ -1382,7 +1399,8 @@ const DOCS = {
         ]
       },
       { id: "termine", title: "Termine", icon: "📅", type: "rows",
-        hint: "Trage hier deine BH-Termine ein - vergangene und geplante. Was wurde besprochen, was sind die nächsten Schritte? Hilft dir, den Überblick zu behalten und gut vorbereitet zu sein.",
+        hint: "Trage hier deine BH-Termine ein. Optional: dein/e Bewährungshelfer/in kann pro Termin auf dem Bildschirm unterschreiben (Knopf unter jeder Zeile).",
+        hasRowSignature: true,
         columns: [
           { id: "datum", label: "Datum", placeholder: "TT.MM.JJJJ" },
           { id: "uhrzeit", label: "Uhrzeit", placeholder: "14:30" },
@@ -1390,6 +1408,7 @@ const DOCS = {
           { id: "themen", label: "Besprochene Themen" },
           { id: "vereinbarungen", label: "Vereinbarungen / nächste Schritte" },
           { id: "status", label: "Status", placeholder: "wahrgenommen / abgesagt / ..." },
+          { id: "notiz", label: "Eigene Notiz", type: "textarea", placeholder: "Persönliche Notiz, Eindruck, was nehme ich mit ..." },
         ]
       },
       { id: "naechster", title: "Nächster Termin", icon: "⏭️", type: "info", fields: [
@@ -5370,10 +5389,15 @@ function renderRowsSection(sec) {
       const spellAttrs = numericLike
         ? `spellcheck="false"`
         : `spellcheck="true" lang="de" autocapitalize="sentences"`;
+      const isTextarea = col.type === "textarea";
+      const fieldClass = isTextarea ? "field-mini field-mini-wide" : "field-mini";
+      const inputEl = isTextarea
+        ? `<textarea data-rowkey="${sec.id}|${idx}|${col.id}" rows="2" placeholder="${esc(col.placeholder || "")}" ${spellAttrs}>${esc(row[col.id] || "")}</textarea>`
+        : `<input data-rowkey="${sec.id}|${idx}|${col.id}" type="text" value="${esc(row[col.id] || "")}" placeholder="${esc(col.placeholder || "")}" ${spellAttrs} />`;
       cols += `
-        <div class="field-mini">
+        <div class="${fieldClass}">
           <label>${esc(col.label)}</label>
-          <input data-rowkey="${sec.id}|${idx}|${col.id}" type="text" value="${esc(row[col.id] || "")}" placeholder="${esc(col.placeholder || "")}" ${spellAttrs} />
+          ${inputEl}
         </div>`;
     });
     let pastMarker = "";
@@ -6288,20 +6312,22 @@ function renderPrintThera() {
 
   // Termine - more rows for multiple sessions on one sheet
   const termineRows = getRows("termine");
-  let termineHtml = `<table><tr><th>Datum</th><th>Uhrzeit</th><th>Dauer</th><th>Art</th><th>Wahr- genommen</th><th>Bemerkung</th><th>Unterschrift / Stempel</th></tr>`;
+  let termineHtml = `<table><tr><th>Datum</th><th>Uhrzeit</th><th>Dauer</th><th>Art</th><th>Wahr-<br>genommen</th><th>Notiz / Hausaufgabe</th><th>Unterschrift / Stempel</th></tr>`;
   // Show entered rows + extra empty rows for upcoming sessions, total at least 15
   const minRows = 15;
   const targetRows = Math.max(termineRows.length + 5, minRows);
   for (let i = 0; i < targetRows; i++) {
     const r = termineRows[i] || {};
+    const rowSigHtml = (i < termineRows.length) ? renderPrintRowSignature("thera", "termine", i) : "";
+    const notizText = esc(r.notiz || "").replace(/\n/g, "<br>");
     termineHtml += `<tr>
       <td>${esc(r.datum || "")}&nbsp;</td>
       <td>${esc(r.uhrzeit || "")}&nbsp;</td>
       <td>${esc(r.dauer || "")}&nbsp;</td>
       <td>${esc(r.art || "")}&nbsp;</td>
       <td style="text-align:center;">☐ ja  ☐ nein</td>
-      <td>&nbsp;</td>
-      <td style="height:32pt;">&nbsp;</td>
+      <td style="font-size:9pt;">${notizText || "&nbsp;"}</td>
+      <td style="height:32pt; vertical-align:middle;">${rowSigHtml || "&nbsp;"}</td>
     </tr>`;
   }
   termineHtml += `</table>`;
@@ -6513,13 +6539,26 @@ function renderPrintSozial() {
   let stTbl = "", stundenSum = 0;
   // Always show header + at least 15 rows for handwriting addition
   stTbl = `<table>
-    <tr><th>Nr</th><th>Datum</th><th>von</th><th>bis</th><th>Pause<br>(Min)</th><th>Stunden<br>netto</th><th>Tätigkeit</th><th>Beleg</th><th>Bestätigt durch (Unterschrift / Stempel)</th></tr>`;
+    <tr><th>Nr</th><th>Datum</th><th>von</th><th>bis</th><th>Pause<br>(Min)</th><th>Stunden<br>netto</th><th>Tätigkeit / Notiz</th><th>Beleg</th><th>Bestätigt durch (Unterschrift / Stempel)</th></tr>`;
   filtered.forEach((r, i) => {
     const h = parseMoney(r.stunden || "");
     stundenSum += h;
     const atts = getAttachments("stunden", r._origIdx);
     const attMark = atts.length > 0 ? `📎 ${atts.length}` : "";
     const rowSigHtml = renderPrintRowSignature("sozial", "stunden", r._origIdx);
+    // Combine tätigkeit + notiz: tätigkeit fett, notiz darunter klein
+    const taet = esc(r.taetigkeit || "");
+    const notizText = esc(r.notiz || "").replace(/\n/g, "<br>");
+    let taetCell = "";
+    if (taet && notizText) {
+      taetCell = `<strong>${taet}</strong><br><span style="font-size:8pt; color:#555;">${notizText}</span>`;
+    } else if (taet) {
+      taetCell = taet;
+    } else if (notizText) {
+      taetCell = `<span style="font-size:8pt; color:#555;">${notizText}</span>`;
+    } else {
+      taetCell = "&nbsp;";
+    }
     stTbl += `<tr>
       <td>${i + 1}</td>
       <td>${esc(r.datum || "")}</td>
@@ -6527,7 +6566,7 @@ function renderPrintSozial() {
       <td>${esc(r.bis || "")}</td>
       <td>${esc(r.pause || "")}</td>
       <td>${esc(r.stunden || "")}</td>
-      <td>${esc(r.taetigkeit || "")}</td>
+      <td>${taetCell}</td>
       <td style="text-align:center;">${attMark}</td>
       <td style="height:36pt; vertical-align:middle;">${rowSigHtml || "&nbsp;"}</td>
     </tr>`;
@@ -6843,19 +6882,33 @@ function renderPrintBhtermine() {
     ["Aktenzeichen Bewährungshilfe", ans("personal","aktenzeichen")], ["Bewährungshelfer/in", ans("personal","bewaehrungshelfer")],
   ]);
   const termineRows = (getDocState().rows && getDocState().rows.termine) || [];
-  const filtered = termineRows.filter(r => r.datum || r.themen);
+  const filtered = termineRows.map((r, i) => ({ ...r, _origIdx: i })).filter(r => r.datum || r.themen);
   let termineTbl = "";
   if (filtered.length > 0) {
     termineTbl = `<table>
-      <tr><th>Datum</th><th>Uhrzeit</th><th>Art</th><th>Besprochene Themen</th><th>Vereinbarungen / nächste Schritte</th><th>Status</th></tr>`;
+      <tr><th>Datum</th><th>Uhrzeit</th><th>Art</th><th>Besprochene Themen</th><th>Vereinbarungen / nächste Schritte</th><th>Status</th><th>Unterschrift BH</th></tr>`;
     filtered.forEach(r => {
+      const rowSigHtml = renderPrintRowSignature("bhtermine", "termine", r._origIdx);
+      const ver = esc(r.vereinbarungen || "");
+      const notizText = esc(r.notiz || "").replace(/\n/g, "<br>");
+      let verCell = "";
+      if (ver && notizText) {
+        verCell = `${ver}<br><span style="font-size:8pt; color:#555; font-style:italic;">📝 ${notizText}</span>`;
+      } else if (ver) {
+        verCell = ver;
+      } else if (notizText) {
+        verCell = `<span style="font-size:9pt; font-style:italic;">📝 ${notizText}</span>`;
+      } else {
+        verCell = "";
+      }
       termineTbl += `<tr>
         <td>${esc(r.datum || "")}</td>
         <td>${esc(r.uhrzeit || "")}</td>
         <td>${esc(r.art || "")}</td>
         <td>${esc(r.themen || "")}</td>
-        <td>${esc(r.vereinbarungen || "")}</td>
+        <td>${verCell}</td>
         <td>${esc(r.status || "")}</td>
+        <td style="height:30pt; vertical-align:middle;">${rowSigHtml || "&nbsp;"}</td>
       </tr>`;
     });
     termineTbl += `</table>`;
