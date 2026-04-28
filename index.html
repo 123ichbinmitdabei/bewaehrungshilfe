@@ -420,11 +420,33 @@
   }
   .modal-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
   .modal-field label { font-size: 12px; color: var(--text-soft); text-transform: uppercase; letter-spacing: .3px; }
-  .modal-field input {
+  .modal-field input, .modal-field textarea {
     border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px;
     font-size: 15px; font-family: inherit; background: var(--input-bg); color: var(--text);
   }
-  .modal-field input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
+  .modal-field input:focus, .modal-field textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
+  .modal-field textarea { resize: vertical; min-height: 56px; }
+  .modal-field-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .modal-field-row .modal-field { min-width: 80px; }
+  /* Quick-Add tabs for Termin */
+  .qa-tabs {
+    display: flex; gap: 4px; margin-bottom: 14px;
+    background: var(--bg); padding: 4px; border-radius: 10px;
+    border: 1px solid var(--border);
+  }
+  .qa-tab {
+    flex: 1; min-width: 0;
+    border: none; background: transparent; cursor: pointer;
+    padding: 8px 6px; font-size: 13px; font-weight: 500;
+    color: var(--text-soft); border-radius: 7px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    transition: all 0.15s;
+  }
+  .qa-tab:hover { background: rgba(0,0,0,0.04); color: var(--text); }
+  .qa-tab.active {
+    background: var(--primary); color: white; font-weight: 600;
+  }
+  [data-theme="dark"] .qa-tab:hover { background: rgba(255,255,255,0.06); }
 
   /* === Signature Pad === */
   .sig-canvas-wrap {
@@ -3348,7 +3370,7 @@ let showArchived = false;
 function toggleShowArchived() { showArchived = !showArchived; render(); }
 
 // === VERSION INFO ===
-const APP_VERSION = "v3.12";
+const APP_VERSION = "v3.13";
 
 // === ONBOARDING ===
 let onboardingActive = false;
@@ -3386,9 +3408,21 @@ function finishOnboarding() {
 }
 
 // === QUICK ADD MODALS ===
-let quickAddOpen = null; // null | "schadens" | "sozial"
+let quickAddOpen = null; // null | "schadens" | "sozial" | "termin"
+let quickAddTerminKind = "thera"; // "thera" | "bhtermine" | "sozial" - which doc the termin goes to
 function openQuickAdd(kind) {
   quickAddOpen = kind;
+  // Default termin-kind based on what's available
+  if (kind === "termin") {
+    const hasThera = (state.docs.thera?.rows?.termine || []).length > 0 || state.docs.thera?.answers?.["therapeut.name"];
+    const hasBh = (state.docs.bhtermine?.rows?.termine || []).length > 0 || state.shared.bewaehrungshelfer;
+    const hasSozial = (state.docs.sozial?.rows?.stunden || []).length > 0 || state.docs.sozial?.answers?.["einrichtung.name"];
+    // Pick the first available (priority: thera > bh > sozial)
+    if (hasThera) quickAddTerminKind = "thera";
+    else if (hasBh) quickAddTerminKind = "bhtermine";
+    else if (hasSozial) quickAddTerminKind = "sozial";
+    else quickAddTerminKind = "thera"; // fallback
+  }
   render();
   setTimeout(() => {
     const first = document.querySelector(".modal input");
@@ -3399,14 +3433,28 @@ function closeQuickAdd() {
   quickAddOpen = null;
   render();
 }
+function setQuickAddTerminKind(kind) {
+  quickAddTerminKind = kind;
+  render();
+  setTimeout(() => {
+    const first = document.querySelector("#qa-datum");
+    if (first) first.focus();
+  }, 50);
+}
 async function quickAddSubmit() {
   const datumEl = document.getElementById("qa-datum");
   const valEl = document.getElementById("qa-value");
   const noteEl = document.getElementById("qa-note");
   const fileEl = document.getElementById("qa-file");
-  const datum = datumEl ? datumEl.value : "";
-  const value = valEl ? valEl.value : "";
-  const note = noteEl ? noteEl.value : "";
+  const datum = datumEl ? autoFormatDate(datumEl.value.trim()) : "";
+  const value = valEl ? valEl.value.trim() : "";
+  const note = noteEl ? noteEl.value.trim() : "";
+
+  // Termin mode has different validation + fields
+  if (quickAddOpen === "termin") {
+    return await quickAddTerminSubmit(datum);
+  }
+
   if (!datum || !value) {
     alert("Bitte Datum und Betrag/Stunden ausfüllen.");
     return;
@@ -3434,8 +3482,78 @@ async function quickAddSubmit() {
   showSaveToast("Eintrag gespeichert");
   render();
 }
+
+// Submit for termin quick-add (different fields per kind)
+async function quickAddTerminSubmit(datum) {
+  const uhrEl = document.getElementById("qa-uhrzeit");
+  const dauerEl = document.getElementById("qa-dauer");
+  const artEl = document.getElementById("qa-art");
+  const bisEl = document.getElementById("qa-bis");
+  const pauseEl = document.getElementById("qa-pause");
+  const taetigkeitEl = document.getElementById("qa-taetigkeit");
+  const themenEl = document.getElementById("qa-themen");
+  const notizEl = document.getElementById("qa-notiz");
+
+  const uhrzeit = uhrEl ? autoFormatTime(uhrEl.value.trim()) : "";
+  if (!datum) {
+    alert("Bitte ein Datum eintragen.");
+    return;
+  }
+  if (!parseDateGuess(datum)) {
+    alert("Datumsformat nicht erkannt. Bitte als TT.MM.JJJJ eingeben.");
+    return;
+  }
+
+  const kind = quickAddTerminKind;
+  let docId, sectionId, newRow;
+
+  if (kind === "thera") {
+    docId = "thera"; sectionId = "termine";
+    newRow = { datum };
+    if (uhrzeit) newRow.uhrzeit = uhrzeit;
+    if (dauerEl?.value.trim()) newRow.dauer = dauerEl.value.trim();
+    if (artEl?.value.trim()) newRow.art = artEl.value.trim();
+    if (notizEl?.value.trim()) newRow.notiz = notizEl.value.trim();
+  } else if (kind === "bhtermine") {
+    docId = "bhtermine"; sectionId = "termine";
+    newRow = { datum };
+    if (uhrzeit) newRow.uhrzeit = uhrzeit;
+    if (artEl?.value.trim()) newRow.art = artEl.value.trim();
+    if (themenEl?.value.trim()) newRow.themen = themenEl.value.trim();
+    if (notizEl?.value.trim()) newRow.notiz = notizEl.value.trim();
+  } else if (kind === "sozial") {
+    docId = "sozial"; sectionId = "stunden";
+    newRow = { datum };
+    if (uhrzeit) newRow.von = uhrzeit;
+    if (bisEl?.value.trim()) newRow.bis = autoFormatTime(bisEl.value.trim());
+    if (pauseEl?.value.trim()) newRow.pause = pauseEl.value.trim();
+    if (taetigkeitEl?.value.trim()) newRow.taetigkeit = taetigkeitEl.value.trim();
+    if (notizEl?.value.trim()) newRow.notiz = notizEl.value.trim();
+  } else {
+    alert("Unbekannter Termin-Typ.");
+    return;
+  }
+
+  state.activeDocId = docId;
+  const rows = getRows(sectionId);
+  rows.push(newRow);
+  setRows(sectionId, rows);
+  await saveActiveDoc();
+  state.activeDocId = null;
+  quickAddOpen = null;
+  const docName = DOCS[docId].title;
+  showSaveToast(`✓ Termin in ${docName} angelegt`);
+  render();
+}
 function renderQuickAddModal() {
   if (!quickAddOpen) return "";
+
+  // === TERMIN MODE ===
+  if (quickAddOpen === "termin") {
+    return renderQuickAddTerminModal();
+  }
+
+  // === ZAHLUNG / STUNDEN MODE (legacy) ===
   const isSchadens = quickAddOpen === "schadens";
   return `
     <div class="modal-backdrop" onclick="if(event.target===this) closeQuickAdd()">
@@ -3464,6 +3582,122 @@ function renderQuickAddModal() {
           <input type="file" id="qa-file" accept="image/*,application/pdf" />
         </div>
         <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:18px;">
+          <button class="btn btn-secondary" onclick="closeQuickAdd()">Abbrechen</button>
+          <button class="btn btn-success" onclick="quickAddSubmit()">✓ Speichern</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// Render the termin quick-add modal with tab switcher for kind
+function renderQuickAddTerminModal() {
+  const kind = quickAddTerminKind;
+  // Show only available kinds based on whether docs have data
+  const hasThera = (state.docs.thera?.rows?.termine || []).length > 0 || state.docs.thera?.answers?.["therapeut.name"];
+  const hasBh = (state.docs.bhtermine?.rows?.termine || []).length > 0 || state.shared.bewaehrungshelfer;
+  const hasSozial = (state.docs.sozial?.rows?.stunden || []).length > 0 || state.docs.sozial?.answers?.["einrichtung.name"];
+
+  // Build tab buttons - we always show all 3 (so user can add even if doc is empty)
+  const tabBtn = (k, label, icon) => `
+    <button class="qa-tab ${kind === k ? 'active' : ''}" onclick="setQuickAddTerminKind('${k}')">${icon} ${label}</button>`;
+
+  const tabs = `
+    <div class="qa-tabs">
+      ${tabBtn("thera", "Therapie", "🧠")}
+      ${tabBtn("bhtermine", "BH-Termin", "📅")}
+      ${tabBtn("sozial", "Sozial", "🤝")}
+    </div>`;
+
+  // Different field sets per kind
+  let fields = "";
+  if (kind === "thera") {
+    fields = `
+      <div class="modal-field-row">
+        <div class="modal-field" style="flex:1;">
+          <label>Uhrzeit (optional)</label>
+          <input type="text" id="qa-uhrzeit" placeholder="z.B. 14:00" inputmode="numeric" />
+        </div>
+        <div class="modal-field" style="flex:1;">
+          <label>Dauer (optional)</label>
+          <input type="text" id="qa-dauer" placeholder="z.B. 50min" />
+        </div>
+      </div>
+      <div class="modal-field">
+        <label>Art (optional)</label>
+        <input type="text" id="qa-art" placeholder="Einzel / Gruppe" />
+      </div>
+      <div class="modal-field">
+        <label>Notiz / Hausaufgabe (optional)</label>
+        <textarea id="qa-notiz" rows="2" placeholder="z.B. Was wurde besprochen, Hausaufgabe ..."></textarea>
+      </div>`;
+  } else if (kind === "bhtermine") {
+    fields = `
+      <div class="modal-field">
+        <label>Uhrzeit (optional)</label>
+        <input type="text" id="qa-uhrzeit" placeholder="z.B. 10:30" inputmode="numeric" />
+      </div>
+      <div class="modal-field">
+        <label>Art (optional)</label>
+        <input type="text" id="qa-art" placeholder="Persönlich / Telefon / Online" />
+      </div>
+      <div class="modal-field">
+        <label>Themen (optional)</label>
+        <input type="text" id="qa-themen" placeholder="z.B. Bewährungsverlauf, Sozialstunden" />
+      </div>
+      <div class="modal-field">
+        <label>Eigene Notiz (optional)</label>
+        <textarea id="qa-notiz" rows="2" placeholder="Persönliche Notiz, Eindruck ..."></textarea>
+      </div>`;
+  } else if (kind === "sozial") {
+    fields = `
+      <div class="modal-field-row">
+        <div class="modal-field" style="flex:1;">
+          <label>von (optional)</label>
+          <input type="text" id="qa-uhrzeit" placeholder="08:00" inputmode="numeric" />
+        </div>
+        <div class="modal-field" style="flex:1;">
+          <label>bis (optional)</label>
+          <input type="text" id="qa-bis" placeholder="12:00" inputmode="numeric" />
+        </div>
+        <div class="modal-field" style="flex:1;">
+          <label>Pause (Min)</label>
+          <input type="text" id="qa-pause" placeholder="30" inputmode="numeric" />
+        </div>
+      </div>
+      <div class="modal-field">
+        <label>Tätigkeit (kurz)</label>
+        <input type="text" id="qa-taetigkeit" placeholder="z.B. Garten, Werkstatt" />
+      </div>
+      <div class="modal-field">
+        <label>Notiz / Bemerkung (optional)</label>
+        <textarea id="qa-notiz" rows="2" placeholder="z.B. Hecke geschnitten, Werkstatt aufgeräumt ..."></textarea>
+      </div>`;
+  }
+
+  // Suggestion text
+  const suggestions = {
+    thera: "Therapie-Termin wird in „🧠 Therapie-Bestätigung“ eingetragen. Stunden werden später beim Erledigt-Klick automatisch berechnet.",
+    bhtermine: "BH-Termin wird in „📅 BH-Termine & Gespräche“ eingetragen.",
+    sozial: "Sozialstunden-Einsatz wird in „🤝 Sozialstunden-Nachweis“ eingetragen. Stunden werden beim Erledigt-Klick aus von/bis/Pause berechnet."
+  };
+
+  return `
+    <div class="modal-backdrop" onclick="if(event.target===this) closeQuickAdd()">
+      <div class="modal" style="max-width:520px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <h3 style="margin:0;">📅 Termin schnell erfassen</h3>
+          <button class="modal-close-btn" onclick="closeQuickAdd()" title="Schließen">✕</button>
+        </div>
+        <p style="margin:0 0 12px; font-size:13px; color:var(--text-soft);">Wähle den Bereich aus, dann das Datum und die Details.</p>
+        ${tabs}
+        <div class="modal-field">
+          <label>Datum</label>
+          <input type="text" id="qa-datum" value="${todayDE()}" placeholder="TT.MM.JJJJ" />
+        </div>
+        ${fields}
+        <p style="margin:10px 0 0; font-size:12px; color:var(--text-soft); line-height:1.4;">💡 ${esc(suggestions[kind] || "")}</p>
+        <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:16px;">
           <button class="btn btn-secondary" onclick="closeQuickAdd()">Abbrechen</button>
           <button class="btn btn-success" onclick="quickAddSubmit()">✓ Speichern</button>
         </div>
@@ -4982,11 +5216,19 @@ function renderHome() {
   // Quick-Add buttons (nur anzeigen wenn die jeweiligen Docs angelegt sind)
   const hasSchadensData = (state.docs.schadens?.answers?.["auflage.gesamt"]) || (state.docs.schadens?.rows?.zahlungen || []).length > 0;
   const hasSozialData = (state.docs.sozial?.answers?.["auflage.stunden_gesamt"]) || (state.docs.sozial?.rows?.stunden || []).length > 0;
+  const hasTheraData = (state.docs.thera?.answers?.["therapeut.name"]) || (state.docs.thera?.rows?.termine || []).length > 0;
+  const hasBhData = state.shared.bewaehrungshelfer || (state.docs.bhtermine?.rows?.termine || []).length > 0;
+  const hasAnyTerminContext = hasTheraData || hasBhData || hasSozialData;
+
   let quickAddBar = "";
-  if (hasSchadensData || hasSozialData) {
+  if (hasSchadensData || hasSozialData || hasAnyTerminContext) {
     let btns = "";
-    if (hasSchadensData) btns += `<button class="btn btn-success" onclick="openQuickAdd('schadens')" style="flex:1;">💶 Schnell Zahlung erfassen</button>`;
-    if (hasSozialData) btns += `<button class="btn btn-success" onclick="openQuickAdd('sozial')" style="flex:1;">⏱ Schnell Stunden erfassen</button>`;
+    // Termin-Knopf zuerst (häufigste Aktion)
+    if (hasAnyTerminContext) {
+      btns += `<button class="btn btn-success" onclick="openQuickAdd('termin')" style="flex:1; min-width:160px;">📅 Termin erfassen</button>`;
+    }
+    if (hasSchadensData) btns += `<button class="btn btn-secondary" onclick="openQuickAdd('schadens')" style="flex:1; min-width:160px;">💶 Zahlung erfassen</button>`;
+    if (hasSozialData) btns += `<button class="btn btn-secondary" onclick="openQuickAdd('sozial')" style="flex:1; min-width:160px;">⏱ Stunden erfassen</button>`;
     quickAddBar = `
       <div style="background:var(--card); border:1px solid var(--border); border-radius:12px; padding:14px; margin-top:16px;">
         <div style="font-size:13px; color:var(--text-soft); margin-bottom:10px;">⚡ Schnell-Eintrag:</div>
