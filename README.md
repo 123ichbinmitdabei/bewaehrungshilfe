@@ -232,6 +232,13 @@ Custom License – siehe [LICENSE](LICENSE).
 
 ## 📜 Changelog
 
+### v3.13 (April 2026) – Schnelleintrag für Termine
+- 📅 **„Termin erfassen"** als Hauptfunktion im Schnelleintrag (vorher nur Zahlungen/Stunden)
+- 🎯 **Tab-Auswahl** zwischen Therapie / BH-Termin / Sozialstunden – wird automatisch in die richtige Tabelle einsortiert
+- 📋 **Bereichs-spezifische Felder:** Therapie hat Dauer/Art, BH hat Themen, Sozial hat von/bis/Pause
+- 🤖 **Smart-Default**: bei Öffnen wird automatisch der Bereich vorausgewählt, der schon Daten hat
+- 💡 Mit Erklärungs-Hinweis welche Tabelle den Eintrag erhält
+
 ### v3.12 (April 2026) – Backup-Erinnerung
 - ⏰ **Smart-Erinnerung alle 14 Tage** - Banner oben auf der Startseite
 - 🧠 **Intelligent**: Erscheint nur wenn seit letztem Backup wirklich Daten geändert wurden
@@ -282,5 +289,5 @@ Custom License – siehe [LICENSE](LICENSE).
 
 ---
 
-**Aktuelle Version:** v3.12
+**Aktuelle Version:** v3.13
 **Letztes Update:** April 2026
