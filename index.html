@@ -702,6 +702,54 @@
     border-radius: 12px; padding: 0; margin-top: 12px; overflow: hidden;
     border: 1px solid var(--border);
   }
+  /* Backup reminder banner */
+  .backup-reminder {
+    margin-top: 14px;
+    border-radius: 12px;
+    padding: 14px 16px;
+    background: linear-gradient(135deg, rgba(91, 165, 114, 0.12), rgba(91, 165, 114, 0.05));
+    border: 1px solid var(--accent);
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-areas: "icon text" "actions actions";
+    gap: 8px 14px;
+    align-items: start;
+  }
+  .backup-reminder.urgent {
+    background: linear-gradient(135deg, rgba(220, 38, 38, 0.12), rgba(220, 38, 38, 0.05));
+    border-color: var(--danger);
+  }
+  .backup-reminder-icon { grid-area: icon; font-size: 28px; line-height: 1; padding-top: 2px; }
+  .backup-reminder-text { grid-area: text; min-width: 0; }
+  .backup-reminder-title {
+    font-weight: 700; font-size: 15px; color: var(--text); margin-bottom: 4px;
+  }
+  .backup-reminder-msg {
+    font-size: 13px; color: var(--text-soft); line-height: 1.45;
+  }
+  .backup-reminder-actions {
+    grid-area: actions;
+    display: flex; gap: 8px; flex-wrap: wrap;
+    margin-top: 4px;
+  }
+  .backup-reminder-actions .btn {
+    flex: 1; min-width: 140px; font-size: 14px; padding: 9px 14px;
+  }
+  @media (min-width: 600px) {
+    .backup-reminder {
+      grid-template-columns: auto 1fr auto;
+      grid-template-areas: "icon text actions";
+      align-items: center;
+    }
+    .backup-reminder-actions { margin-top: 0; }
+    .backup-reminder-actions .btn { flex: 0 0 auto; min-width: auto; }
+  }
+  [data-theme="dark"] .backup-reminder {
+    background: linear-gradient(135deg, rgba(110, 231, 183, 0.10), rgba(110, 231, 183, 0.04));
+  }
+  [data-theme="dark"] .backup-reminder.urgent {
+    background: linear-gradient(135deg, rgba(248, 113, 113, 0.12), rgba(248, 113, 113, 0.04));
+  }
   .today-overview.danger { border-color: var(--danger); background: rgba(220, 38, 38, 0.05); }
   .today-overview.warn { border-color: var(--warn); background: rgba(217, 119, 6, 0.05); }
   .today-overview.info { border-color: var(--primary-light); background: var(--primary-soft); }
@@ -1750,6 +1798,7 @@ const SHARED_STORAGE_KEY = "bh_shared_v1";
 const NOTES_STORAGE_KEY = "bh_notes_v1";
 const PIN_STORAGE_KEY = "bh_pin_v1";
 const PIN_RECOVERY_KEY = "bh_pin_recovery_v1";
+const BACKUP_REMINDER_KEY = "bh_backup_reminder_v1";
 
 // ============================================
 // STORAGE WRAPPER (localStorage primary, fallback to window.storage, then memory)
@@ -1792,6 +1841,10 @@ let state = {
   rowSearch: {},       // per-section search filters: { "schadens.zahlungen": "term" }
   notes: [],           // [{ id, text, category, createdAt, done }]
   pinLocked: false,    // is the app currently locked
+  // Backup reminder tracking
+  lastBackupAt: null,  // ISO timestamp of last successful backup
+  lastChangeAt: null,  // ISO timestamp of most recent data change
+  backupReminderSnoozedUntil: null,  // ISO timestamp until which the reminder is hidden
   docs: {              // per-doc state
     ear: { answers: {}, currentIdx: 0, signatures: {} },
     zeit: { answers: {}, currentIdx: 0, rows: {}, signatures: {} },
@@ -3295,7 +3348,7 @@ let showArchived = false;
 function toggleShowArchived() { showArchived = !showArchived; render(); }
 
 // === VERSION INFO ===
-const APP_VERSION = "v3.11";
+const APP_VERSION = "v3.12";
 
 // === ONBOARDING ===
 let onboardingActive = false;
@@ -3710,6 +3763,18 @@ async function loadAllState() {
       if (Array.isArray(parsed)) state.notes = parsed;
     } catch(e){}
   }
+  // Load backup reminder state
+  const reminderRaw = await Storage.get(BACKUP_REMINDER_KEY);
+  if (reminderRaw) {
+    try {
+      const parsed = JSON.parse(reminderRaw);
+      if (parsed && typeof parsed === "object") {
+        state.lastBackupAt = parsed.lastBackupAt || null;
+        state.lastChangeAt = parsed.lastChangeAt || null;
+        state.backupReminderSnoozedUntil = parsed.backupReminderSnoozedUntil || null;
+      }
+    } catch(e){}
+  }
   // Check for PIN - if set, lock immediately
   const pinHash = await Storage.get(PIN_STORAGE_KEY);
   if (pinHash && pinHash.length > 0) {
@@ -3720,6 +3785,91 @@ async function loadAllState() {
 function applyTheme() {
   document.documentElement.setAttribute("data-theme", state.theme);
 }
+
+// === BACKUP REMINDER LOGIC ===
+const BACKUP_REMINDER_DAYS = 14; // every 14 days
+const BACKUP_REMINDER_SNOOZE_HOURS = 24; // "Später erinnern" snoozes for 1 day
+
+// Persist the backup reminder state (called when fields change)
+async function persistBackupReminder() {
+  try {
+    await Storage.set(BACKUP_REMINDER_KEY, JSON.stringify({
+      lastBackupAt: state.lastBackupAt,
+      lastChangeAt: state.lastChangeAt,
+      backupReminderSnoozedUntil: state.backupReminderSnoozedUntil
+    }));
+  } catch (e) { console.error("backup reminder persist:", e); }
+}
+
+// Mark that data has changed - called from saveActiveDoc and direct row edits
+function markDataChanged() {
+  state.lastChangeAt = new Date().toISOString();
+  // Don't await - fire and forget
+  persistBackupReminder();
+}
+
+// Check whether to show the backup reminder banner
+function shouldShowBackupReminder() {
+  // No data changes yet? No reminder.
+  if (!state.lastChangeAt) return false;
+  const now = new Date();
+  // Snoozed?
+  if (state.backupReminderSnoozedUntil) {
+    const snoozeEnd = new Date(state.backupReminderSnoozedUntil);
+    if (snoozeEnd > now) return false;
+  }
+  // Never backed up? Show only after data is at least 1 day old (avoid annoying brand-new users)
+  if (!state.lastBackupAt) {
+    const lastChange = new Date(state.lastChangeAt);
+    const ageHours = (now - lastChange) / (1000 * 60 * 60);
+    return ageHours >= 24;
+  }
+  // Has there been a change since last backup?
+  const lastBackup = new Date(state.lastBackupAt);
+  const lastChange = new Date(state.lastChangeAt);
+  if (lastChange <= lastBackup) return false;  // No new changes since backup
+  // Has 14 days passed since last backup?
+  const daysSinceBackup = (now - lastBackup) / (1000 * 60 * 60 * 24);
+  return daysSinceBackup >= BACKUP_REMINDER_DAYS;
+}
+
+// Get a human-readable summary of when last backup was
+function getBackupReminderInfo() {
+  const now = new Date();
+  if (!state.lastBackupAt) {
+    return { neverBackedUp: true, message: "Du hast noch nie ein Backup gemacht. Sicher dir deine Daten - ein Datenverlust kann jederzeit passieren." };
+  }
+  const lastBackup = new Date(state.lastBackupAt);
+  const daysAgo = Math.floor((now - lastBackup) / (1000 * 60 * 60 * 24));
+  let when;
+  if (daysAgo === 0) when = "heute";
+  else if (daysAgo === 1) when = "gestern";
+  else if (daysAgo < 30) when = `vor ${daysAgo} Tagen`;
+  else if (daysAgo < 60) when = `vor über einem Monat`;
+  else when = `vor ${Math.floor(daysAgo / 30)} Monaten`;
+  return {
+    neverBackedUp: false,
+    daysAgo,
+    message: `Dein letztes Backup war ${when}. Seitdem hast du Daten geändert - jetzt wäre ein guter Zeitpunkt, sie zu sichern.`
+  };
+}
+
+// "Später erinnern" - snooze for 24 hours
+async function snoozeBackupReminder() {
+  const snoozeUntil = new Date();
+  snoozeUntil.setHours(snoozeUntil.getHours() + BACKUP_REMINDER_SNOOZE_HOURS);
+  state.backupReminderSnoozedUntil = snoozeUntil.toISOString();
+  await persistBackupReminder();
+  render();
+}
+
+// Called from exportAllData on success - mark backup as done
+async function markBackupDone() {
+  state.lastBackupAt = new Date().toISOString();
+  state.backupReminderSnoozedUntil = null;
+  await persistBackupReminder();
+}
+
 async function toggleTheme() {
   state.theme = state.theme === "dark" ? "light" : "dark";
   applyTheme();
@@ -3734,6 +3884,8 @@ async function saveActiveDoc() {
     await Storage.set(DOCS[id].storageKey, JSON.stringify(state.docs[id]));
     await Storage.set(SHARED_STORAGE_KEY, JSON.stringify(state.shared));
     saveStatus = "saved";
+    // Track for backup reminder
+    markDataChanged();
   } catch(e) { saveStatus = "error"; }
   updateSaveIndicator();
 }
@@ -4053,6 +4205,26 @@ function getTodayOverview() {
 
   return items;
 }
+
+// Render the backup reminder banner (shown above the today-overview)
+function renderBackupReminder() {
+  if (!shouldShowBackupReminder()) return "";
+  const info = getBackupReminderInfo();
+  const isUrgent = info.neverBackedUp || (info.daysAgo && info.daysAgo > 30);
+  return `
+    <div class="backup-reminder ${isUrgent ? 'urgent' : ''}">
+      <div class="backup-reminder-icon">${isUrgent ? '⚠️' : '💾'}</div>
+      <div class="backup-reminder-text">
+        <div class="backup-reminder-title">${isUrgent ? 'Wichtig: Backup machen' : 'Erinnerung: Daten sichern'}</div>
+        <div class="backup-reminder-msg">${esc(info.message)}</div>
+      </div>
+      <div class="backup-reminder-actions">
+        <button class="btn btn-primary" onclick="exportAllData()" title="Backup-Datei jetzt erstellen">💾 Jetzt sichern</button>
+        <button class="btn btn-secondary" onclick="snoozeBackupReminder()" title="In 24 Stunden wieder erinnern">⏰ Später erinnern</button>
+      </div>
+    </div>`;
+}
+
 function renderTodayOverview() {
   const items = getTodayOverview();
   if (items.length === 0) return "";
@@ -4320,6 +4492,7 @@ function saveAndRefresh(docId) {
   // Rows are mutated in place; persist now (don't wait for debounce)
   try {
     Storage.set(DOCS[docId].storageKey, JSON.stringify(ds));
+    markDataChanged();
   } catch (e) {
     console.error("save failed:", e);
   }
@@ -4975,6 +5148,7 @@ function renderHome() {
       <h1>📁 Bewährungshilfe-Assistent</h1>
       <p>Strukturierte Vorlagen für deine Bewährungshelferin. Klick auf eine Karte, um zu starten - du kannst jederzeit pausieren und später weitermachen.</p>
       <div style="margin-top:14px; font-size:12px; color:var(--text-soft);">${localInfo} · <span style="opacity:0.85; padding:1px 8px; background:var(--primary-soft); border-radius:999px; color:var(--primary); font-weight:600;" title="App-Version – nützlich für Support-Anfragen">${APP_VERSION}</span></div>
+      ${renderBackupReminder()}
       ${renderTodayOverview()}
       ${bewProgress}
       ${calBtn}
@@ -5154,6 +5328,16 @@ function renderHelpView() {
         <li>Auf Gerät B: Datei öffnen, dann <strong>„📥 Laden"</strong> → JSON auswählen</li>
       </ol>
       <p style="font-size:13px; color:var(--text-soft);">Achtung: Beim Import werden die Daten auf Gerät B <em>überschrieben</em>. Wer auf beiden Geräten gleichzeitig arbeitet, muss den Sync regelmäßig machen, sonst gehen Änderungen verloren.</p>
+
+      <h2 style="color:var(--primary); font-size:18px; margin:18px 0 10px;">⏰ Backup-Erinnerung</h2>
+      <p>Die App erinnert dich automatisch alle <strong>14 Tage</strong> daran, ein Backup zu machen – aber <em>nur wenn sich seit deinem letzten Backup wirklich Daten geändert haben</em>. Wer 3 Wochen nichts in der App tut, wird also nicht genervt.</p>
+      <p>Das Banner erscheint oben auf der Startseite mit zwei Knöpfen:</p>
+      <ul style="padding-left:20px;">
+        <li><strong>💾 Jetzt sichern</strong> – startet das Backup direkt; danach verschwindet die Erinnerung für die nächsten 14 Tage</li>
+        <li><strong>⏰ Später erinnern</strong> – versteckt die Erinnerung für 24 Stunden; danach taucht sie wieder auf</li>
+      </ul>
+      <p style="font-size:13px; color:var(--text-soft);">Wenn du noch nie ein Backup gemacht hast und seit gestern Daten in der App sind, erscheint das Banner sofort - mit Hinweis dass es noch <em>kein</em> Backup gibt. Bei mehr als 30 Tagen ohne Backup wird das Banner rot statt grün.</p>
+
 
       <h2 style="color:var(--primary); font-size:18px; margin:18px 0 10px;">📄 Wie fülle ich die Dokumente aus?</h2>
       <p>Klick auf eine Karte → du landest im Wizard. Geh Abschnitt für Abschnitt durch. Was nicht zutrifft, kannst du mit <strong>„Nicht zutreffend"</strong> markieren – diese Felder erscheinen dann nicht im fertigen Dokument. Felder mit 🔗 werden automatisch zwischen allen Dokumenten geteilt – einmal eintragen reicht.</p>
@@ -6419,6 +6603,7 @@ async function exportAllData() {
   a.href = url; a.download = `Bewaehrungshilfe-Daten_${userName ? userName + "_" : ""}${stamp}.json`;
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(url);
+  await markBackupDone();
   showSaveToast("Backup gespeichert");
 }
 
