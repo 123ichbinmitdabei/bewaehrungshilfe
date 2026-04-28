@@ -8,6 +8,109 @@
 
 ---
 
+---
+
+## 🔍 Gibt es Alternativen? (Marktrecherche)
+
+**Kurze Antwort: Nein – nicht für Probandinnen und Probanden zur Selbstdokumentation.**
+
+Die ausführliche Recherche im Frühjahr 2026 hat folgendes Bild ergeben:
+
+### 🏛 Was es gibt (für Bewährungshilfe-Fachkräfte)
+
+Der **DBH-Fachverband für Soziale Arbeit, Strafrecht und Kriminalpolitik** dokumentiert in einer [aktualisierten Übersicht](https://www.dbh-online.de/aktuelles/technisierung-der-bewaehrungshilfe-der-einsatz-von-apps-kurzer-uebersicht-0) inzwischen mehrere Bewährungshilfe-Apps in Europa. Die Mehrheit dieser Programme richtet sich allerdings an **Bewährungshelfer:innen als Behörden-Tools**, nicht an Probandinnen und Probanden.
+
+### 🔬 Was in Entwicklung ist (für spezielle Zielgruppen)
+
+| Projekt | Zielgruppe | Zweck |
+|---------|------------|-------|
+| **@myTabu** ([dhpol.de](https://www.dhpol.de/departments/department_III/FG_III.5/mytabu.php)) | Verurteilte mit Kindesmissbrauchsdelikten unter Bewährungs-/Führungsaufsicht | Therapeutengestützte Online-Intervention zur Rückfallprävention, BMBF-gefördert |
+| **Baden-Württembergische App zur Bewährungshilfe** | Bewährungshelfer:innen | Behörden-internes Tool, in Entwicklung |
+
+Diese Apps sind ausschließlich für **spezifische Behandlungsprogramme** oder **internen Behördengebrauch** gedacht – nicht für die alltägliche Selbstdokumentation eines/einer Probanden:in.
+
+### ❌ Was es nicht gibt
+
+Trotz intensiver Recherche konnte **keine** App identifiziert werden, die:
+
+1. ✗ **Probandinnen und Probanden direkt** dabei hilft, ihre Auflagen zu organisieren
+2. ✗ Sozialstunden mit **Pro-Einsatz-Bestätigung** (Stempel, Unterschrift) tracked
+3. ✗ Schadenswiedergutmachung mit **Zahlungsverlauf und Belegen** dokumentiert
+4. ✗ Therapietermine mit **Notizen und Hausaufgaben** erfasst
+5. ✗ Verfahrenskosten und Geldstrafen mit **Antrags-Generator** (Stundung, Ratenzahlung) abdeckt
+6. ✗ **Offline und ohne Anmeldung** funktioniert (Datenschutz!)
+7. ✗ **Kostenlos** und ohne Werbung verfügbar ist
+8. ✗ **Open Source** ist und damit nachprüfbar
+9. ✗ Daten **lokal auf dem Gerät** behält (keine Cloud, kein Server)
+
+### 🛠 Was Probanden bisher tun (mussten)
+
+Ohne spezialisierte App bleiben nur **Behelfslösungen**:
+
+- 📒 **Papier-Heft / Notizbuch** – vergisst nichts, aber unstrukturiert, keine Suche, kein Backup
+- 📊 **Excel-/Numbers-Tabelle** – flexibel, aber pro Auflage neu zu bauen, keine Unterschriften
+- 📝 **Word-Vorlagen** (wie unsere alten Einzel-Dateien) – formal, aber statisch, keine Berechnungen
+- 📅 **Generische To-Do-Apps** (Todoist, Things) – zu generisch, kein Bezug zu Auflagen
+- 🗓 **Google/Apple Kalender** – nur Termine, keine Belegverwaltung oder Stunden-Tracking
+- 📧 **E-Mail an sich selbst** – billig, aber keinerlei Struktur
+
+**Keine** dieser Optionen bietet was Probandinnen und Probanden eigentlich brauchen: einen **strukturierten Selbstdokumentations-Begleiter** durch die gesamte Bewährungszeit.
+
+### 💡 Warum gibt es das nicht?
+
+Es gibt mehrere Gründe, warum dieser Bedarf bisher nicht abgedeckt ist:
+
+1. **Datenschutz-Sensibilität** – Daten zu Straftaten, Therapie und Sozialstunden sind heikel. Kommerzielle Anbieter haben Hemmungen, weil die Compliance-Anforderungen hoch sind.
+2. **Kleine Zielgruppe** – In Deutschland gibt es etwa 150.000–180.000 Probandinnen und Probanden, davon viele in finanziell schwieriger Lage. Kein attraktiver Markt für Werbe- oder Abo-Modelle.
+3. **Föderalismus & Vielfalt der Auflagen** – Jedes Bundesland regelt Bewährungshilfe etwas anders, jeder Bewährungsbeschluss ist individuell. Eine standardisierte Lösung ist schwer zu bauen.
+4. **Fachkräfte-fokus** – Bisherige Apps wurden „top-down" für Behörden entwickelt – nie aus der Perspektive der Probandinnen und Probanden.
+5. **Stigmatisierung** – Es gibt wenig öffentliche Sichtbarkeit für die alltäglichen Herausforderungen, die mit Bewährungsauflagen einhergehen.
+
+### 🎯 Genau diese Lücke füllt der Bewährungshilfe-Assistent
+
+Diese App wurde **aus der Praxis heraus** entwickelt, mit Fokus auf:
+
+- ✅ **Selbstbestimmung der Probandinnen und Probanden** – die App gehört dem/der Nutzer:in, nicht der Justiz
+- ✅ **Strenger Datenschutz durch Architektur** – Daten leben nur auf dem Gerät, keine Cloud, keine Anmeldung
+- ✅ **Offline-Fähigkeit** – funktioniert auch ohne Internet, sobald einmal geladen
+- ✅ **Kostenlos und Open Source** – jederzeit nachprüfbar und kontrollierbar
+- ✅ **Praxisnah** – jede Funktion entspricht einem echten Bedürfnis aus dem Bewährungs-Alltag
+- ✅ **Würdevoll** – kein „Überwachungs-Look", sondern eine Helfer-App auf Augenhöhe
+
+> 💡 **Warnung:** Die App ist **kein Ersatz** für die offizielle Bewährungshilfe. Sie ist ein **persönliches Werkzeug**, das dir hilft, den Überblick zu behalten und Auflagen sauber zu dokumentieren. Die offizielle Berichtspflicht und der regelmäßige Kontakt zu deiner Bewährungshelferin / deinem Bewährungshelfer bleibt unverändert wichtig.
+
+---
+
+## 🔄 Was ist neu gegenüber den alten Einzel-Dateien?
+
+In früheren Iterationen gab es separate kleine HTML-Dateien und Word-Vorlagen für einzelne Bereiche:
+
+| Alte Datei | Was sie konnte | Was die neue App zusätzlich kann |
+|---|---|---|
+| **EAR-Assistent.html** | Einnahmen-Ausgaben-Rechnung in einer einzelnen HTML-Datei, Word-Export | ✅ Gleiche EAR-Funktionalität, aber **integriert** mit Stammdaten-Sharing zwischen allen Bereichen, plus Print-PDF, ZIP-Export mit Belegen |
+| **Einnahmen-Ausgaben-Rechnung.docx** | Vorgefertigte Word-Vorlage zum manuellen Ausfüllen | ✅ Wird **dynamisch erzeugt** aus deinen Eingaben – keine doppelten Eintragungen, keine veralteten Stammdaten |
+| **Therapie-Terminbestaetigung.docx** | Statische Word-Vorlage für Therapie-Bestätigung | ✅ Plus **digitale Unterschrift pro Termin**, Notiz-Feld pro Sitzung, automatische Stunden-Summierung, Hausaufgaben-Tracking |
+| **Zeitstrahl-Lebensverlauf.docx** | Statische Word-Vorlage für den Lebensverlauf | ✅ Plus **strukturierte Wizards** für Wohnungen, Arbeit, Bildung, Therapie, Hilfen – alles als eine Tabelle mit Sortierung und Suche |
+
+### Was du mit der neuen App zusätzlich bekommst (was es vorher gar nicht gab)
+
+- 📞 **BH-Termine & Gespräche-Tracker** mit Vorbereitungs-Notizen und Pro-Zeile-Unterschrift
+- 💶 **Schadenswiedergutmachung** mit Zahlungsverlauf, Belegen und Quittungen
+- 💸 **Verfahrenskosten & Geldstrafe** inkl. Antrags-Generator (Stundung, Ratenzahlung)
+- 🤝 **Sozialstunden-Nachweis** mit von/bis/Pause-Auto-Berechnung und Einrichtungs-Bestätigung
+- 📦 **Beweismittel & Asservate** mit Antrag auf Herausgabe (§ 111n StPO)
+- ✉️ **9 Anschreiben-Vorlagen** für typische Behördenkontakte
+- 📅 **Heute-Übersicht** mit Action-Buttons (Erledigt / Verpasst / Verschieben / Kalender)
+- ✍️ **Digitale Unterschriften** mit Zeitstempel und Geräte-Info
+- 📲 **Kalender-Export** (.ics) für alle Termine
+- 💾 **Backup-System** mit smarter Erinnerung alle 14 Tage
+- ⚡ **Schnelleintrag** für Termine, Zahlungen, Stunden direkt von der Startseite
+- 📤 **System-Teilen** mit Belegen (iOS/Android), ZIP-Export, PWA-Installation
+
+> 💡 **Migration:** Wenn du Daten in den alten Word-Vorlagen hast, kannst du sie weiter nutzen. Sobald du in die neue App umsteigst, trägst du sie einmal sauber ein – ab da ist alles digital, durchsuchbar, sicherbar und beidseitig signierbar.
+
+---
+
 ## ✨ Was kann die App?
 
 Strukturierte Vorlagen für 9 zentrale Dokumente, dazu 9 vorgefertigte Anschreiben für typische Behördenkontakte – plus ein **digitales Unterschriften-System**, eine **Heute-Übersicht** mit Action-Buttons, und **Kalender-Export** für alle Termine.
@@ -232,6 +335,16 @@ Custom License – siehe [LICENSE](LICENSE).
 
 ## 📜 Changelog
 
+### v3.14 (April 2026) – Nächste Termine + Einstellungen + Marktrecherche
+- 📅 **Nächste Termine pro Bereich** auf der Startseite: BH-Termin / Therapie-Termin / Sozial-Einsatz, jeweils mit „📲 In Kalender"-Knopf
+- ⚙️ **Einstellungs-Seite** für individuelle App-Konfiguration:
+  - Dokumente ein-/ausblenden (für nicht benötigte Bereiche)
+  - Backup-Erinnerungs-Intervall einstellbar (7/14/30 Tage / aus)
+  - Startseiten-Sektionen einzeln ein-/ausblendbar
+  - Reset-Knopf auf Standardwerte
+- 🔍 **Marktrecherche** in der README: bestätigt, dass es keine vergleichbare App für Probandinnen und Probanden gibt
+- 💾 Einstellungen werden mitgesichert und beim Import wiederhergestellt
+
 ### v3.13 (April 2026) – Schnelleintrag für Termine
 - 📅 **„Termin erfassen"** als Hauptfunktion im Schnelleintrag (vorher nur Zahlungen/Stunden)
 - 🎯 **Tab-Auswahl** zwischen Therapie / BH-Termin / Sozialstunden – wird automatisch in die richtige Tabelle einsortiert
@@ -289,5 +402,5 @@ Custom License – siehe [LICENSE](LICENSE).
 
 ---
 
-**Aktuelle Version:** v3.13
+**Aktuelle Version:** v3.14
 **Letztes Update:** April 2026
