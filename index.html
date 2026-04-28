@@ -714,10 +714,33 @@
   .today-item {
     display: flex; align-items: center; gap: 8px; font-size: 13px;
     padding: 6px 8px; border-radius: 6px;
+    flex-wrap: wrap;
   }
+  .today-item-text { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
   .today-item.danger { color: var(--danger); }
   .today-item.warn { color: var(--warn); }
   .today-item.info { color: var(--primary); }
+  /* Action buttons in today overview */
+  .today-actions {
+    display: flex; gap: 6px; flex-wrap: wrap;
+    padding: 0 16px 12px;
+  }
+  .today-rest .today-actions {
+    padding: 4px 0 4px 26px; /* indent under icon */
+  }
+  .today-act-btn {
+    border: 1px solid var(--border); background: var(--card); color: var(--text);
+    padding: 6px 12px; border-radius: 8px; font-size: 13px; font-weight: 500;
+    cursor: pointer; white-space: nowrap;
+    transition: all 0.15s;
+  }
+  .today-act-btn:hover { transform: translateY(-1px); }
+  .today-act-btn.done { border-color: var(--accent); color: var(--accent); }
+  .today-act-btn.done:hover { background: var(--accent); color: white; }
+  .today-act-btn.missed { border-color: var(--warn); color: var(--warn); }
+  .today-act-btn.missed:hover { background: var(--warn); color: white; }
+  .today-act-btn.cancelled { border-color: var(--text-soft); color: var(--text-soft); }
+  .today-act-btn.cancelled:hover { background: var(--text-soft); color: white; }
   /* Belege manager */
   .belege-list { display: flex; flex-direction: column; gap: 8px; }
   .belege-row {
@@ -2996,7 +3019,7 @@ let showArchived = false;
 function toggleShowArchived() { showArchived = !showArchived; render(); }
 
 // === VERSION INFO ===
-const APP_VERSION = "v3.9";
+const APP_VERSION = "v3.10";
 
 // === ONBOARDING ===
 let onboardingActive = false;
@@ -3562,6 +3585,14 @@ function checkNoteSuggestionsAfterTermin() {
 // PUNKT 14: HEUTE-ÜBERSICHT
 // ============================================
 // Returns array of "today" items based on app data
+// Check if a row's status field indicates it has been handled (not "pending")
+// Returns true if status contains keywords like "wahrgenommen", "abgesagt", "verpasst", "bezahlt", "erledigt"
+function isStatusHandled(status) {
+  if (!status || typeof status !== "string") return false;
+  const s = status.toLowerCase();
+  return /wahrgenommen|abgesagt|verpasst|nicht.?(da|wahrgenommen|erschienen)|bezahlt|erledigt|stattgefunden|nicht.?statt/.test(s);
+}
+
 function getTodayOverview() {
   const items = [];
   const now = new Date();
@@ -3594,62 +3625,90 @@ function getTodayOverview() {
 
   // 2. BH-Termine aus Tabelle (gespeicherte Termine)
   const bhRows = state.docs.bhtermine?.rows?.termine || [];
-  bhRows.forEach(row => {
+  bhRows.forEach((row, idx) => {
     if (!row.datum) return;
     const d = parseDateGuess(row.datum);
     const cls = d ? classifyDate(d) : null;
-    if (!cls || cls.days < 0) return;
+    if (!cls) return;
+    // Skip if already handled (status set)
+    if (isStatusHandled(row.status)) return;
     // Skip if already covered by "naechster.datum"
     if (naechsterDatum && row.datum === naechsterDatum) return;
     const uhr = row.uhrzeit || "";
-    items.push({ kind: cls.kind, icon: "📅", text: `${cls.label} BH-Termin${uhr ? " um " + uhr : ""}${row.themen ? ": " + row.themen.substring(0, 40) : ""}` });
+    items.push({
+      kind: cls.kind, icon: "📅",
+      text: `${cls.label} BH-Termin${uhr ? " um " + uhr : ""}${row.themen ? ": " + row.themen.substring(0, 40) : ""}`,
+      action: { type: "appointment", docId: "bhtermine", sectionId: "termine", rowIdx: idx, kind: "bh" }
+    });
   });
 
   // 3. Therapie-Termine
   const theraRows = state.docs.thera?.rows?.termine || [];
-  theraRows.forEach(row => {
+  theraRows.forEach((row, idx) => {
     if (!row.datum) return;
     const d = parseDateGuess(row.datum);
     const cls = d ? classifyDate(d) : null;
-    if (!cls || cls.days < 0) return;
+    if (!cls) return;
+    // Skip if already handled (status field added when user confirms)
+    if (isStatusHandled(row.status)) return;
     const uhr = row.uhrzeit || row.von || "";
-    items.push({ kind: cls.kind, icon: "🧠", text: `${cls.label} Therapie-Termin${uhr ? " um " + uhr : ""}` });
+    items.push({
+      kind: cls.kind, icon: "🧠",
+      text: `${cls.label} Therapie-Termin${uhr ? " um " + uhr : ""}`,
+      action: { type: "appointment", docId: "thera", sectionId: "termine", rowIdx: idx, kind: "thera" }
+    });
   });
 
   // 4. Sozialstunden-Einsätze
   const sozialRows = state.docs.sozial?.rows?.stunden || [];
-  sozialRows.forEach(row => {
+  sozialRows.forEach((row, idx) => {
     if (!row.datum) return;
     const d = parseDateGuess(row.datum);
     const cls = d ? classifyDate(d) : null;
-    if (!cls || cls.days < 0) return;
+    if (!cls) return;
+    // Skip if already handled
+    if (isStatusHandled(row.status)) return;
     const uhr = row.von || "";
     const taet = row.taetigkeit ? ": " + row.taetigkeit.substring(0, 40) : "";
-    items.push({ kind: cls.kind, icon: "🤝", text: `${cls.label} Sozialstunden-Einsatz${uhr ? " ab " + uhr : ""}${taet}` });
+    items.push({
+      kind: cls.kind, icon: "🤝",
+      text: `${cls.label} Sozialstunden-Einsatz${uhr ? " ab " + uhr : ""}${taet}`,
+      action: { type: "appointment", docId: "sozial", sectionId: "stunden", rowIdx: idx, kind: "sozial" }
+    });
   });
 
   // 5. Schadens: anstehende Zahlungen (Ratenzahlung)
   const schadensRows = state.docs.schadens?.rows?.zahlungen || [];
-  schadensRows.forEach(row => {
+  schadensRows.forEach((row, idx) => {
     if (!row.datum) return;
     const d = parseDateGuess(row.datum);
     const cls = d ? classifyDate(d) : null;
-    if (!cls || cls.days < 0) return;
+    if (!cls) return;
     // Only show as upcoming if no payment has been made yet for this row (no betrag set)
     if (row.betrag) return; // Already paid - don't remind
+    if (isStatusHandled(row.status)) return;
     const betrag = row.bemerkung ? " " + row.bemerkung.substring(0, 30) : "";
-    items.push({ kind: cls.kind, icon: "💶", text: `${cls.label} Schadens-Zahlung${betrag}` });
+    items.push({
+      kind: cls.kind, icon: "💶",
+      text: `${cls.label} Schadens-Zahlung${betrag}`,
+      action: { type: "payment", docId: "schadens", sectionId: "zahlungen", rowIdx: idx }
+    });
   });
 
   // 6. Verfahrenskosten: anstehende Zahlungen
   const kostenRows = state.docs.kosten?.rows?.zahlungen || [];
-  kostenRows.forEach(row => {
+  kostenRows.forEach((row, idx) => {
     if (!row.datum) return;
     const d = parseDateGuess(row.datum);
     const cls = d ? classifyDate(d) : null;
-    if (!cls || cls.days < 0) return;
+    if (!cls) return;
     if (row.betrag) return; // Already paid
-    items.push({ kind: cls.kind, icon: "💸", text: `${cls.label} Verfahrenskosten-Zahlung` });
+    if (isStatusHandled(row.status)) return;
+    items.push({
+      kind: cls.kind, icon: "💸",
+      text: `${cls.label} Verfahrenskosten-Zahlung`,
+      action: { type: "payment", docId: "kosten", sectionId: "zahlungen", rowIdx: idx }
+    });
   });
 
   // 7. Schadens: Frist nahe?
@@ -3732,11 +3791,183 @@ function renderTodayOverview() {
         <span class="today-text"><strong>${esc(summary.text)}</strong>${restCount > 0 && !expanded ? ` <span style="opacity:0.7;">+${restCount} weitere</span>` : ""}</span>
         <span class="today-toggle">${expanded ? "▲" : "▼"}</span>
       </div>
+      ${summary.action ? renderTodayActions(summary.action) : ""}
       ${expanded && items.length > 1 ? `
         <div class="today-rest">
-          ${items.slice(1).map(it => `<div class="today-item ${it.kind}"><span class="today-icon">${it.icon}</span><span>${esc(it.text)}</span></div>`).join("")}
+          ${items.slice(1).map(it => `
+            <div class="today-item ${it.kind}">
+              <div class="today-item-text"><span class="today-icon">${it.icon}</span><span>${esc(it.text)}</span></div>
+              ${it.action ? renderTodayActions(it.action) : ""}
+            </div>`).join("")}
         </div>` : ""}
     </div>`;
+}
+
+// Render action buttons for an appointment/payment item
+function renderTodayActions(action) {
+  const ref = _registerActionRef(action);
+  if (action.type === "appointment") {
+    return `
+      <div class="today-actions">
+        <button class="today-act-btn done" onclick="confirmAppointment('${ref}', 'done', event)" title="Termin als erledigt / wahrgenommen markieren">✅ Erledigt</button>
+        <button class="today-act-btn missed" onclick="confirmAppointment('${ref}', 'missed', event)" title="Termin verpasst / nicht erschienen">⏭️ Verpasst</button>
+        <button class="today-act-btn cancelled" onclick="confirmAppointment('${ref}', 'cancelled', event)" title="Termin wurde abgesagt">✕ Abgesagt</button>
+      </div>`;
+  }
+  if (action.type === "payment") {
+    return `
+      <div class="today-actions">
+        <button class="today-act-btn done" onclick="confirmPayment('${ref}', 'paid', event)" title="Zahlung getätigt - Betrag jetzt eintragen">💶 Bezahlt</button>
+        <button class="today-act-btn missed" onclick="confirmPayment('${ref}', 'postponed', event)" title="Zahlung verschoben">⏭️ Verschoben</button>
+      </div>`;
+  }
+  return "";
+}
+
+// Action ref registry (avoid quote-encoding issues in inline onclick)
+window._actionRefs = {};
+function _registerActionRef(action) {
+  const id = "act_" + Math.random().toString(36).substring(2, 11);
+  window._actionRefs[id] = action;
+  return id;
+}
+
+function _getActionRef(refId) {
+  return window._actionRefs[refId];
+}
+
+// Handle appointment confirmation (Erledigt / Verpasst / Abgesagt)
+function confirmAppointment(refId, status, ev) {
+  if (ev) ev.stopPropagation();
+  const action = _getActionRef(refId);
+  if (!action) return;
+  const { docId, sectionId, rowIdx, kind } = action;
+  const rows = state.docs[docId]?.rows?.[sectionId];
+  if (!rows || !rows[rowIdx]) return;
+  const row = rows[rowIdx];
+
+  // Map status to readable text
+  const statusText = {
+    done: "wahrgenommen",
+    missed: "verpasst (nicht erschienen)",
+    cancelled: "abgesagt"
+  }[status];
+
+  // Confirm dialog for destructive actions (missed / cancelled)
+  if (status === "missed" || status === "cancelled") {
+    const which = status === "missed" ? "verpasst" : "abgesagt";
+    const dateStr = row.datum || "(ohne Datum)";
+    const docName = DOCS[docId].title;
+    if (!confirm(`Termin am ${dateStr} (${docName}) wirklich als „${which}" markieren?\n\nDas wird im Status-Feld eingetragen und der Termin verschwindet aus der Erinnerungsliste.`)) {
+      return;
+    }
+  }
+
+  // Special handling for sozial: offer to auto-fill stunden
+  if (kind === "sozial" && status === "done") {
+    handleSozialDone(docId, sectionId, rowIdx, row);
+    return;
+  }
+
+  // Regular: just set status
+  row.status = statusText;
+  saveAndRefresh(docId);
+}
+
+// Sozial special: prompt user about auto-calculating stunden
+function handleSozialDone(docId, sectionId, rowIdx, row) {
+  const calculated = calculateNetHours(row.von, row.bis, row.pause);
+  let action = "manual";
+  if (calculated !== null && calculated > 0 && row.von && row.bis) {
+    // We can calculate - ask user
+    const msg = `Sozialstunden-Einsatz als erledigt markieren.\n\n` +
+      `Aus deinen Eingaben (${row.von}–${row.bis}, Pause ${row.pause || 0} Min) wären das ${calculated.toLocaleString("de-DE", { maximumFractionDigits: 2 })} h netto.\n\n` +
+      `OK   = ${calculated.toLocaleString("de-DE", { maximumFractionDigits: 2 })} h automatisch eintragen\n` +
+      `Abbrechen = Nur Status setzen, Stunden später eintragen`;
+    if (confirm(msg)) {
+      row.stunden = calculated.toLocaleString("de-DE", { maximumFractionDigits: 2 });
+    }
+  }
+  row.status = "wahrgenommen";
+  saveAndRefresh(docId);
+}
+
+// Calculate net hours from von/bis/pause (returns number or null)
+function calculateNetHours(von, bis, pause) {
+  if (!von || !bis) return null;
+  const parseTime = s => {
+    const m = String(s).match(/^(\d{1,2})[:.]?(\d{0,2})$/);
+    if (!m) return null;
+    const h = parseInt(m[1]); const mi = parseInt(m[2] || "0");
+    if (isNaN(h) || isNaN(mi) || h > 23 || mi > 59) return null;
+    return h * 60 + mi;
+  };
+  const v = parseTime(von); const b = parseTime(bis);
+  if (v === null || b === null) return null;
+  let mins = b - v;
+  if (mins < 0) mins += 24 * 60; // crossed midnight (rare)
+  const pauseMin = pause ? parseInt(String(pause).replace(/[^\d]/g, "")) || 0 : 0;
+  mins -= pauseMin;
+  if (mins <= 0) return null;
+  return mins / 60;
+}
+
+// Handle payment confirmation
+function confirmPayment(refId, status, ev) {
+  if (ev) ev.stopPropagation();
+  const action = _getActionRef(refId);
+  if (!action) return;
+  const { docId, sectionId, rowIdx } = action;
+  const rows = state.docs[docId]?.rows?.[sectionId];
+  if (!rows || !rows[rowIdx]) return;
+  const row = rows[rowIdx];
+
+  if (status === "paid") {
+    // Ask user for amount (most likely they want to enter it now)
+    const docName = DOCS[docId].title;
+    const dateStr = row.datum || "(ohne Datum)";
+    const suggested = row.bemerkung && /\d/.test(row.bemerkung) ? row.bemerkung.match(/\d+[,\.]?\d*/)?.[0] : "";
+    const amount = prompt(`Zahlung am ${dateStr} (${docName}) als bezahlt markieren.\n\nWelchen Betrag hast du gezahlt? (€)`, suggested || "");
+    if (amount === null) return; // User cancelled
+    const cleaned = amount.trim();
+    if (!cleaned) {
+      // No amount - just set status
+      row.status = "bezahlt";
+    } else {
+      row.betrag = cleaned;
+      row.status = "bezahlt";
+    }
+  } else if (status === "postponed") {
+    if (!confirm(`Zahlung wirklich als „verschoben" markieren?\n\nDer Eintrag bleibt erhalten, aber verschwindet aus der Erinnerungsliste. Du kannst später ein neues Datum eintragen.`)) {
+      return;
+    }
+    row.status = "verschoben";
+  }
+  saveAndRefresh(docId);
+}
+
+// Common save + refresh helper for action handlers
+function saveAndRefresh(docId) {
+  const ds = state.docs[docId];
+  if (!ds) return;
+  // Rows are mutated in place; persist now (don't wait for debounce)
+  try {
+    Storage.set(DOCS[docId].storageKey, JSON.stringify(ds));
+  } catch (e) {
+    console.error("save failed:", e);
+  }
+  showSaveToast("✓ Status gespeichert");
+  render();
+}
+
+function showSaveToast(text) {
+  const existing = document.querySelector(".save-toast.action-toast");
+  if (existing) existing.remove();
+  const toast = document.createElement("div");
+  toast.className = "save-toast action-toast";
+  toast.textContent = text;
+  document.body.appendChild(toast);
+  setTimeout(() => { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 2000);
 }
 
 // ============================================
