@@ -719,6 +719,62 @@
     background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3);
     padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;
   }
+  /* Settings View */
+  .settings-section {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 20px;
+    margin-bottom: 16px;
+  }
+  .settings-section h2 {
+    margin: 0 0 6px; font-size: 17px; color: var(--text);
+  }
+  .settings-section-desc {
+    margin: 0 0 14px; font-size: 13px; color: var(--text-soft); line-height: 1.5;
+  }
+  .settings-toggle {
+    display: flex; gap: 12px; align-items: flex-start;
+    padding: 10px 0; border-top: 1px solid var(--border); cursor: pointer;
+  }
+  .settings-toggle:first-of-type { border-top: none; padding-top: 0; }
+  .settings-toggle input[type="checkbox"] {
+    margin-top: 2px; width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);
+  }
+  .settings-toggle-text {
+    display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0;
+  }
+  .settings-toggle-text strong { font-size: 14px; color: var(--text); font-weight: 600; }
+  .settings-toggle-desc { font-size: 12px; color: var(--text-soft); }
+  .settings-radio {
+    display: flex; gap: 10px; align-items: center;
+    padding: 8px 0; cursor: pointer; font-size: 14px; color: var(--text);
+  }
+  .settings-radio input[type="radio"] {
+    width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);
+  }
+  /* Next appointments card (BH / Therapie / Sozial) */
+  .next-appts-card {
+    margin-top: 10px;
+    background: var(--primary-soft);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .next-appt-row {
+    padding: 10px 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    font-size: 13px;
+    border-bottom: 1px solid rgba(0,0,0,0.06);
+  }
+  .next-appt-row:last-child { border-bottom: none; }
+  .next-appt-text { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; flex-wrap: wrap; }
+  .next-appt-icon { font-size: 16px; }
+  .next-appt-btn { font-size: 12px !important; padding: 5px 10px; white-space: nowrap; }
+  [data-theme="dark"] .next-appt-row { border-bottom-color: rgba(255,255,255,0.08); }
   /* Today overview */
   .today-overview {
     border-radius: 12px; padding: 0; margin-top: 12px; overflow: hidden;
@@ -1821,6 +1877,7 @@ const NOTES_STORAGE_KEY = "bh_notes_v1";
 const PIN_STORAGE_KEY = "bh_pin_v1";
 const PIN_RECOVERY_KEY = "bh_pin_recovery_v1";
 const BACKUP_REMINDER_KEY = "bh_backup_reminder_v1";
+const SETTINGS_STORAGE_KEY = "bh_settings_v1";
 
 // ============================================
 // STORAGE WRAPPER (localStorage primary, fallback to window.storage, then memory)
@@ -1867,6 +1924,18 @@ let state = {
   lastBackupAt: null,  // ISO timestamp of last successful backup
   lastChangeAt: null,  // ISO timestamp of most recent data change
   backupReminderSnoozedUntil: null,  // ISO timestamp until which the reminder is hidden
+  // User settings (configurable)
+  settings: {
+    hiddenDocs: [],              // array of doc-ids to hide from the home grid
+    backupReminderDays: 14,       // 7 | 14 | 30 | 0 (0 = off)
+    showInstallBanner: true,      // show "Install as PWA" banner
+    showBackupReminder: true,     // show backup reminder banner at all
+    showTodayOverview: true,      // show today overview section
+    showNextAppointments: true,   // show "Nächste Termine" card
+    showBewaehrungProgress: true, // show progress bar at top of home
+    showStats: true,              // show monthly stats card
+    showQuickAdd: true            // show quick-add bar
+  },
   docs: {              // per-doc state
     ear: { answers: {}, currentIdx: 0, signatures: {} },
     zeit: { answers: {}, currentIdx: 0, rows: {}, signatures: {} },
@@ -3370,7 +3439,7 @@ let showArchived = false;
 function toggleShowArchived() { showArchived = !showArchived; render(); }
 
 // === VERSION INFO ===
-const APP_VERSION = "v3.13";
+const APP_VERSION = "v3.14";
 
 // === ONBOARDING ===
 let onboardingActive = false;
@@ -4009,6 +4078,19 @@ async function loadAllState() {
       }
     } catch(e){}
   }
+  // Load user settings
+  const settingsRaw = await Storage.get(SETTINGS_STORAGE_KEY);
+  if (settingsRaw) {
+    try {
+      const parsed = JSON.parse(settingsRaw);
+      if (parsed && typeof parsed === "object") {
+        // Merge: keep defaults for missing keys
+        state.settings = { ...state.settings, ...parsed };
+        // Ensure hiddenDocs is array
+        if (!Array.isArray(state.settings.hiddenDocs)) state.settings.hiddenDocs = [];
+      }
+    } catch(e){}
+  }
   // Check for PIN - if set, lock immediately
   const pinHash = await Storage.get(PIN_STORAGE_KEY);
   if (pinHash && pinHash.length > 0) {
@@ -4044,6 +4126,8 @@ function markDataChanged() {
 
 // Check whether to show the backup reminder banner
 function shouldShowBackupReminder() {
+  // User disabled the reminder?
+  if (state.settings && state.settings.showBackupReminder === false) return false;
   // No data changes yet? No reminder.
   if (!state.lastChangeAt) return false;
   const now = new Date();
@@ -4052,6 +4136,12 @@ function shouldShowBackupReminder() {
     const snoozeEnd = new Date(state.backupReminderSnoozedUntil);
     if (snoozeEnd > now) return false;
   }
+  // Determine interval (custom or default)
+  let days = BACKUP_REMINDER_DAYS;
+  if (state.settings && typeof state.settings.backupReminderDays === "number") {
+    days = state.settings.backupReminderDays;
+  }
+  if (days === 0) return false; // user turned reminder off
   // Never backed up? Show only after data is at least 1 day old (avoid annoying brand-new users)
   if (!state.lastBackupAt) {
     const lastChange = new Date(state.lastChangeAt);
@@ -4062,9 +4152,9 @@ function shouldShowBackupReminder() {
   const lastBackup = new Date(state.lastBackupAt);
   const lastChange = new Date(state.lastChangeAt);
   if (lastChange <= lastBackup) return false;  // No new changes since backup
-  // Has 14 days passed since last backup?
+  // Has interval passed since last backup?
   const daysSinceBackup = (now - lastBackup) / (1000 * 60 * 60 * 24);
-  return daysSinceBackup >= BACKUP_REMINDER_DAYS;
+  return daysSinceBackup >= days;
 }
 
 // Get a human-readable summary of when last backup was
@@ -4089,6 +4179,51 @@ function getBackupReminderInfo() {
 }
 
 // "Später erinnern" - snooze for 24 hours
+// === USER SETTINGS ===
+async function persistSettings() {
+  try {
+    await Storage.set(SETTINGS_STORAGE_KEY, JSON.stringify(state.settings));
+  } catch (e) { console.error("settings persist:", e); }
+}
+function setSetting(key, value) {
+  state.settings[key] = value;
+  // Side-effect: changing backupReminderDays needs to update the reminder
+  if (key === "backupReminderDays") {
+    // 0 means off; persist immediately
+  }
+  persistSettings();
+  render();
+}
+function toggleHiddenDoc(docId) {
+  const arr = state.settings.hiddenDocs || [];
+  const idx = arr.indexOf(docId);
+  if (idx >= 0) arr.splice(idx, 1);
+  else arr.push(docId);
+  state.settings.hiddenDocs = arr;
+  persistSettings();
+  render();
+}
+function isDocHidden(docId) {
+  return (state.settings.hiddenDocs || []).indexOf(docId) >= 0;
+}
+function resetSettingsToDefaults() {
+  if (!confirm("Alle Einstellungen auf Standard zurücksetzen?\n\nDeine Daten bleiben unberührt - nur die Anzeige-Einstellungen werden zurückgesetzt.")) return;
+  state.settings = {
+    hiddenDocs: [],
+    backupReminderDays: 14,
+    showInstallBanner: true,
+    showBackupReminder: true,
+    showTodayOverview: true,
+    showNextAppointments: true,
+    showBewaehrungProgress: true,
+    showStats: true,
+    showQuickAdd: true
+  };
+  persistSettings();
+  render();
+  showSaveToast("Einstellungen zurückgesetzt");
+}
+
 async function snoozeBackupReminder() {
   const snoozeUntil = new Date();
   snoozeUntil.setHours(snoozeUntil.getHours() + BACKUP_REMINDER_SNOOZE_HOURS);
@@ -4441,6 +4576,99 @@ function getTodayOverview() {
 }
 
 // Render the backup reminder banner (shown above the today-overview)
+// Render a card with the next upcoming appointment per area (BH / Therapie / Sozial)
+function renderNextAppointmentsCard() {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const items = [];
+
+  // 1. BH-Termin: prefer special "naechster.datum" if set, else use earliest future row
+  const naechsterDatum = state.docs.bhtermine?.answers?.["naechster.datum"];
+  const naechsterUhrzeit = state.docs.bhtermine?.answers?.["naechster.uhrzeit"];
+  let bhSpecialUsed = false;
+  if (naechsterDatum) {
+    const d = parseDateGuess(naechsterDatum);
+    if (d && d >= today) {
+      items.push({
+        icon: "📅",
+        label: "Nächster BH-Termin",
+        date: naechsterDatum,
+        time: naechsterUhrzeit || "",
+        action: { kind: "bh-special" }
+      });
+      bhSpecialUsed = true;
+    }
+  }
+  if (!bhSpecialUsed) {
+    const next = findNextFutureRow("bhtermine", "termine", today);
+    if (next) items.push({
+      icon: "📅",
+      label: "Nächster BH-Termin",
+      date: next.row.datum,
+      time: next.row.uhrzeit || "",
+      action: { kind: "row", docId: "bhtermine", sectionId: "termine", rowIdx: next.idx }
+    });
+  }
+
+  // 2. Therapie-Termin: earliest future row
+  const nextThera = findNextFutureRow("thera", "termine", today);
+  if (nextThera) items.push({
+    icon: "🧠",
+    label: "Nächster Therapie-Termin",
+    date: nextThera.row.datum,
+    time: nextThera.row.uhrzeit || "",
+    extra: nextThera.row.art ? ` (${nextThera.row.art})` : "",
+    action: { kind: "row", docId: "thera", sectionId: "termine", rowIdx: nextThera.idx }
+  });
+
+  // 3. Sozialstunden-Einsatz: earliest future row
+  const nextSozial = findNextFutureRow("sozial", "stunden", today);
+  if (nextSozial) items.push({
+    icon: "🤝",
+    label: "Nächster Sozial-Einsatz",
+    date: nextSozial.row.datum,
+    time: nextSozial.row.von || "",
+    extra: nextSozial.row.taetigkeit ? `: ${nextSozial.row.taetigkeit}` : "",
+    action: { kind: "row", docId: "sozial", sectionId: "stunden", rowIdx: nextSozial.idx }
+  });
+
+  if (items.length === 0) return "";
+
+  const lines = items.map(it => {
+    let calClick;
+    if (it.action.kind === "bh-special") {
+      calClick = `exportNextBhTerminToCalendar()`;
+    } else {
+      calClick = `exportRowToCalendar('${it.action.docId}', '${it.action.sectionId}', ${it.action.rowIdx})`;
+    }
+    return `
+      <div class="next-appt-row">
+        <span class="next-appt-text">
+          <span class="next-appt-icon">${it.icon}</span>
+          <strong>${esc(it.label)}:</strong> ${esc(it.date)}${it.time ? " um " + esc(it.time) : ""}${it.extra ? esc(it.extra) : ""}
+        </span>
+        <button class="btn btn-secondary next-appt-btn" onclick="${calClick}" title="Diesen Termin in den Kalender exportieren">📲 In Kalender</button>
+      </div>`;
+  }).join("");
+
+  return `<div class="next-appts-card">${lines}</div>`;
+}
+
+// Helper: find earliest future (or today) row in a section
+function findNextFutureRow(docId, sectionId, today) {
+  const rows = state.docs[docId]?.rows?.[sectionId] || [];
+  let best = null;
+  rows.forEach((row, idx) => {
+    if (!row.datum) return;
+    const d = parseDateGuess(row.datum);
+    if (!d || d < today) return;
+    if (isStatusHandled(row.status)) return;
+    if (!best || d < best.date) {
+      best = { idx, row, date: d };
+    }
+  });
+  return best;
+}
+
 function renderBackupReminder() {
   if (!shouldShowBackupReminder()) return "";
   const info = getBackupReminderInfo();
@@ -5018,6 +5246,7 @@ function render() {
   else if (state.view === "help") app.innerHTML = renderHelpView();
   else if (state.view === "anschreiben") app.innerHTML = renderAnschreibenView();
   else if (state.view === "belege") app.innerHTML = renderBelegeView();
+  else if (state.view === "settings") app.innerHTML = renderSettingsView();
   // Render modal overlay if open
   let existing = document.getElementById("modalOverlay");
   if (existing) existing.remove();
@@ -5099,6 +5328,8 @@ function renderHome() {
   orderedDocIds.forEach(docId => {
     const doc = DOCS[docId];
     if (!doc) return; // safety: skip if id is in DOC_ORDER but not in DOCS
+    // Skip docs that user has hidden in settings
+    if (isDocHidden(docId)) return;
     const docArchived = isArchived(doc.id);
     if (docArchived) archivedCount++;
     if (docArchived !== showArchived) return; // skip if doesn't match filter
@@ -5357,16 +5588,8 @@ function renderHome() {
       <div class="notes-list">${notesList || `<div style="text-align:center; padding:14px; color:var(--text-soft); font-size:12px;">Noch keine Notizen. Schreib oben rein, was du dir merken willst.</div>`}</div>
     </div>`;
 
-  // Calendar export hint if next BH termin is set
-  let calBtn = "";
-  const naechsterDatum = state.docs.bhtermine?.answers?.["naechster.datum"];
-  if (naechsterDatum) {
-    const naechsterUhrzeit = state.docs.bhtermine.answers?.["naechster.uhrzeit"];
-    calBtn = `<div style="margin-top:10px; padding:10px 14px; background:var(--primary-soft); border-radius:10px; font-size:13px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-      <span><strong>📅 Nächster BH-Termin:</strong> ${esc(naechsterDatum)}${naechsterUhrzeit ? " um " + esc(naechsterUhrzeit) : ""}</span>
-      <button class="btn btn-secondary" onclick="exportNextBhTerminToCalendar()" style="font-size:12px;">📲 In Kalender</button>
-    </div>`;
-  }
+  // Calendar export hint - now part of "Nächste Termine" card (rendered via settings)
+  // (Kept here for backwards compatibility - no longer used in template below)
 
   // PIN status indicator
   let pinStatus = "";
@@ -5381,6 +5604,7 @@ function renderHome() {
     <div class="home-hero">
       <div style="display:flex; justify-content:flex-end; gap:8px; margin-bottom:8px; flex-wrap:wrap;">
         <button class="btn btn-secondary" onclick="state.view='anschreiben'; render();" title="Briefe und Anträge erstellen">✉️ Briefe</button>
+        <button class="btn btn-secondary" onclick="state.view='settings'; render();" title="App-Einstellungen anpassen">⚙️ Einstellungen</button>
         <button class="btn btn-secondary" onclick="state.view='help'; render();" title="Anleitung anzeigen">❓ Hilfe</button>
         ${pinStatus}
         <button class="btn btn-secondary" onclick="exportAllData()" title="Alle Daten als Backup speichern">💾 Sichern</button>
@@ -5390,15 +5614,15 @@ function renderHome() {
       <h1>📁 Bewährungshilfe-Assistent</h1>
       <p>Strukturierte Vorlagen für deine Bewährungshelferin. Klick auf eine Karte, um zu starten - du kannst jederzeit pausieren und später weitermachen.</p>
       <div style="margin-top:14px; font-size:12px; color:var(--text-soft);">${localInfo} · <span style="opacity:0.85; padding:1px 8px; background:var(--primary-soft); border-radius:999px; color:var(--primary); font-weight:600;" title="App-Version – nützlich für Support-Anfragen">${APP_VERSION}</span></div>
-      ${renderBackupReminder()}
-      ${renderTodayOverview()}
-      ${bewProgress}
-      ${calBtn}
+      ${state.settings.showBackupReminder !== false ? renderBackupReminder() : ""}
+      ${state.settings.showNextAppointments !== false ? renderNextAppointmentsCard() : ""}
+      ${state.settings.showTodayOverview !== false ? renderTodayOverview() : ""}
+      ${state.settings.showBewaehrungProgress !== false ? bewProgress : ""}
       ${onboardingPrompt}
-      ${installBanner}
-      ${statsCard}
+      ${state.settings.showInstallBanner !== false ? installBanner : ""}
+      ${state.settings.showStats !== false ? statsCard : ""}
     </div>
-    ${quickAddBar}
+    ${state.settings.showQuickAdd !== false ? quickAddBar : ""}
     ${notesPanel}
     ${archivedCount > 0 || showArchived ? `
       <div style="display:flex; justify-content:flex-end; margin-top:12px;">
@@ -5410,6 +5634,90 @@ function renderHome() {
       Brauchst du Hilfe? Klick oben auf <strong>❓ Hilfe</strong> für die ausführliche Anleitung.
     </div>
   `;
+}
+
+function renderSettingsView() {
+  const s = state.settings;
+  // Build doc visibility checkboxes
+  const docList = ["uebersicht", "bhtermine", "ear", "schadens", "kosten", "sozial", "thera", "zeit", "asservate"];
+  const docCheckboxes = docList.map(id => {
+    const doc = DOCS[id];
+    if (!doc) return "";
+    const isHidden = isDocHidden(id);
+    return `
+      <label class="settings-toggle">
+        <input type="checkbox" ${isHidden ? "" : "checked"} onchange="toggleHiddenDoc('${id}')" />
+        <span class="settings-toggle-text">
+          <strong>${doc.icon} ${esc(doc.title)}</strong>
+          <span class="settings-toggle-desc">${esc(doc.short || doc.subtitle || "")}</span>
+        </span>
+      </label>`;
+  }).join("");
+
+  // Backup interval radio
+  const intervalOpts = [
+    [7, "Alle 7 Tage (häufig)"],
+    [14, "Alle 14 Tage (empfohlen)"],
+    [30, "Alle 30 Tage (selten)"],
+    [0, "Aus (keine Erinnerung)"]
+  ];
+  const intervalRadios = intervalOpts.map(([val, label]) => `
+    <label class="settings-radio">
+      <input type="radio" name="backup-interval" value="${val}" ${s.backupReminderDays === val ? "checked" : ""} onchange="setSetting('backupReminderDays', ${val})" />
+      <span>${esc(label)}</span>
+    </label>`).join("");
+
+  // Show toggles
+  const showToggle = (key, label, desc) => `
+    <label class="settings-toggle">
+      <input type="checkbox" ${s[key] !== false ? "checked" : ""} onchange="setSetting('${key}', this.checked)" />
+      <span class="settings-toggle-text">
+        <strong>${esc(label)}</strong>
+        <span class="settings-toggle-desc">${esc(desc)}</span>
+      </span>
+    </label>`;
+
+  return `
+    <div class="container">
+      <button class="btn btn-secondary" onclick="state.view='home'; render();" style="margin-bottom:14px;">← Zurück zur Startseite</button>
+      <h1 style="margin:0 0 6px;">⚙️ Einstellungen</h1>
+      <p style="color:var(--text-soft); margin:0 0 24px; font-size:14px;">Hier kannst du anpassen, welche Funktionen und Dokumente du brauchst. Änderungen werden sofort gespeichert.</p>
+
+      <div class="settings-section">
+        <h2>📁 Sichtbare Dokumente</h2>
+        <p class="settings-section-desc">Verstecke Dokumente, die du nicht brauchst (z.B. wenn du keine Sozialstunden-Auflage hast). Sie verschwinden vom Startbildschirm, deine Daten bleiben erhalten.</p>
+        ${docCheckboxes}
+      </div>
+
+      <div class="settings-section">
+        <h2>⏰ Backup-Erinnerung</h2>
+        <p class="settings-section-desc">Wie oft die App dich an ein Backup erinnert. Erinnerung erscheint nur, wenn seit dem letzten Backup wirklich etwas geändert wurde.</p>
+        ${intervalRadios}
+      </div>
+
+      <div class="settings-section">
+        <h2>🏠 Startseite</h2>
+        <p class="settings-section-desc">Welche Bereiche werden auf der Startseite angezeigt?</p>
+        ${showToggle("showNextAppointments", "📅 Nächste Termine", "Karte mit nächstem Termin pro Bereich + Kalender-Knopf")}
+        ${showToggle("showTodayOverview", "🔔 Heute-Übersicht", "Zusammenfassung von heutigen/morgigen Terminen mit Action-Buttons")}
+        ${showToggle("showQuickAdd", "⚡ Schnell-Eintrag", "Knöpfe für schnelles Anlegen von Terminen, Zahlungen, Stunden")}
+        ${showToggle("showBewaehrungProgress", "📊 Bewährungs-Fortschritt", "Fortschrittsbalken (wieviel der Bewährungszeit ist um)")}
+        ${showToggle("showStats", "📈 Monats-Statistiken", "Zahlen vom aktuellen Monat (Zahlungen, Stunden, Termine)")}
+        ${showToggle("showInstallBanner", "📲 Installations-Hinweis", "Banner mit Anleitung wie die App installiert wird (PWA)")}
+        ${showToggle("showBackupReminder", "💾 Backup-Erinnerungs-Banner", "Banner oben auf der Startseite (nicht das Intervall)")}
+      </div>
+
+      <div class="settings-section">
+        <h2>🔄 Zurücksetzen</h2>
+        <p class="settings-section-desc">Setzt alle obigen Einstellungen auf Standard zurück. Deine Daten bleiben unberührt.</p>
+        <button class="btn btn-secondary" onclick="resetSettingsToDefaults()" style="margin-top:8px;">↺ Auf Standard zurücksetzen</button>
+      </div>
+
+      <div class="settings-section" style="background:var(--primary-soft); border-color:var(--primary-light);">
+        <h2>💡 Tipp</h2>
+        <p style="margin:0; font-size:14px;">Nicht alle Funktionen sind für jeden gleich nützlich. Wer keine Sozialstunden hat, kann sie ausblenden. Wer die App stark nutzt, kann das Banner deaktivieren. Stell die App so ein, wie sie dir am besten dient.</p>
+      </div>
+    </div>`;
 }
 
 function renderHelpView() {
@@ -6835,6 +7143,7 @@ async function exportAllData() {
     exportedAt: new Date().toISOString(),
     shared: state.shared,
     theme: state.theme,
+    settings: state.settings,
     docs: state.docs,
   };
   const blob = new Blob([JSON.stringify(dump, null, 2)], { type: "application/json" });
