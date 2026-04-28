@@ -232,6 +232,14 @@ Custom License – siehe [LICENSE](LICENSE).
 
 ## 📜 Changelog
 
+### v3.12 (April 2026) – Backup-Erinnerung
+- ⏰ **Smart-Erinnerung alle 14 Tage** - Banner oben auf der Startseite
+- 🧠 **Intelligent**: Erscheint nur wenn seit letztem Backup wirklich Daten geändert wurden
+- 💾 **Direkt-Knopf** „Jetzt sichern" + **„Später erinnern"** (24h Snooze)
+- 🔴 **Dringend-Modus** (rot) wenn noch nie Backup gemacht oder mehr als 30 Tage her
+- 🚫 **Kein Genöle** bei frischen Usern oder wenn nichts geändert wurde
+- 📚 Hilfe-Sektion erweitert
+
 ### v3.11 (April 2026) – Termin-Management komplett
 - 📅 **Verschieben-Funktion**: neuer Dialog mit Wahl zwischen „neue Zeile" und „direkt ändern"
 - 🔁 **Ersatz-Termin** automatisch nach Verpasst/Abgesagt anbieten
@@ -274,5 +282,5 @@ Custom License – siehe [LICENSE](LICENSE).
 
 ---
 
-**Aktuelle Version:** v3.11
+**Aktuelle Version:** v3.12
 **Letztes Update:** April 2026
