@@ -3738,7 +3738,7 @@ let showArchived = false;
 function toggleShowArchived() { showArchived = !showArchived; render(); }
 
 // === VERSION INFO ===
-const APP_VERSION = "v3.20";
+const APP_VERSION = "v3.21";
 
 // === ONBOARDING ===
 let onboardingActive = false;
@@ -7543,26 +7543,40 @@ function renderPreviewToolbar() {
     ` : ""}
   `;
 }
-// Print the document. Opens it in a clean, separate window with only the print
-// styles. The new window prints ITSELF after fully loading (incl. images) - far
-// more reliable than calling print() on the window from the parent context.
+// Print the document. Builds a fresh, self-contained printable HTML page,
+// loads it as a real document via a Blob URL (a proper loaded page where
+// window.print() works reliably - unlike a document.write'd blank window),
+// and that page prints itself once fully loaded.
 function confirmAndPrint() {
   const id = state.activeDocId;
-  // Make sure the print view is rendered WITH attachments included (if the doc
-  // has any). The user expects belege in the printout.
-  const docsWithAttachments = ["schadens", "sozial", "kosten", "asservate"];
-  if (docsWithAttachments.includes(id) && countAllAttachments(id) > 0 && !state.printWithAttachments) {
-    state.printWithAttachments = true;
-    render(); // re-render the preview so #printView includes the attachment pages
+  // Render the print HTML FRESH so that attachments (Belege) are definitely
+  // included. We force the attachment flag on for the printout - belege belong
+  // in the submitted document.
+  const prevPWA = state.printWithAttachments;
+  state.printWithAttachments = true;
+  let printHtml = "", isLandscape = false;
+  try {
+    if (id === "ear") printHtml = renderPrintEAR();
+    else if (id === "zeit") { printHtml = renderPrintZeit(); isLandscape = true; }
+    else if (id === "thera") printHtml = renderPrintThera();
+    else if (id === "schadens") printHtml = renderPrintSchadens();
+    else if (id === "sozial") { printHtml = renderPrintSozial(); isLandscape = true; }
+    else if (id === "uebersicht") printHtml = renderPrintUebersicht();
+    else if (id === "bhtermine") { printHtml = renderPrintBhtermine(); isLandscape = true; }
+    else if (id === "asservate") { printHtml = renderPrintAsservate(); isLandscape = true; }
+    else if (id === "kosten") { printHtml = renderPrintKosten(); isLandscape = true; }
+  } catch (e) {
+    console.error("Print render error:", e);
   }
-  const pv = document.getElementById("printView");
-  if (!pv || !pv.innerHTML.trim()) {
-    try { window.print(); } catch (e) {
-      alert("Bitte die Druckfunktion deines Browsers nutzen (Strg+P).");
-    }
+  state.printWithAttachments = prevPWA;
+  if (!printHtml) {
+    const pv = document.getElementById("printView");
+    if (pv) { printHtml = pv.innerHTML; isLandscape = pv.classList.contains("landscape-mode"); }
+  }
+  if (!printHtml.trim()) {
+    alert("Es gibt nichts zu drucken. Bitte zuerst Daten erfassen.");
     return;
   }
-  const isLandscape = pv.classList.contains("landscape-mode");
   const docTitle = (DOCS[id] && DOCS[id].title) || "Dokument";
   const printCss = `
     * { box-sizing: border-box; }
@@ -7595,52 +7609,52 @@ function confirmAndPrint() {
     .sig-inline-img { max-height: 48pt; display: block; }
     img { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     @page { size: A4${isLandscape ? " landscape" : ""}; margin: 1.5cm; }
-    /* On-screen print controls - hidden when actually printing */
     .print-controls {
-      position: fixed; top: 0; left: 0; right: 0;
-      background: #2E5984; color: #fff; padding: 10px 16px;
-      display: flex; gap: 10px; align-items: center; justify-content: center;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.2); z-index: 9999;
+      position: sticky; top: 0; background: #2E5984; color: #fff;
+      padding: 12px 16px; display: flex; gap: 10px; align-items: center;
+      justify-content: center; flex-wrap: wrap; margin: -1.2cm -1.2cm 16pt; z-index: 50;
     }
     .print-controls button {
-      background: #fff; color: #2E5984; border: none; padding: 8px 18px;
+      background: #fff; color: #2E5984; border: none; padding: 9px 20px;
       border-radius: 6px; font-weight: 700; font-size: 14px; cursor: pointer;
     }
-    .print-controls span { font-size: 13px; }
-    body.has-controls { padding-top: 70px; }
-    @media print { .print-controls { display: none !important; } body.has-controls { padding-top: 1.2cm; } }
+    .print-controls .hint { font-size: 12px; opacity: 0.9; }
+    @media print { .print-controls { display: none !important; } }
   `;
-  // Self-printing script: waits for full load (images included), then prints.
   const printScript =
-    "window.addEventListener('load', function(){" +
-    "  setTimeout(function(){ try { window.print(); } catch(e){} }, 350);" +
-    "});";
+    "function doPrint(){ try { window.focus(); window.print(); } catch(e){ alert('Druck konnte nicht gestartet werden. Bitte Strg+P drücken.'); } }" +
+    "window.addEventListener('load', function(){ setTimeout(doPrint, 500); });";
   const controlsBar =
     '<div class="print-controls">' +
-    '<span>📄 Druckvorschau</span>' +
-    '<button onclick="window.print()">🖨 Drucken / als PDF</button>' +
-    '<button onclick="window.close()">Schließen</button>' +
+    '<button onclick="doPrint()">🖨 Jetzt drucken / als PDF speichern</button>' +
+    '<button onclick="window.close()">Fenster schließen</button>' +
+    '<span class="hint">Falls kein Druckdialog erscheint: Strg+P drücken</span>' +
     '</div>';
-  const win = window.open("", "_blank");
-  if (!win) {
-    try { window.print(); } catch (e) {
-      alert("Das Druckfenster wurde vom Browser blockiert. Bitte Pop-ups für diese Seite erlauben - oder direkt mit Strg+P drucken.");
-    }
-    return;
-  }
-  win.document.open();
-  win.document.write(
+  const fullHtml =
     '<!DOCTYPE html><html lang="de"><head><meta charset="utf-8">' +
     '<title>' + esc(docTitle) + '</title>' +
     '<style>' + printCss + '</style>' +
     '<scr' + 'ipt>' + printScript + '</scr' + 'ipt>' +
-    '</head><body class="has-controls">' +
-    controlsBar +
-    pv.innerHTML +
-    '</body></html>'
-  );
-  win.document.close();
-  win.focus();
+    '</head><body>' + controlsBar + printHtml + '</body></html>';
+  // Load as a REAL document via Blob URL - window.print() is reliable on a
+  // properly loaded page (unlike a document.write'd about:blank window).
+  let blobUrl;
+  try {
+    const blob = new Blob([fullHtml], { type: "text/html" });
+    blobUrl = URL.createObjectURL(blob);
+  } catch (e) {
+    console.error(e);
+    alert("Die Druckseite konnte nicht erstellt werden.");
+    return;
+  }
+  const win = window.open(blobUrl, "_blank");
+  if (!win) {
+    URL.revokeObjectURL(blobUrl);
+    alert("Das Druckfenster wurde vom Browser blockiert.\n\nBitte erlaube Pop-up-Fenster für diese Seite (Adressleiste) und versuche es erneut. Alternativ kannst du im geöffneten Tab Strg+P drücken.");
+    return;
+  }
+  // Clean up the blob URL after a minute (window has loaded long before)
+  setTimeout(() => { try { URL.revokeObjectURL(blobUrl); } catch (e) {} }, 60000);
 }
 
 function countAllAttachments(docId) {
