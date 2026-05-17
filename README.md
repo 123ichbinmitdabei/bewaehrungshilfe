@@ -365,6 +365,11 @@ Custom License – siehe [LICENSE](LICENSE).
 
 ## 📜 Changelog
 
+### v3.19 (Mai 2026) – Drucken & Word-Download endlich korrekt
+- 🖨 **Drucken komplett neu gebaut:** Das Dokument wird jetzt in einem sauberen, separaten Fenster geöffnet und gedruckt. Das umgeht alle möglichen Störungen durch die App-Oberfläche und funktioniert zuverlässig in allen Browsern.
+- 📄 **„Word herunterladen" lädt jetzt wirklich Word** – nicht mehr versehentlich ein ZIP. Belege gibt es weiterhin separat über den „ZIP mit Belegen"-Knopf.
+- 🛡 Fällt das Druckfenster aus (z.B. Pop-up-Blocker), wird automatisch direkt gedruckt
+
 ### v3.18 (Mai 2026) – Word-Export & Drucken endgültig repariert
 - 🐛 **Word-Bibliothek:** Wird jetzt als `index.iife.js` geladen (echte Browser-Datei). Die zuvor genutzten `.cjs`-Dateien werden von Browsern als „application/node" abgewiesen.
 - 🖨 **Drucken repariert:** Der blockierende Bestätigungsdialog wurde entfernt. Falls ein Browser Dialoge unterdrückt, wurde dadurch das Drucken komplett verhindert. Die Datenschutz-Warnung steht weiterhin sichtbar als Banner.
@@ -455,5 +460,5 @@ Custom License – siehe [LICENSE](LICENSE).
 
 ---
 
-**Aktuelle Version:** v3.18
+**Aktuelle Version:** v3.19
 **Letztes Update:** Mai 2026
