@@ -365,6 +365,12 @@ Custom License – siehe [LICENSE](LICENSE).
 
 ## 📜 Changelog
 
+### v3.16 (Mai 2026) – Bugfix Druckansicht + Belege-Checkbox
+- 🐛 **Wichtiger Bugfix:** Buttons in der Druckansicht (Teilen / ZIP / Drucken) reagierten teils nicht - ein unsichtbares Overlay konnte Klicks abfangen. Behoben.
+- 📎 **Belege mitdrucken** ist jetzt eine klare, gut sichtbare Checkbox in der Druckansicht - statt eines unscheinbaren Knopfes
+- 🖨 Drucken funktioniert auch dann, wenn der Browser Dialog-Boxen unterdrückt
+- 🛡 Modal-Verwaltung robuster: nur noch ein Overlay gleichzeitig, keine „Geister-Overlays" mehr
+
 ### v3.15 (Mai 2026) – Unterschrift hochladen + Mittelwert-Rechner
 - 📤 **Unterschrift als Bild hochladen** – zusätzlich zum Zeichenpad. Foto oder Scan der Unterschrift wird automatisch zugeschnitten
 - ⚡ **Unterschrift in Stammdaten hinterlegen** – einmal speichern, dann per 1-Klick unterschreiben statt jedes Mal neu zeichnen
@@ -438,5 +444,5 @@ Custom License – siehe [LICENSE](LICENSE).
 
 ---
 
-**Aktuelle Version:** v3.15
+**Aktuelle Version:** v3.16
 **Letztes Update:** Mai 2026
