@@ -365,6 +365,14 @@ Custom License – siehe [LICENSE](LICENSE).
 
 ## 📜 Changelog
 
+### v3.22 (Mai 2026) – Einnahmen-Ausgaben-Rechnung erweitert
+- 📊 **Zwischensummen pro Bereich:** In der Übersicht, im Ausdruck und im Word-Dokument wird jetzt nach jedem Bereich (Wohnen, Versicherungen, ...) eine eigene Zwischensumme angezeigt.
+- 🧾 **Kompakte Gesamt-Übersicht:** Am Ende der EAR fasst eine übersichtliche Tabelle alle Bereichs-Zwischensummen zusammen - Einnahmen gesamt, Ausgaben gesamt, Überschuss / Fehlbetrag auf einen Blick.
+- ➕ **Mehr Ausgaben-Posten:** Neue Felder für Garage / Stellplatz, Sterbegeldvorsorge, Kontoführungs- und Bausparrate sowie ein neuer Abschnitt „Beruf & Bildung" (Weiterbildung, Studiengebühren, Gewerkschaft, Berufskleidung, Bewerbung, Fachliteratur).
+- 🤲 **Neuer Abschnitt „Pflege & Haushaltshilfe":** Haushaltshilfe / Reinigungskraft, Pflege- / Betreuungsdienst, Alltagsbegleitung und behinderungsbedingte Kosten.
+- 🚗 **Mobilität erweitert:** Ladestrom / Ladekarte (E-Auto), Mietwagen / Carsharing, Taxi / Fahrdienst.
+- 🏛 Weitere neue Felder: Behörden- / Verwaltungsgebühren (Justiz), größere Anschaffungen (Freizeit), Pflegegeld und Eingliederungs- / Blindenhilfe (Einnahmen).
+
 ### v3.21 (Mai 2026) – Drucken über echte Druckseite
 - 🖨 **Drucken neu aufgebaut:** Die Druckseite wird jetzt als vollwertige, geladene Datei geöffnet (über eine Blob-URL). In so einer richtig geladenen Seite funktioniert der Druck zuverlässig - anders als in einem nachträglich beschriebenen Leer-Fenster.
 - 📎 **Belege werden jetzt sicher mitgedruckt:** Die Druck-Seite wird frisch erzeugt und enthält immer alle angehängten Belege als zusätzliche Seiten.
@@ -470,5 +478,5 @@ Custom License – siehe [LICENSE](LICENSE).
 
 ---
 
-**Aktuelle Version:** v3.21
+**Aktuelle Version:** v3.22
 **Letztes Update:** Mai 2026
