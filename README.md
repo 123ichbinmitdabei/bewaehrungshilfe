@@ -177,17 +177,25 @@ Die `.ics`-Dateien enthalten Erinnerungen 1 Tag und 1 Stunde vorher. Bei Sozials
 
 ---
 
-## ✍️ Digitale Unterschriften – drei Wege
+## ✍️ Digitale Unterschriften
 
-Bei Sozialstunden, Therapie, Schadenswiedergutmachung und BH-Terminen kannst du Bestätigungen auf drei Wegen einsammeln:
+Bei Sozialstunden, Therapie, Schadenswiedergutmachung und BH-Terminen kannst du Bestätigungen auf mehreren Wegen einsammeln:
 
-1. **Digital direkt in der App** – mit Finger oder Stylus auf dem Bildschirm. Mit Zeitstempel und Geräte-Info dokumentiert.
-2. **Klassisch auf Papier + Foto** – ausdrucken, unterschreiben/stempeln lassen, abfotografieren und als Beleg an die Zeile anhängen.
-3. **Stempel-Foto** – manche Einrichtungen haben einen offiziellen Stempel der mehr zählt als die Unterschrift.
+1. **Zeichnen direkt in der App** – mit Finger oder Stylus auf dem Bildschirm. Mit Zeitstempel und Geräte-Info dokumentiert.
+2. **Bild hochladen** – ein Foto oder Scan der Unterschrift wird hochgeladen und automatisch zugeschnitten. Praktisch für alle, die schon eine digitale Unterschrift haben.
+3. **Gespeicherte Unterschrift (1-Klick)** – einmal in den Stammdaten hinterlegt, dann beim Unterschreiben mit einem Klick verfügbar – kein erneutes Zeichnen nötig.
+4. **Klassisch auf Papier + Foto** – ausdrucken, unterschreiben/stempeln lassen, abfotografieren und als Beleg an die Zeile anhängen.
+5. **Stempel-Foto** – manche Einrichtungen haben einen offiziellen Stempel der mehr zählt als die Unterschrift.
+
+### ⚡ Eigene Unterschrift hinterlegen
+
+In den **Einstellungen → „Meine Unterschrift"** kannst du deine Unterschrift einmalig speichern (gezeichnet oder als Bild). Danach erscheint beim Unterschreiben ein Knopf „✓ Diese verwenden" – ein Klick, fertig. Das spart bei wöchentlichen Therapie- oder BH-Terminen viel Zeit.
+
+> Hinweis: Die gespeicherte Unterschrift ist nur für dich gedacht. Therapeut:innen und Einrichtungen unterschreiben weiterhin direkt am Gerät, damit der Beweiswert erhalten bleibt.
 
 Pro Zeile UND/ODER als Sammel-Unterschrift am Ende möglich. Im Druck und Word-Dokument erscheinen digitale Unterschriften als Bild mit Zeitstempel. Wenn nicht digital signiert wurde, bleiben die Unterschriftslinien für handschriftliche Eintragungen frei.
 
-**📋 Verifikations-Seite:** Am Ende des Ausdrucks erscheint eine Übersicht aller digital erfassten Unterschriften – mit Zeitpunkt, Gerät und Zeitzone.
+**📋 Verifikations-Seite:** Am Ende des Ausdrucks erscheint eine Übersicht aller digital erfassten Unterschriften – mit Zeitpunkt, Erfassungsart (gezeichnet / hochgeladen / gespeichert), Gerät und Zeitzone.
 
 > ⚖️ **Rechtlicher Hinweis:** Eine digitale Unterschrift in dieser App ist *keine qualifizierte elektronische Signatur* im Sinne der eIDAS-Verordnung. Sie hat aber Beweiswert (vergleichbar mit einer Unterschrift auf einem DHL-Paket-Tablet). Für förmliche Anträge bei Gericht ist weiterhin eine handschriftliche Papier-Unterschrift erforderlich.
 
@@ -202,6 +210,21 @@ Jeder Termin oder Einsatz hat ein eigenes mehrzeiliges Notiz-Feld:
 - **BH-Termine:** „Eigene Notiz" – persönliche Eindrücke und Bemerkungen
 
 Notizen erscheinen im Druck (klein neben dem jeweiligen Eintrag) und im Word-Export.
+
+---
+
+## 🧮 Mittelwert-Rechner für die Einnahmen-Ausgaben-Rechnung
+
+Wer schwankendes Einkommen hat (Mini-Job, wechselnde Stunden, unregelmäßige Aufträge), muss in der EAR oft einen Durchschnittswert angeben. Statt im Kopf zu rechnen:
+
+Bei jedem Geldbetrag-Feld in der EAR gibt es den Knopf **„Ø Mittelwert"**. Ein Klick öffnet einen Rechner, in den du die Beträge aus mehreren Monaten einträgst (z.B. aus 3 Kontoauszügen). Die App berechnet den Durchschnitt und trägt ihn auf Wunsch direkt ins Feld ein.
+
+- Bis zu 6 Monatswerte eingebbar
+- Live-Berechnung während der Eingabe
+- Deutsche Zahlenformate (1.800,00) werden korrekt erkannt
+- Empfehlung: 3 Monate mitteln, den Kontoauszug als Beleg anhängen
+
+> 💡 Bewusst **kein** automatisches Auslesen von Kontoauszügen: Das wäre nur mit einem externen Analysedienst möglich – deine sensiblen Finanzdaten würden das Gerät verlassen. Der Rechner als Eingabehilfe ist genauso schnell, aber 100% lokal und unter deiner Kontrolle.
 
 ---
 
@@ -279,15 +302,22 @@ Nach der Installation läuft die App im Vollbild – wie eine richtige App, auch
 - Sortierung nach Dringlichkeit
 
 ### Digitale Unterschriften ✍️
-- Mit Finger oder Stylus auf dem Bildschirm
+- Mit Finger oder Stylus auf dem Bildschirm zeichnen
+- **Oder** ein Bild der Unterschrift hochladen (Foto/Scan, auto-zugeschnitten)
+- **1-Klick-Unterschrift** mit in den Stammdaten gespeicherter Unterschrift
 - Zeitstempel + Geräte-Info automatisch erfasst
 - Pro Zeile (Sozial, Therapie, BH, Schadens) und/oder als Gesamt-Unterschrift
-- Verifikations-Seite im Ausdruck
+- Verifikations-Seite im Ausdruck mit Erfassungsart
 
 ### Termin-Management
 - Reschedule-Dialog mit zwei Modi (Verlauf erhalten oder direkt ändern)
 - Ersatz-Termin nach Verpasst/Abgesagt mit einem Klick
 - Auto-Berechnung der Sozialstunden aus von/bis/Pause
+
+### Eingabe-Hilfen
+- 🧮 Mittelwert-Rechner für EAR-Geldbeträge (Durchschnitt aus mehreren Monaten)
+- Schnelleintrag für Termine, Zahlungen, Stunden direkt von der Startseite
+- Auto-Formatierung von Datum, Uhrzeit und Beträgen
 
 ### Export & Versand
 - 📄 PDF / Drucken
@@ -334,6 +364,12 @@ Custom License – siehe [LICENSE](LICENSE).
 ---
 
 ## 📜 Changelog
+
+### v3.15 (Mai 2026) – Unterschrift hochladen + Mittelwert-Rechner
+- 📤 **Unterschrift als Bild hochladen** – zusätzlich zum Zeichenpad. Foto oder Scan der Unterschrift wird automatisch zugeschnitten
+- ⚡ **Unterschrift in Stammdaten hinterlegen** – einmal speichern, dann per 1-Klick unterschreiben statt jedes Mal neu zeichnen
+- 🧮 **Mittelwert-Rechner für die EAR** – bei jedem Geldbetrag-Feld: mehrere Monatswerte eingeben, Durchschnitt wird automatisch berechnet und eingetragen (ideal bei schwankendem Einkommen)
+- 📋 Verifikations-Seite zeigt jetzt die Erfassungsart (gezeichnet / hochgeladen / gespeicherte Unterschrift)
 
 ### v3.14 (April 2026) – Nächste Termine + Einstellungen + Marktrecherche
 - 📅 **Nächste Termine pro Bereich** auf der Startseite: BH-Termin / Therapie-Termin / Sozial-Einsatz, jeweils mit „📲 In Kalender"-Knopf
@@ -402,5 +438,5 @@ Custom License – siehe [LICENSE](LICENSE).
 
 ---
 
-**Aktuelle Version:** v3.14
-**Letztes Update:** April 2026
+**Aktuelle Version:** v3.15
+**Letztes Update:** Mai 2026
