@@ -3738,7 +3738,7 @@ let showArchived = false;
 function toggleShowArchived() { showArchived = !showArchived; render(); }
 
 // === VERSION INFO ===
-const APP_VERSION = "v3.19";
+const APP_VERSION = "v3.20";
 
 // === ONBOARDING ===
 let onboardingActive = false;
@@ -7543,21 +7543,27 @@ function renderPreviewToolbar() {
     ` : ""}
   `;
 }
-// Print the document. Opens the document in a clean, separate window with only
-// the print styles - this is far more robust than printing the whole app page
-// (no overlays, no theme, no cached CSS quirks can interfere).
+// Print the document. Opens it in a clean, separate window with only the print
+// styles. The new window prints ITSELF after fully loading (incl. images) - far
+// more reliable than calling print() on the window from the parent context.
 function confirmAndPrint() {
+  const id = state.activeDocId;
+  // Make sure the print view is rendered WITH attachments included (if the doc
+  // has any). The user expects belege in the printout.
+  const docsWithAttachments = ["schadens", "sozial", "kosten", "asservate"];
+  if (docsWithAttachments.includes(id) && countAllAttachments(id) > 0 && !state.printWithAttachments) {
+    state.printWithAttachments = true;
+    render(); // re-render the preview so #printView includes the attachment pages
+  }
   const pv = document.getElementById("printView");
   if (!pv || !pv.innerHTML.trim()) {
-    // Nothing rendered - fall back to plain print
     try { window.print(); } catch (e) {
       alert("Bitte die Druckfunktion deines Browsers nutzen (Strg+P).");
     }
     return;
   }
   const isLandscape = pv.classList.contains("landscape-mode");
-  const docTitle = (DOCS[state.activeDocId] && DOCS[state.activeDocId].title) || "Dokument";
-  // Self-contained print stylesheet (mirrors the .print-view rules)
+  const docTitle = (DOCS[id] && DOCS[id].title) || "Dokument";
   const printCss = `
     * { box-sizing: border-box; }
     body { font-family: Arial, Helvetica, sans-serif; font-size: 10pt; color: #000; background: #fff; margin: 0; padding: 1.2cm; }
@@ -7587,13 +7593,38 @@ function confirmAndPrint() {
     .verification-footer { margin-top: 20pt; }
     .verification-footer h2 { margin-top: 0; }
     .sig-inline-img { max-height: 48pt; display: block; }
+    img { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     @page { size: A4${isLandscape ? " landscape" : ""}; margin: 1.5cm; }
+    /* On-screen print controls - hidden when actually printing */
+    .print-controls {
+      position: fixed; top: 0; left: 0; right: 0;
+      background: #2E5984; color: #fff; padding: 10px 16px;
+      display: flex; gap: 10px; align-items: center; justify-content: center;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2); z-index: 9999;
+    }
+    .print-controls button {
+      background: #fff; color: #2E5984; border: none; padding: 8px 18px;
+      border-radius: 6px; font-weight: 700; font-size: 14px; cursor: pointer;
+    }
+    .print-controls span { font-size: 13px; }
+    body.has-controls { padding-top: 70px; }
+    @media print { .print-controls { display: none !important; } body.has-controls { padding-top: 1.2cm; } }
   `;
+  // Self-printing script: waits for full load (images included), then prints.
+  const printScript =
+    "window.addEventListener('load', function(){" +
+    "  setTimeout(function(){ try { window.print(); } catch(e){} }, 350);" +
+    "});";
+  const controlsBar =
+    '<div class="print-controls">' +
+    '<span>📄 Druckvorschau</span>' +
+    '<button onclick="window.print()">🖨 Drucken / als PDF</button>' +
+    '<button onclick="window.close()">Schließen</button>' +
+    '</div>';
   const win = window.open("", "_blank");
   if (!win) {
-    // Popup blocked - fall back to printing the current page directly
     try { window.print(); } catch (e) {
-      alert("Das Druckfenster wurde vom Browser blockiert. Bitte Pop-ups für diese Seite erlauben oder Strg+P nutzen.");
+      alert("Das Druckfenster wurde vom Browser blockiert. Bitte Pop-ups für diese Seite erlauben - oder direkt mit Strg+P drucken.");
     }
     return;
   }
@@ -7601,16 +7632,15 @@ function confirmAndPrint() {
   win.document.write(
     '<!DOCTYPE html><html lang="de"><head><meta charset="utf-8">' +
     '<title>' + esc(docTitle) + '</title>' +
-    '<style>' + printCss + '</style></head><body>' +
+    '<style>' + printCss + '</style>' +
+    '<scr' + 'ipt>' + printScript + '</scr' + 'ipt>' +
+    '</head><body class="has-controls">' +
+    controlsBar +
     pv.innerHTML +
     '</body></html>'
   );
   win.document.close();
-  // Give the new window a moment to render images, then print
   win.focus();
-  setTimeout(() => {
-    try { win.print(); } catch (e) { /* user can still print manually */ }
-  }, 500);
 }
 
 function countAllAttachments(docId) {
