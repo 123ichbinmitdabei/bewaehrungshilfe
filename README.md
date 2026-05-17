@@ -365,6 +365,13 @@ Custom License – siehe [LICENSE](LICENSE).
 
 ## 📜 Changelog
 
+### v3.23 (Mai 2026) – Eigene Einträge & weitere EAR-Felder
+- ➕ **Neue Seite „Eigene Einträge":** In der Einnahmen-Ausgaben-Rechnung lassen sich jetzt eigene Posten anlegen, die in keine vorgegebene Kategorie passen. Je Eintrag wird per Auswahl festgelegt, ob es eine Einnahme oder eine Ausgabe ist; der Betrag fließt automatisch in Gesamtsumme, Saldo, Ausdruck und Word-Dokument ein.
+- 🧾 Eigene Einträge erscheinen als eigener Abschnitt im Ausdruck und im Word-Export und tauchen mit Zwischensumme in der kompakten Übersicht auf.
+- 🚗 Weitere neue Ausgaben-Felder: Auto-Finanzierung / Leasingrate, Automobilclub / Pannenhilfe (Mobilität), Wasser / Abwasser (Wohnen), Mahngebühren / Verzugszinsen (Schulden).
+- 💰 Weitere neue Einnahmen-Felder: Unfallrente / BG-Rente (Renten), Erstattungen / Rückzahlungen (Sonstige Einnahmen).
+- 🔧 Eingabezeilen können jetzt Auswahl-Felder (Dropdown) enthalten.
+
 ### v3.22 (Mai 2026) – Einnahmen-Ausgaben-Rechnung erweitert
 - 📊 **Zwischensummen pro Bereich:** In der Übersicht, im Ausdruck und im Word-Dokument wird jetzt nach jedem Bereich (Wohnen, Versicherungen, ...) eine eigene Zwischensumme angezeigt.
 - 🧾 **Kompakte Gesamt-Übersicht:** Am Ende der EAR fasst eine übersichtliche Tabelle alle Bereichs-Zwischensummen zusammen - Einnahmen gesamt, Ausgaben gesamt, Überschuss / Fehlbetrag auf einen Blick.
@@ -478,5 +485,5 @@ Custom License – siehe [LICENSE](LICENSE).
 
 ---
 
-**Aktuelle Version:** v3.22
+**Aktuelle Version:** v3.23
 **Letztes Update:** Mai 2026
