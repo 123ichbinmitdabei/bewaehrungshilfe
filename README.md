@@ -365,6 +365,11 @@ Custom License – siehe [LICENSE](LICENSE).
 
 ## 📜 Changelog
 
+### v3.20 (Mai 2026) – Druckdialog & Belege im Ausdruck
+- 🖨 **Druckdialog erscheint jetzt zuverlässig:** Das Druckfenster startet den Druck selbst, sobald es fertig geladen ist (inklusive aller Bilder). Zusätzlich gibt es im Fenster einen sichtbaren „🖨 Drucken"-Knopf als Reserve.
+- 📎 **Belege werden jetzt mitgedruckt:** Beim Drucken wird automatisch sichergestellt, dass alle angehängten Belege als zusätzliche Seiten im Ausdruck erscheinen - wichtig beim Einreichen der Unterlagen.
+- ❎ Das Druckfenster hat jetzt eine „Schließen"-Schaltfläche
+
 ### v3.19 (Mai 2026) – Drucken & Word-Download endlich korrekt
 - 🖨 **Drucken komplett neu gebaut:** Das Dokument wird jetzt in einem sauberen, separaten Fenster geöffnet und gedruckt. Das umgeht alle möglichen Störungen durch die App-Oberfläche und funktioniert zuverlässig in allen Browsern.
 - 📄 **„Word herunterladen" lädt jetzt wirklich Word** – nicht mehr versehentlich ein ZIP. Belege gibt es weiterhin separat über den „ZIP mit Belegen"-Knopf.
@@ -460,5 +465,5 @@ Custom License – siehe [LICENSE](LICENSE).
 
 ---
 
-**Aktuelle Version:** v3.19
+**Aktuelle Version:** v3.20
 **Letztes Update:** Mai 2026
