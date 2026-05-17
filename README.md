@@ -365,6 +365,11 @@ Custom License – siehe [LICENSE](LICENSE).
 
 ## 📜 Changelog
 
+### v3.18 (Mai 2026) – Word-Export & Drucken endgültig repariert
+- 🐛 **Word-Bibliothek:** Wird jetzt als `index.iife.js` geladen (echte Browser-Datei). Die zuvor genutzten `.cjs`-Dateien werden von Browsern als „application/node" abgewiesen.
+- 🖨 **Drucken repariert:** Der blockierende Bestätigungsdialog wurde entfernt. Falls ein Browser Dialoge unterdrückt, wurde dadurch das Drucken komplett verhindert. Die Datenschutz-Warnung steht weiterhin sichtbar als Banner.
+- 📤 **„Teilen" am Desktop:** Desktop-Browser (z.B. Firefox) haben keine System-Teilen-Funktion. Der Knopf heißt dort jetzt „📄 Word herunterladen" und lädt die Datei direkt herunter, statt eine wirkungslose Meldung zu zeigen.
+
 ### v3.17 (Mai 2026) – Bugfix Word- und ZIP-Export
 - 🐛 **Word-Export und „Teilen" repariert:** Die Word-Bibliothek wurde unter einer veralteten Adresse geladen (Dateiname hatte sich geändert). Word-Dokumente, ZIP-Bundles und Teilen funktionieren wieder.
 - 🌐 **Drei CDN-Quellen mit automatischem Fallback:** Wenn ein CDN nicht erreichbar ist, wird automatisch das nächste probiert (jsDelivr → unpkg → cdnjs)
@@ -450,5 +455,5 @@ Custom License – siehe [LICENSE](LICENSE).
 
 ---
 
-**Aktuelle Version:** v3.17
+**Aktuelle Version:** v3.18
 **Letztes Update:** Mai 2026
