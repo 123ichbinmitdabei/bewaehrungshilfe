@@ -365,6 +365,11 @@ Custom License – siehe [LICENSE](LICENSE).
 
 ## 📜 Changelog
 
+### v3.21 (Mai 2026) – Drucken über echte Druckseite
+- 🖨 **Drucken neu aufgebaut:** Die Druckseite wird jetzt als vollwertige, geladene Datei geöffnet (über eine Blob-URL). In so einer richtig geladenen Seite funktioniert der Druck zuverlässig - anders als in einem nachträglich beschriebenen Leer-Fenster.
+- 📎 **Belege werden jetzt sicher mitgedruckt:** Die Druck-Seite wird frisch erzeugt und enthält immer alle angehängten Belege als zusätzliche Seiten.
+- 🖱 Im Druckfenster: großer „Jetzt drucken"-Knopf, „Schließen"-Knopf und ein Hinweis auf Strg+P als Reserve
+
 ### v3.20 (Mai 2026) – Druckdialog & Belege im Ausdruck
 - 🖨 **Druckdialog erscheint jetzt zuverlässig:** Das Druckfenster startet den Druck selbst, sobald es fertig geladen ist (inklusive aller Bilder). Zusätzlich gibt es im Fenster einen sichtbaren „🖨 Drucken"-Knopf als Reserve.
 - 📎 **Belege werden jetzt mitgedruckt:** Beim Drucken wird automatisch sichergestellt, dass alle angehängten Belege als zusätzliche Seiten im Ausdruck erscheinen - wichtig beim Einreichen der Unterlagen.
@@ -465,5 +470,5 @@ Custom License – siehe [LICENSE](LICENSE).
 
 ---
 
-**Aktuelle Version:** v3.20
+**Aktuelle Version:** v3.21
 **Letztes Update:** Mai 2026
