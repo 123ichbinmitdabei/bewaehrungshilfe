@@ -318,6 +318,18 @@
   .review-list .item .v { color: var(--primary); font-weight: 600; max-width: 60%; text-align: right; }
   .review-list h4 { font-size: 12px; text-transform: uppercase; letter-spacing: .5px; color: var(--text-soft); margin: 12px 0 6px; }
   .review-list h4:first-child { margin-top: 0; }
+  .review-list .item.subtotal { font-weight: 700; border-top: 1px solid var(--border); margin-top: 2px; }
+  .review-list .item.subtotal span:first-child { color: var(--text-soft); text-transform: uppercase; font-size: 11px; letter-spacing: .5px; }
+  .ear-overview { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 14px; margin: 12px 0; }
+  .ear-overview .ov-title { font-weight: 700; font-size: 14px; margin-bottom: 8px; }
+  .ear-overview h4 { font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--text-soft); margin: 12px 0 4px; }
+  .ear-overview h4:first-of-type { margin-top: 0; }
+  .ear-overview .row { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; padding: 3px 0; }
+  .ear-overview .row .v { font-weight: 600; color: var(--primary); }
+  .ear-overview .row.sub { font-weight: 700; border-top: 1px solid var(--border); margin-top: 2px; padding-top: 5px; }
+  .ear-overview .row.grand { font-weight: 700; border-top: 2px solid var(--border); margin-top: 6px; padding-top: 7px; font-size: 14px; }
+  .ear-overview .row.grand .v.positive { color: var(--accent); }
+  .ear-overview .row.grand .v.negative { color: var(--danger); }
   .reset-btn { background: none; border: none; color: var(--danger); font-size: 12px; cursor: pointer; padding: 4px 8px; }
   .reset-btn:hover { text-decoration: underline; }
   /* Attachment styles */
@@ -1028,6 +1040,7 @@
   .print-view th { background: #B8CCE4; font-weight: bold; text-align: left; }
   .print-view td.label { background: #F2F2F2; font-weight: bold; width: 30%; }
   .print-view td.subhead { background: #DDEBF7; font-weight: bold; }
+  .print-view td.subsum { background: #EAF1F8; font-weight: bold; }
   .print-view td.sum { background: #FFF2CC; font-weight: bold; }
   .print-view .strike { text-decoration: line-through; color: #888; }
   .print-view .pagebreak { page-break-before: always; break-before: page; }
@@ -1140,6 +1153,8 @@ const DOCS = {
         { id: "buergergeld_kdu", label: "Bürgergeld (Kosten der Unterkunft)" },
         { id: "alg1", label: "Arbeitslosengeld I (ALG I)" },
         { id: "sozialhilfe", label: "Sozialhilfe / Grundsicherung" },
+        { id: "pflegegeld", label: "Pflegegeld" },
+        { id: "eingliederung", label: "Eingliederungs- / Blindenhilfe (LWV / Sozialamt)" },
         { id: "wohngeld", label: "Wohngeld" },
         { id: "krankengeld", label: "Krankengeld" },
         { id: "uebergangsgeld", label: "Übergangsgeld" },
@@ -1184,6 +1199,7 @@ const DOCS = {
         fields: [
         { id: "miete", label: "Miete (kalt)" },
         { id: "nebenkosten", label: "Nebenkosten (Hausgeld, Müll, Wasser, ...)" },
+        { id: "garage", label: "Garage / Stellplatz / Carport" },
         { id: "heizung", label: "Heizkosten" },
         { id: "strom", label: "Strom" },
         { id: "gas", label: "Gas" },
@@ -1198,6 +1214,7 @@ const DOCS = {
         { id: "hausrat", label: "Hausratversicherung" },
         { id: "rs", label: "Rechtsschutzversicherung" },
         { id: "lv", label: "Lebensversicherung" },
+        { id: "sterbe", label: "Sterbegeld- / Bestattungsvorsorge" },
         { id: "bu", label: "Berufsunfähigkeitsversicherung" },
         { id: "unfall", label: "Unfallversicherung" },
         { id: "kfz_v", label: "KFZ-Versicherung" },
@@ -1206,11 +1223,14 @@ const DOCS = {
       { id: "mob", title: "Mobilität", icon: "🚗", type: "money", side: "aus", fields: [
         { id: "kfz_steuer", label: "KFZ-Steuer" },
         { id: "sprit", label: "Kraftstoff (Benzin / Diesel)" },
+        { id: "ladestrom", label: "Ladestrom / Ladekarte (E-Auto)" },
         { id: "werkstatt", label: "Werkstatt / Reparaturen / TÜV" },
         { id: "oepnv", label: "ÖPNV / Deutschlandticket" },
         { id: "bahn", label: "Bahn / Fernverkehr" },
         { id: "fahrrad", label: "Fahrrad / Reparaturen" },
         { id: "parken", label: "Parkgebühren" },
+        { id: "mietwagen", label: "Mietwagen / Carsharing" },
+        { id: "taxi", label: "Taxi / Fahrdienst (Uber o.ä.)" },
       ]},
       { id: "tk", title: "Telekommunikation & Medien", icon: "📱", type: "money", side: "aus", fields: [
         { id: "handy", label: "Mobilfunk" },
@@ -1218,6 +1238,16 @@ const DOCS = {
         { id: "streaming", label: "Streaming-Dienste (Netflix, Spotify, ...)" },
         { id: "zeitung", label: "Zeitung / Zeitschriften" },
         { id: "software", label: "Software-Abos" },
+      ]},
+      { id: "beruf", title: "Beruf & Bildung", icon: "🎓", type: "money", side: "aus",
+        hint: "Kosten rund um Arbeit, Bewerbung, Weiterbildung und Studium.",
+        fields: [
+        { id: "weiterbildung", label: "Weiterbildung / Kurse / Seminare" },
+        { id: "studium", label: "Studien- / Lehrgangsgebühren" },
+        { id: "gewerkschaft", label: "Gewerkschaft / Berufsverband" },
+        { id: "arbeitskleidung", label: "Berufskleidung / Arbeitsmittel" },
+        { id: "bewerbung", label: "Bewerbungskosten" },
+        { id: "fachliteratur", label: "Fachliteratur" },
       ]},
       { id: "leben", title: "Lebenshaltung", icon: "🛒", type: "money", side: "aus", fields: [
         { id: "lebensmittel", label: "Lebensmittel / Getränke" },
@@ -1236,6 +1266,14 @@ const DOCS = {
         { id: "brille", label: "Brille / Kontaktlinsen" },
         { id: "heilpraktiker", label: "Heilpraktiker / Therapie (Eigenanteil)" },
       ]},
+      { id: "pflege_aus", title: "Pflege & Haushaltshilfe", icon: "🤲", type: "money", side: "aus",
+        hint: "Bezahlte Unterstützung im Alltag - Haushaltshilfe, Pflege- / Betreuungsdienst, behinderungsbedingte Kosten.",
+        fields: [
+        { id: "haushaltshilfe", label: "Haushaltshilfe / Reinigungskraft" },
+        { id: "pflegedienst", label: "Pflege- / Betreuungsdienst" },
+        { id: "betreuung", label: "Alltagsbegleitung / Fahr- & Begleitdienste" },
+        { id: "hilfsmittel", label: "Hilfsmittel / behinderungsbedingte Kosten (Eigenanteil)" },
+      ]},
       { id: "familie_aus", title: "Familie / Kinder", icon: "👶", type: "money", side: "aus", fields: [
         { id: "unterhalt_out", label: "Unterhaltszahlungen (geleistet)" },
         { id: "kita", label: "Kita / Schule / Hort" },
@@ -1250,6 +1288,8 @@ const DOCS = {
         { id: "pfaendung", label: "Lohnpfändung / P-Konto-Pfändung" },
         { id: "privat_schulden", label: "Privatschulden (Familie / Freunde)" },
         { id: "schuldnerb", label: "Schuldenberatung / Insolvenzverwalter" },
+        { id: "kontofuehrung", label: "Kontoführungsgebühren" },
+        { id: "bauspar", label: "Bauspar- / Sparvertrag (Rate)" },
       ]},
       { id: "justiz", title: "Bewährungsauflagen / Justiz", icon: "⚖️", type: "money", side: "aus", fields: [
         { id: "geldauflage", label: "Geldauflage (Ratenzahlung)" },
@@ -1257,6 +1297,7 @@ const DOCS = {
         { id: "schaden", label: "Schadenswiedergutmachung an Geschädigte" },
         { id: "verfahren", label: "Verfahrenskosten / Gerichtskosten" },
         { id: "anwalt", label: "Anwaltskosten / Ratenzahlung" },
+        { id: "behoerden", label: "Behörden- / Verwaltungsgebühren (Amt, Bürgeramt, SCHUFA ...)" },
         { id: "fahrt_bh", label: "Fahrtkosten zur Bewährungshilfe" },
         { id: "fahrt_sozstd", label: "Fahrtkosten zu Sozialstunden" },
         { id: "fahrt_thera", label: "Fahrtkosten zu Therapie / Beratung" },
@@ -1267,6 +1308,7 @@ const DOCS = {
         { id: "verein", label: "Vereinsbeiträge" },
         { id: "geschenke_out", label: "Geschenke (Geburtstage etc.)" },
         { id: "urlaub", label: "Urlaub / Reisen (anteilig)" },
+        { id: "anschaffungen", label: "Größere Anschaffungen (Möbel, Geräte, Elektronik)" },
         { id: "tier", label: "Tierhaltung (Futter, Tierarzt)" },
         { id: "spenden", label: "Spenden" },
         { id: "sonst_aus_1", label: "Sonstiges 1" },
@@ -3738,7 +3780,7 @@ let showArchived = false;
 function toggleShowArchived() { showArchived = !showArchived; render(); }
 
 // === VERSION INFO ===
-const APP_VERSION = "v3.21";
+const APP_VERSION = "v3.22";
 
 // === ONBOARDING ===
 let onboardingActive = false;
@@ -5645,6 +5687,25 @@ function totalsBySide() {
   hhRows.forEach(r => { einHH += parseMoney(r.betrag || ""); });
   return { ein, einHH, aus, saldo: (ein + einHH) - aus };
 }
+// Per-section (Bereichs-) subtotals for the EAR. Returns the sum of every
+// money section, split by side, so reviews/printouts can show Zwischensummen.
+function earSectionSums() {
+  const out = { ein: [], aus: [], einSum: 0, ausSum: 0 };
+  if (state.activeDocId !== "ear") return out;
+  DOCS.ear.sections.forEach(sec => {
+    if (sec.type !== "money") return;
+    let s = 0;
+    sec.fields.forEach(f => {
+      const a = getAnswer(sec.id, f.id);
+      if (isSkipped(a)) return;
+      const v = valueOf(a);
+      if (v) s += parseMoney(v);
+    });
+    if (sec.side === "ein") { out.ein.push({ id: sec.id, title: sec.title, sum: s }); out.einSum += s; }
+    else if (sec.side === "aus") { out.aus.push({ id: sec.id, title: sec.title, sum: s }); out.ausSum += s; }
+  });
+  return out;
+}
 
 // ============================================
 // RENDERING
@@ -7454,17 +7515,55 @@ function renderReview(doc) {
         items += `<div class="item"><span>✓</span><span class="v">${esc(o)}</span></div>`;
       });
     } else if (sec.fields) {
+      let secSum = 0, hasMoneyVal = false;
       sec.fields.forEach(f => {
         const a = getAnswer(sec.id, f.id);
         if (a === undefined) return;
         const skipped = isSkipped(a); const v = valueOf(a);
         if (!skipped && !v) return;
+        if (sec.type === "money" && !skipped && v) { secSum += parseMoney(v); hasMoneyVal = true; }
         items += `<div class="item ${skipped ? 'skipped' : ''}"><span>${esc(f.label)}</span><span class="v">${skipped ? "Nicht zutreffend" : esc(v)}</span></div>`;
       });
+      if (sec.type === "money" && hasMoneyVal) {
+        items += `<div class="item subtotal"><span>Zwischensumme</span><span class="v">${formatMoney(secSum)}</span></div>`;
+      }
     }
     if (items) html += `<h4>${sec.icon} ${esc(sec.title)}</h4>${items}`;
   });
   html += `</div>`;
+  if (doc.id === "ear") {
+    const g = earSectionSums();
+    const t2 = totalsBySide();
+    const einAreas = g.ein.filter(a => a.sum !== 0);
+    const ausAreas = g.aus.filter(a => a.sum !== 0);
+    const hasHH2 = t2.einHH > 0;
+    if (einAreas.length || ausAreas.length || hasHH2) {
+      let ov = `<div class="ear-overview"><div class="ov-title">📊 Kompakte Übersicht – alle Bereiche</div>`;
+      if (einAreas.length || hasHH2) {
+        ov += `<h4>Einnahmen</h4>`;
+        einAreas.forEach(a => {
+          ov += `<div class="row"><span>${esc(a.title)}</span><span class="v">${formatMoney(a.sum)}</span></div>`;
+        });
+        if (hasHH2) {
+          ov += `<div class="row sub"><span>Deine Einnahmen</span><span class="v">${formatMoney(t2.ein)}</span></div>`;
+          ov += `<div class="row"><span>Einnahmen weiterer Haushaltsmitglieder</span><span class="v">${formatMoney(t2.einHH)}</span></div>`;
+          ov += `<div class="row sub"><span>Gesamteinnahmen Haushalt</span><span class="v">${formatMoney(t2.ein + t2.einHH)}</span></div>`;
+        } else {
+          ov += `<div class="row sub"><span>Einnahmen gesamt</span><span class="v">${formatMoney(t2.ein)}</span></div>`;
+        }
+      }
+      if (ausAreas.length) {
+        ov += `<h4>Ausgaben</h4>`;
+        ausAreas.forEach(a => {
+          ov += `<div class="row"><span>${esc(a.title)}</span><span class="v">${formatMoney(a.sum)}</span></div>`;
+        });
+        ov += `<div class="row sub"><span>Ausgaben gesamt${hasHH2 ? " (Haushalt)" : ""}</span><span class="v">${formatMoney(t2.aus)}</span></div>`;
+      }
+      ov += `<div class="row grand"><span>${t2.saldo >= 0 ? "Überschuss" : "Fehlbetrag"}${hasHH2 ? " (Haushalt)" : ""}</span><span class="v ${t2.saldo >= 0 ? 'positive' : 'negative'}">${formatMoney(t2.saldo)}</span></div>`;
+      ov += `</div>`;
+      html += ov;
+    }
+  }
   html += `
     <div class="nav">
       <button class="btn btn-secondary" onclick="prev()">← Zurück</button>
@@ -7589,6 +7688,7 @@ function confirmAndPrint() {
     th { background: #B8CCE4; font-weight: bold; text-align: left; }
     td.label { background: #F2F2F2; font-weight: bold; width: 30%; }
     td.subhead { background: #DDEBF7; font-weight: bold; }
+    td.subsum { background: #EAF1F8; font-weight: bold; }
     td.sum { background: #FFF2CC; font-weight: bold; }
     .strike { text-decoration: line-through; color: #888; }
     .pagebreak { page-break-before: always; break-before: page; }
@@ -8018,10 +8118,12 @@ function renderPrintEAR() {
     let html = `<table><tr><th style="width:70%">Bezeichnung</th><th>Betrag (EUR)</th></tr>`;
     let sum = 0;
     let anyShown = false;
+    const groupSums = [];
     groups.forEach(grp => {
       const sec = DOCS.ear.sections.find(s => s.id === grp.id);
       // Collect rows that should be visible (have a value, not skipped)
       const visibleFields = [];
+      let grpSum = 0;
       sec.fields.forEach(f => {
         const a = getAnswer(grp.id, f.id);
         const skipped = isSkipped(a);
@@ -8029,6 +8131,7 @@ function renderPrintEAR() {
         if (!skipped && v) {
           const n = parseMoney(v);
           sum += n;
+          grpSum += n;
           visibleFields.push({ label: f.label, value: moneyOnly(n) });
         }
       });
@@ -8038,12 +8141,14 @@ function renderPrintEAR() {
       visibleFields.forEach(f => {
         html += `<tr><td>${esc(f.label)}</td><td>${f.value}</td></tr>`;
       });
+      html += `<tr><td class="subsum">Zwischensumme ${esc(sec.title)}</td><td class="subsum">${moneyOnly(grpSum)}</td></tr>`;
+      groupSums.push({ title: sec.title, sum: grpSum });
     });
     if (!anyShown) {
       html += `<tr><td colspan="2" style="text-align:center; color:#888; font-style:italic;">(keine Einträge)</td></tr>`;
     }
     html += `<tr><td class="sum">${sumLabel}</td><td class="sum">${moneyOnly(sum)}</td></tr></table>`;
-    return { html, sum };
+    return { html, sum, groupSums };
   }
 
   const einGroups = [
@@ -8056,7 +8161,9 @@ function renderPrintEAR() {
   const ausGroups = [
     { id: "wohnen", title: "WOHNEN" }, { id: "vers", title: "VERSICHERUNGEN" },
     { id: "mob", title: "MOBILITÄT" }, { id: "tk", title: "TELEKOMMUNIKATION & MEDIEN" },
+    { id: "beruf", title: "BERUF & BILDUNG" },
     { id: "leben", title: "LEBENSHALTUNG" }, { id: "gesundheit", title: "GESUNDHEIT" },
+    { id: "pflege_aus", title: "PFLEGE & HAUSHALTSHILFE" },
     { id: "familie_aus", title: "FAMILIE / KINDER" }, { id: "schulden", title: "SCHULDEN / VERPFLICHTUNGEN" },
     { id: "justiz", title: "BEWÄHRUNGSAUFLAGEN / JUSTIZ" }, { id: "freizeit", title: "FREIZEIT / SONSTIGES" },
   ];
@@ -8087,25 +8194,37 @@ function renderPrintEAR() {
     noteSection = `<h2>${hhFiltered.length > 0 ? "6" : "5"}. Anmerkungen / Erläuterungen</h2>${noteHtml}`;
   }
 
-  // Build saldo table - different depending on whether household has entries
-  let saldoTable;
-  if (hhFiltered.length > 0) {
-    saldoTable = `<table>
+  // Build saldo table - compact overview listing every area subtotal,
+  // then the grand totals and the resulting surplus / shortfall.
+  const hasHHsaldo = hhFiltered.length > 0;
+  let saldoTable = `<table>
       <tr><th style="width:70%">Position</th><th>Betrag (EUR)</th></tr>
-      <tr><td>Deine Einnahmen</td><td>${moneyOnly(einR.sum)}</td></tr>
-      <tr><td>Einnahmen weiterer Haushaltsmitglieder</td><td>${moneyOnly(hhSum)}</td></tr>
-      <tr><td><strong>Gesamteinnahmen Haushalt</strong></td><td><strong>${moneyOnly(totalEin)}</strong></td></tr>
-      <tr><td>Gesamtausgaben Haushalt</td><td>${moneyOnly(ausR.sum)}</td></tr>
-      <tr><td class="sum">ÜBERSCHUSS / FEHLBETRAG (Haushalt)</td><td class="sum" style="color:${saldo >= 0 ? '#5BA572' : '#dc2626'}">${moneyOnly(saldo)}</td></tr>
-    </table>`;
+      <tr><td class="subhead" colspan="2">EINNAHMEN</td></tr>`;
+  if (einR.groupSums.length === 0) {
+    saldoTable += `<tr><td colspan="2" style="text-align:center; color:#888; font-style:italic;">(keine Einträge)</td></tr>`;
   } else {
-    saldoTable = `<table>
-      <tr><th style="width:70%">Position</th><th>Betrag (EUR)</th></tr>
-      <tr><td>Gesamteinnahmen</td><td>${moneyOnly(einR.sum)}</td></tr>
-      <tr><td>Gesamtausgaben</td><td>${moneyOnly(ausR.sum)}</td></tr>
-      <tr><td class="sum">ÜBERSCHUSS / FEHLBETRAG</td><td class="sum" style="color:${saldo >= 0 ? '#5BA572' : '#dc2626'}">${moneyOnly(saldo)}</td></tr>
-    </table>`;
+    einR.groupSums.forEach(g => {
+      saldoTable += `<tr><td>${esc(g.title)}</td><td>${moneyOnly(g.sum)}</td></tr>`;
+    });
   }
+  if (hasHHsaldo) {
+    saldoTable += `<tr><td class="subsum">Deine Einnahmen gesamt</td><td class="subsum">${moneyOnly(einR.sum)}</td></tr>`;
+    saldoTable += `<tr><td>Einnahmen weiterer Haushaltsmitglieder</td><td>${moneyOnly(hhSum)}</td></tr>`;
+    saldoTable += `<tr><td class="subsum">Gesamteinnahmen Haushalt</td><td class="subsum">${moneyOnly(totalEin)}</td></tr>`;
+  } else {
+    saldoTable += `<tr><td class="subsum">Gesamteinnahmen</td><td class="subsum">${moneyOnly(einR.sum)}</td></tr>`;
+  }
+  saldoTable += `<tr><td class="subhead" colspan="2">AUSGABEN</td></tr>`;
+  if (ausR.groupSums.length === 0) {
+    saldoTable += `<tr><td colspan="2" style="text-align:center; color:#888; font-style:italic;">(keine Einträge)</td></tr>`;
+  } else {
+    ausR.groupSums.forEach(g => {
+      saldoTable += `<tr><td>${esc(g.title)}</td><td>${moneyOnly(g.sum)}</td></tr>`;
+    });
+  }
+  saldoTable += `<tr><td class="subsum">Gesamtausgaben${hasHHsaldo ? " Haushalt" : ""}</td><td class="subsum">${moneyOnly(ausR.sum)}</td></tr>`;
+  saldoTable += `<tr><td class="sum">ÜBERSCHUSS / FEHLBETRAG${hasHHsaldo ? " (Haushalt)" : ""}</td><td class="sum" style="color:${saldo >= 0 ? '#5BA572' : '#dc2626'}">${moneyOnly(saldo)}</td></tr>
+    </table>`;
 
   // Build sections with dynamic numbering
   const hhSection = hhFiltered.length > 0 ? `<h2>3. Einnahmen weiterer Haushaltsmitglieder</h2>${hhTable}<div class="pagebreak"></div>` : "";
@@ -9454,10 +9573,10 @@ async function buildEarDocx() {
       docxCell("Betrag (EUR)", { width: c2, bold: true, shade: COLOR_SUB }),
     ]})];
     rows.forEach((r,i) => {
-      const sh = r.sub ? "DDEBF7" : (r.sum ? "FFF2CC" : (i%2===0 ? COLOR_ZEILE : null));
+      const sh = r.sub ? "DDEBF7" : (r.sum ? "FFF2CC" : (r.subsum ? "EAF1F8" : (i%2===0 ? COLOR_ZEILE : null)));
       trs.push(new D.TableRow({ children: [
-        docxCell(r.label, { width: c1, bold: r.sub||r.sum, shade: sh }),
-        docxCell(r.value, { width: c2, bold: r.sum, shade: sh }),
+        docxCell(r.label, { width: c1, bold: r.sub||r.sum||r.subsum, shade: sh }),
+        docxCell(r.value, { width: c2, bold: r.sum||r.subsum, shade: sh }),
       ]}));
     });
     return new D.Table({ width: { size: c1+c2, type: D.WidthType.DXA }, columnWidths: [c1,c2], rows: trs });
@@ -9480,25 +9599,29 @@ async function buildEarDocx() {
   ];
 
   function buildMoneyRows(groups) {
-    const rows = []; let sum = 0;
+    const rows = []; let sum = 0; const groupSums = [];
     groups.forEach(grp => {
       const sec = DOCS.ear.sections.find(s => s.id === grp.id);
       // Collect visible fields first (skip skipped + skip empty)
       const visible = [];
+      let grpSum = 0;
       sec.fields.forEach(f => {
         const a = getAnswer(grp.id, f.id);
         const skipped = isSkipped(a); const val = valueOf(a);
         if (!skipped && val) {
           const n = parseMoney(val);
           sum += n;
+          grpSum += n;
           visible.push({ label: f.label, value: moneyOnly(n) });
         }
       });
       if (visible.length === 0) return; // hide empty subgroup
       rows.push({ label: grp.title, value: "", sub: true });
       visible.forEach(v => rows.push(v));
+      rows.push({ label: "Zwischensumme " + sec.title, value: moneyOnly(grpSum), subsum: true });
+      groupSums.push({ title: sec.title, sum: grpSum });
     });
-    return { rows, sum };
+    return { rows, sum, groupSums };
   }
   const ein = buildMoneyRows([
     { id: "arbeit", title: "ARBEITSEINKOMMEN" }, { id: "sozial", title: "SOZIALLEISTUNGEN" },
@@ -9508,7 +9631,9 @@ async function buildEarDocx() {
   const aus = buildMoneyRows([
     { id: "wohnen", title: "WOHNEN" }, { id: "vers", title: "VERSICHERUNGEN" },
     { id: "mob", title: "MOBILITÄT" }, { id: "tk", title: "TELEKOMMUNIKATION & MEDIEN" },
+    { id: "beruf", title: "BERUF & BILDUNG" },
     { id: "leben", title: "LEBENSHALTUNG" }, { id: "gesundheit", title: "GESUNDHEIT" },
+    { id: "pflege_aus", title: "PFLEGE & HAUSHALTSHILFE" },
     { id: "familie_aus", title: "FAMILIE / KINDER" }, { id: "schulden", title: "SCHULDEN / VERPFLICHTUNGEN" },
     { id: "justiz", title: "BEWÄHRUNGSAUFLAGEN / JUSTIZ" }, { id: "freizeit", title: "FREIZEIT / SONSTIGES" },
   ]);
@@ -9552,17 +9677,20 @@ async function buildEarDocx() {
 
   const totalEin = ein.sum + hhSum;
   const saldo = totalEin - aus.sum;
-  const saldoRows = hasHH ? [
-    { label: "Deine Einnahmen", value: moneyOnly(ein.sum) },
-    { label: "Einnahmen weiterer Haushaltsmitglieder", value: moneyOnly(hhSum) },
-    { label: "Gesamteinnahmen Haushalt", value: moneyOnly(totalEin), sub: true },
-    { label: "Gesamtausgaben Haushalt", value: moneyOnly(aus.sum) },
-    { label: "ÜBERSCHUSS / FEHLBETRAG (Haushalt)", value: moneyOnly(saldo), sum: true },
-  ] : [
-    { label: "Gesamteinnahmen", value: moneyOnly(ein.sum) },
-    { label: "Gesamtausgaben", value: moneyOnly(aus.sum) },
-    { label: "ÜBERSCHUSS / FEHLBETRAG", value: moneyOnly(saldo), sum: true },
-  ];
+  const saldoRows = [];
+  saldoRows.push({ label: "EINNAHMEN", value: "", sub: true });
+  ein.groupSums.forEach(g => saldoRows.push({ label: g.title, value: moneyOnly(g.sum) }));
+  if (hasHH) {
+    saldoRows.push({ label: "Deine Einnahmen gesamt", value: moneyOnly(ein.sum), subsum: true });
+    saldoRows.push({ label: "Einnahmen weiterer Haushaltsmitglieder", value: moneyOnly(hhSum) });
+    saldoRows.push({ label: "Gesamteinnahmen Haushalt", value: moneyOnly(totalEin), subsum: true });
+  } else {
+    saldoRows.push({ label: "Gesamteinnahmen", value: moneyOnly(ein.sum), subsum: true });
+  }
+  saldoRows.push({ label: "AUSGABEN", value: "", sub: true });
+  aus.groupSums.forEach(g => saldoRows.push({ label: g.title, value: moneyOnly(g.sum) }));
+  saldoRows.push({ label: "Gesamtausgaben" + (hasHH ? " Haushalt" : ""), value: moneyOnly(aus.sum), subsum: true });
+  saldoRows.push({ label: "ÜBERSCHUSS / FEHLBETRAG" + (hasHH ? " (Haushalt)" : ""), value: moneyOnly(saldo), sum: true });
 
   const noteVal = v("anmerkung", "notes");
   let secNum = 1;
