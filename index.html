@@ -3604,18 +3604,9 @@ async function downloadDocBundle(docId, ev) {
 async function shareDocument(docId) {
   const doc = DOCS[docId];
   // Desktop browsers (e.g. Firefox/Chrome on Windows) usually have no Web Share API.
-  // Instead of showing an alert (which the browser may suppress), the button
-  // directly downloads the document so the click always does something useful.
+  // On desktop this button is labelled "Word herunterladen" and downloads ONLY the
+  // Word document. Belege have their own separate "ZIP mit Belegen" button.
   if (!navigator.share) {
-    const docsWithAttachments = ["schadens", "sozial", "kosten", "asservate"];
-    const hasAtts = docsWithAttachments.includes(docId) && countAllAttachments(docId) > 0;
-    if (hasAtts) {
-      // Has attachments -> download the full ZIP bundle
-      await downloadDocBundle(docId);
-      showSaveToast("📦 Als ZIP heruntergeladen - per Mail anhängbar");
-      return;
-    }
-    // No attachments -> download just the Word document
     try {
       const blob = await buildDocBlob(docId);
       if (blob) {
@@ -3629,7 +3620,8 @@ async function shareDocument(docId) {
         URL.revokeObjectURL(url);
         showSaveToast("📄 Word-Dokument heruntergeladen");
       } else {
-        showSaveToast("Bitte „🖨 Drucken / als PDF\" nutzen");
+        // Docs without a Word export (kosten, asservate, bhtermine, uebersicht)
+        showSaveToast("Für dieses Dokument bitte „Drucken / als PDF\" nutzen");
       }
     } catch (e) {
       console.error(e);
@@ -3746,7 +3738,7 @@ let showArchived = false;
 function toggleShowArchived() { showArchived = !showArchived; render(); }
 
 // === VERSION INFO ===
-const APP_VERSION = "v3.18";
+const APP_VERSION = "v3.19";
 
 // === ONBOARDING ===
 let onboardingActive = false;
@@ -7551,16 +7543,74 @@ function renderPreviewToolbar() {
     ` : ""}
   `;
 }
-// Print the document. The privacy warning for sensitive documents is already
-// shown as a visible banner in the toolbar, so we do NOT use a blocking confirm()
-// dialog here - a suppressed confirm() (browser setting) would otherwise silently
-// prevent printing entirely.
+// Print the document. Opens the document in a clean, separate window with only
+// the print styles - this is far more robust than printing the whole app page
+// (no overlays, no theme, no cached CSS quirks can interfere).
 function confirmAndPrint() {
-  try {
-    window.print();
-  } catch (e) {
-    alert("Der Druck konnte nicht gestartet werden. Bitte nutze die Druckfunktion deines Browsers (Menü → Drucken oder Strg+P).");
+  const pv = document.getElementById("printView");
+  if (!pv || !pv.innerHTML.trim()) {
+    // Nothing rendered - fall back to plain print
+    try { window.print(); } catch (e) {
+      alert("Bitte die Druckfunktion deines Browsers nutzen (Strg+P).");
+    }
+    return;
   }
+  const isLandscape = pv.classList.contains("landscape-mode");
+  const docTitle = (DOCS[state.activeDocId] && DOCS[state.activeDocId].title) || "Dokument";
+  // Self-contained print stylesheet (mirrors the .print-view rules)
+  const printCss = `
+    * { box-sizing: border-box; }
+    body { font-family: Arial, Helvetica, sans-serif; font-size: 10pt; color: #000; background: #fff; margin: 0; padding: 1.2cm; }
+    h1 { font-size: 18pt; color: #1F3864; text-align: center; margin: 0 0 4pt; }
+    .subtitle { font-size: 11pt; color: #555; font-style: italic; text-align: center; margin-bottom: 16pt; }
+    h2 { font-size: 12pt; color: #fff; background: #2E5984; padding: 4pt 8pt; margin: 12pt 0 6pt; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    table { border-collapse: collapse; width: 100%; margin-bottom: 8pt; }
+    td, th { border: 1px solid #999; padding: 4pt 6pt; vertical-align: top; font-size: 9pt; line-height: 1.35; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    th { background: #B8CCE4; font-weight: bold; text-align: left; }
+    td.label { background: #F2F2F2; font-weight: bold; width: 30%; }
+    td.subhead { background: #DDEBF7; font-weight: bold; }
+    td.sum { background: #FFF2CC; font-weight: bold; }
+    .strike { text-decoration: line-through; color: #888; }
+    .pagebreak { page-break-before: always; break-before: page; }
+    .signature { display: grid; grid-template-columns: 1fr 1fr; gap: 30pt; margin-top: 50pt; }
+    .signature > div { border-top: 1px solid #999; padding-top: 4pt; font-size: 8pt; color: #666; }
+    .signature img { max-height: 60pt; }
+    .checkbox-list { line-height: 1.6; }
+    .checkbox-list .item { margin-bottom: 2pt; }
+    .empty-line { border-bottom: 1px solid #ccc; height: 16pt; margin-bottom: 4pt; }
+    .briefkopf { border: 2pt solid #2E5984; padding: 16pt; background: #F8F9FB; margin-bottom: 18pt; text-align: center; min-height: 80pt; }
+    .briefkopf .label { font-size: 9pt; font-style: italic; color: #888; }
+    .attachment-page { page-break-before: always; padding-top: 20pt; text-align: center; }
+    .attachment-page img { max-width: 100%; max-height: 70vh; border: 1px solid #999; }
+    .attachment-caption { font-size: 10pt; color: #555; margin-top: 8pt; font-style: italic; }
+    .attachment-pdf-note { border: 1pt dashed #999; padding: 12pt; margin-top: 8pt; font-size: 10pt; color: #555; }
+    .verification-footer { margin-top: 20pt; }
+    .verification-footer h2 { margin-top: 0; }
+    .sig-inline-img { max-height: 48pt; display: block; }
+    @page { size: A4${isLandscape ? " landscape" : ""}; margin: 1.5cm; }
+  `;
+  const win = window.open("", "_blank");
+  if (!win) {
+    // Popup blocked - fall back to printing the current page directly
+    try { window.print(); } catch (e) {
+      alert("Das Druckfenster wurde vom Browser blockiert. Bitte Pop-ups für diese Seite erlauben oder Strg+P nutzen.");
+    }
+    return;
+  }
+  win.document.open();
+  win.document.write(
+    '<!DOCTYPE html><html lang="de"><head><meta charset="utf-8">' +
+    '<title>' + esc(docTitle) + '</title>' +
+    '<style>' + printCss + '</style></head><body>' +
+    pv.innerHTML +
+    '</body></html>'
+  );
+  win.document.close();
+  // Give the new window a moment to render images, then print
+  win.focus();
+  setTimeout(() => {
+    try { win.print(); } catch (e) { /* user can still print manually */ }
+  }, 500);
 }
 
 function countAllAttachments(docId) {
