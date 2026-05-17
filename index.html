@@ -2931,12 +2931,29 @@ let jszipLoading = null;
 function loadJSZipLib() {
   if (window.JSZip) return Promise.resolve();
   if (jszipLoading) return jszipLoading;
+  const sources = [
+    "https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js",
+    "https://unpkg.com/jszip@3.10.1/dist/jszip.min.js",
+    "https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"
+  ];
   jszipLoading = new Promise((resolve, reject) => {
-    const s = document.createElement("script");
-    s.src = "https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js";
-    s.onload = () => resolve();
-    s.onerror = () => reject(new Error("Konnte ZIP-Bibliothek nicht laden. Bitte Internetverbindung prüfen."));
-    document.head.appendChild(s);
+    let idx = 0;
+    function tryNext() {
+      if (idx >= sources.length) {
+        reject(new Error("Konnte die ZIP-Bibliothek nicht laden. Bitte Internetverbindung prüfen. Tipp: Du kannst stattdessen „🖨 Drucken / als PDF\" nutzen - das funktioniert auch ohne Internet."));
+        return;
+      }
+      const url = sources[idx++];
+      const s = document.createElement("script");
+      s.src = url;
+      s.onload = () => {
+        if (window.JSZip) resolve();
+        else tryNext();
+      };
+      s.onerror = () => tryNext();
+      document.head.appendChild(s);
+    }
+    tryNext();
   });
   return jszipLoading;
 }
@@ -3699,7 +3716,7 @@ let showArchived = false;
 function toggleShowArchived() { showArchived = !showArchived; render(); }
 
 // === VERSION INFO ===
-const APP_VERSION = "v3.16";
+const APP_VERSION = "v3.17";
 
 // === ONBOARDING ===
 let onboardingActive = false;
@@ -6440,7 +6457,7 @@ function renderHelpView() {
       <p style="font-size:13px; color:var(--text-soft);">Tipp: Mit „📲 QR-Code anzeigen" wird ein QR-Code generiert, den andere mit der Handy-Kamera scannen können.</p>
 
       <h2 style="color:var(--primary); font-size:18px; margin:18px 0 10px;">🔒 Datenschutz</h2>
-      <p>Die App läuft komplett offline und sendet nichts an irgendeinen Server. Einzige Ausnahme: wenn du <strong>„📄 Word-Dokument erstellen"</strong> nutzt, wird einmal die docx-Bibliothek von einem öffentlichen CDN geladen (cdnjs.cloudflare.com). Deine eingegebenen Daten verlassen dabei trotzdem nie dein Gerät.</p>
+      <p>Die App läuft komplett offline und sendet nichts an irgendeinen Server. Einzige Ausnahme: wenn du <strong>„📄 Word-Dokument erstellen"</strong> oder <strong>„📦 ZIP mit Belegen"</strong> nutzt, wird einmal eine Hilfsbibliothek von einem öffentlichen CDN geladen. Deine eingegebenen Daten verlassen dabei trotzdem nie dein Gerät. Ohne Internet funktioniert weiterhin alles außer Word- und ZIP-Export - nutze dann einfach <strong>„🖨 Drucken / als PDF"</strong>.</p>
 
       <div style="margin-top:24px; padding:14px; background:var(--bg); border-radius:8px; font-size:13px;">
         <strong>Noch Fragen?</strong> Die App wurde gemeinsam mit jemandem in der Bewährungshilfe entwickelt. Wenn dir was fehlt oder unklar ist, sprich mit der Person, die dir die Datei gegeben hat.
@@ -9078,12 +9095,36 @@ let docxLoading = null;
 function loadDocxLib() {
   if (window.docx) return Promise.resolve();
   if (docxLoading) return docxLoading;
+  // docx 9.x ships its browser build as index.umd.cjs (NOT index.umd.js).
+  // Primary: jsDelivr (mirrors npm exactly, correct MIME type).
+  // Fallback: unpkg, then cdnjs iife build.
+  const sources = [
+    "https://cdn.jsdelivr.net/npm/docx@9.5.1/dist/index.umd.cjs",
+    "https://unpkg.com/docx@9.5.1/dist/index.umd.cjs",
+    "https://cdnjs.cloudflare.com/ajax/libs/docx/9.5.1/index.iife.js"
+  ];
   docxLoading = new Promise((resolve, reject) => {
-    const s = document.createElement("script");
-    s.src = "https://cdnjs.cloudflare.com/ajax/libs/docx/9.5.1/index.umd.js";
-    s.onload = () => resolve();
-    s.onerror = () => reject(new Error("Konnte docx-Bibliothek nicht laden. Bitte Internetverbindung prüfen oder die Druckansicht nutzen."));
-    document.head.appendChild(s);
+    let idx = 0;
+    function tryNext() {
+      if (idx >= sources.length) {
+        reject(new Error("Konnte die Word-Bibliothek nicht laden. Bitte Internetverbindung prüfen. Tipp: Du kannst stattdessen „🖨 Drucken / als PDF\" nutzen - das funktioniert auch ohne Internet."));
+        return;
+      }
+      const url = sources[idx++];
+      const s = document.createElement("script");
+      s.src = url;
+      s.onload = () => {
+        // Verify the library actually loaded a usable global
+        if (window.docx && (window.docx.Document || window.docx.Packer)) {
+          resolve();
+        } else {
+          tryNext();
+        }
+      };
+      s.onerror = () => tryNext();
+      document.head.appendChild(s);
+    }
+    tryNext();
   });
   return docxLoading;
 }
