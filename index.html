@@ -467,6 +467,75 @@
     text-align: center; color: #94a3b8; font-size: 14px; pointer-events: none;
     font-style: italic;
   }
+  /* Average calculator */
+  .avg-calc-btn {
+    margin-top: 6px;
+    background: var(--primary-soft); border: 1px solid var(--primary-light);
+    color: var(--primary); font-size: 12px; font-weight: 600;
+    padding: 5px 12px; border-radius: 6px; cursor: pointer;
+  }
+  .avg-calc-btn:hover { background: var(--primary); color: white; }
+  .avg-inputs { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+  .avg-input-row { display: flex; align-items: center; gap: 8px; }
+  .avg-input-num { font-size: 13px; color: var(--text-soft); width: 20px; text-align: right; }
+  .avg-input-row input {
+    flex: 1; border: 1px solid var(--border); border-radius: 8px;
+    padding: 9px 11px; font-size: 15px; background: var(--input-bg); color: var(--text);
+  }
+  .avg-input-row input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
+  .avg-input-cur { font-size: 14px; color: var(--text-soft); }
+  .avg-result {
+    display: flex; justify-content: space-between; align-items: center;
+    background: var(--bg); border-radius: 10px; padding: 12px 16px; gap: 12px;
+  }
+  .avg-result button {
+    background: var(--accent); color: white; border: none;
+    padding: 10px 18px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer;
+    white-space: nowrap;
+  }
+  .avg-result button:disabled { opacity: 0.4; cursor: not-allowed; }
+  /* Signature mode tabs (draw / upload) */
+  .sig-mode-tabs {
+    display: flex; gap: 4px; margin-bottom: 14px;
+    background: var(--bg); padding: 4px; border-radius: 10px;
+    border: 1px solid var(--border);
+  }
+  .sig-mode-tab {
+    flex: 1; border: none; background: transparent; cursor: pointer;
+    padding: 9px 8px; font-size: 13px; font-weight: 500;
+    color: var(--text-soft); border-radius: 7px; transition: all 0.15s;
+  }
+  .sig-mode-tab:hover { background: rgba(0,0,0,0.04); color: var(--text); }
+  .sig-mode-tab.active { background: var(--primary); color: white; font-weight: 600; }
+  [data-theme="dark"] .sig-mode-tab:hover { background: rgba(255,255,255,0.06); }
+  /* Signature upload zone */
+  .sig-upload-zone {
+    border: 2px dashed var(--border); border-radius: 10px;
+    padding: 28px 16px; text-align: center; cursor: pointer;
+    background: var(--bg); transition: all 0.15s;
+  }
+  .sig-upload-zone:hover { border-color: var(--primary); background: var(--primary-soft); }
+  /* Saved signature box */
+  .sig-saved-box {
+    background: var(--primary-soft); border: 1px solid var(--primary-light);
+    border-radius: 10px; padding: 12px 14px; margin-bottom: 6px;
+  }
+  .sig-saved-preview {
+    height: 48px; max-width: 150px; background: white;
+    border: 1px solid var(--border); border-radius: 6px; padding: 2px;
+    object-fit: contain;
+  }
+  .sig-or-divider {
+    text-align: center; margin: 12px 0; position: relative;
+  }
+  .sig-or-divider::before {
+    content: ""; position: absolute; left: 0; right: 0; top: 50%;
+    border-top: 1px solid var(--border);
+  }
+  .sig-or-divider span {
+    position: relative; background: var(--card); padding: 0 12px;
+    font-size: 12px; color: var(--text-soft); text-transform: uppercase; letter-spacing: .5px;
+  }
   /* Inline display of saved signature in wizard / print */
   .sig-display {
     background: #ffffff; border: 1px solid var(--border); border-radius: 8px;
@@ -2969,9 +3038,13 @@ const SIG_CANVAS_W = 600;
 const SIG_CANVAS_H = 200;
 
 function openSignaturePad(opts) {
-  // opts: { title, subtitle, onSave: (dataUrl, timestamp, signerName) => void, askName: bool, defaultName: string }
+  // opts: { title, subtitle, onSave: (dataUrl, timestamp, signerName, device, method) => void, askName: bool, defaultName: string }
   const existing = document.getElementById("sig-modal");
   if (existing) existing.remove();
+
+  // Check if there is a saved signature in Stammdaten we can offer as 1-click
+  const savedSig = state.shared && state.shared.savedSignature;
+  const savedSigName = (state.shared && state.shared.savedSignatureName) || "";
 
   const modal = document.createElement("div");
   modal.id = "sig-modal";
@@ -2979,23 +3052,69 @@ function openSignaturePad(opts) {
   modal.innerHTML = `
     <div class="modal sig-modal-card" style="max-width:680px;" onclick="event.stopPropagation()">
       <h3 style="margin:0 0 6px;">${esc(opts.title || "Digitale Unterschrift")}</h3>
-      <p style="margin:0 0 14px; font-size:14px; color:var(--text-soft);">${esc(opts.subtitle || "Unterschreibe mit Finger, Maus oder Stylus im Feld unten.")}</p>
+      <p style="margin:0 0 14px; font-size:14px; color:var(--text-soft);">${esc(opts.subtitle || "Unterschreibe mit Finger, Maus oder Stylus - oder lade ein Bild deiner Unterschrift hoch.")}</p>
       ${opts.askName ? `
         <label style="display:block; margin-bottom:10px;">
           <span style="font-size:13px; font-weight:600; color:var(--text);">Name der unterschreibenden Person</span>
           <input type="text" id="sig-name-input" value="${esc(opts.defaultName || "")}" placeholder="z.B. Dr. Müller, Caritas Marburg, Max Mustermann" style="width:100%; margin-top:4px; padding:8px 10px; border:1px solid var(--border); border-radius:8px; font-size:15px; box-sizing:border-box; background:var(--input-bg); color:var(--text);">
         </label>` : ""}
-      <div class="sig-canvas-wrap">
-        <canvas id="sig-canvas" width="${SIG_CANVAS_W}" height="${SIG_CANVAS_H}"></canvas>
-        <div class="sig-canvas-line"></div>
-        <div class="sig-canvas-hint">Hier unterschreiben</div>
+
+      ${savedSig ? `
+        <div class="sig-saved-box">
+          <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+            <img src="${savedSig}" alt="Gespeicherte Unterschrift" class="sig-saved-preview" />
+            <div style="flex:1; min-width:140px;">
+              <div style="font-size:13px; font-weight:600; color:var(--text);">⚡ Gespeicherte Unterschrift</div>
+              <div style="font-size:12px; color:var(--text-soft);">${savedSigName ? esc(savedSigName) : "aus deinen Stammdaten"}</div>
+            </div>
+            <button onclick="useSavedSignature()" class="btn-success" style="font-size:13px; padding:8px 14px;">✓ Diese verwenden</button>
+          </div>
+        </div>
+        <div class="sig-or-divider"><span>oder neu erfassen</span></div>
+      ` : ""}
+
+      <div class="sig-mode-tabs">
+        <button class="sig-mode-tab active" id="sig-tab-draw" onclick="switchSigMode('draw')">🖌️ Zeichnen</button>
+        <button class="sig-mode-tab" id="sig-tab-upload" onclick="switchSigMode('upload')">📤 Bild hochladen</button>
       </div>
-      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:14px;">
-        <button onclick="clearSignaturePad()" class="btn-secondary" style="flex:1; min-width:120px;">🗑 Löschen</button>
-        <button onclick="cancelSignaturePad()" class="btn-secondary" style="flex:1; min-width:120px;">Abbrechen</button>
-        <button onclick="saveSignaturePad()" id="sig-save-btn" style="flex:2; min-width:140px;">✓ Übernehmen</button>
+
+      <div id="sig-mode-draw">
+        <div class="sig-canvas-wrap">
+          <canvas id="sig-canvas" width="${SIG_CANVAS_W}" height="${SIG_CANVAS_H}"></canvas>
+          <div class="sig-canvas-line"></div>
+          <div class="sig-canvas-hint">Hier unterschreiben</div>
+        </div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:14px;">
+          <button onclick="clearSignaturePad()" class="btn-secondary" style="flex:1; min-width:120px;">🗑 Löschen</button>
+          <button onclick="cancelSignaturePad()" class="btn-secondary" style="flex:1; min-width:120px;">Abbrechen</button>
+          <button onclick="saveSignaturePad()" id="sig-save-btn" style="flex:2; min-width:140px;">✓ Übernehmen</button>
+        </div>
+        <p style="margin:14px 0 0; font-size:12px; color:var(--text-soft);">💡 Tipp: Auf Tablet/Smartphone mit dem Finger oder Stylus unterschreiben - das funktioniert genauso wie bei einem DHL-Paketboten.</p>
       </div>
-      <p style="margin:14px 0 0; font-size:12px; color:var(--text-soft);">💡 Tipp: Auf Tablet/Smartphone mit dem Finger oder Stylus unterschreiben - das funktioniert genauso wie bei einem DHL-Paketboten.</p>
+
+      <div id="sig-mode-upload" style="display:none;">
+        <div class="sig-upload-zone" id="sig-upload-zone" onclick="document.getElementById('sig-file-input').click()">
+          <input type="file" id="sig-file-input" accept="image/*" style="display:none;" onchange="handleSignatureUpload(event)" />
+          <div id="sig-upload-empty">
+            <div style="font-size:38px; margin-bottom:8px;">📤</div>
+            <div style="font-size:14px; font-weight:600; color:var(--text);">Bild der Unterschrift auswählen</div>
+            <div style="font-size:12px; color:var(--text-soft); margin-top:4px;">PNG oder JPG - z.B. ein Foto oder Scan deiner Unterschrift</div>
+          </div>
+          <div id="sig-upload-preview" style="display:none;">
+            <img id="sig-upload-img" alt="Vorschau" style="max-width:100%; max-height:160px; border-radius:6px;" />
+            <div style="font-size:12px; color:var(--text-soft); margin-top:8px;">Tippen um ein anderes Bild zu wählen</div>
+          </div>
+        </div>
+        <label style="display:flex; align-items:center; gap:8px; margin-top:10px; font-size:13px; color:var(--text); cursor:pointer;">
+          <input type="checkbox" id="sig-save-to-stammdaten" style="width:17px; height:17px; accent-color:var(--primary);" />
+          <span>Diese Unterschrift in meinen Stammdaten speichern (für 1-Klick-Unterschrift künftig)</span>
+        </label>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:14px;">
+          <button onclick="cancelSignaturePad()" class="btn-secondary" style="flex:1; min-width:120px;">Abbrechen</button>
+          <button onclick="saveUploadedSignature()" id="sig-upload-save-btn" style="flex:2; min-width:140px;" disabled>✓ Übernehmen</button>
+        </div>
+        <p style="margin:14px 0 0; font-size:12px; color:var(--text-soft);">💡 Tipp: Fotografiere deine Unterschrift auf weißem Papier bei gutem Licht. Die App schneidet sie automatisch zurecht.</p>
+      </div>
     </div>`;
   modal.onclick = (e) => { if (e.target === modal) cancelSignaturePad(); };
   document.body.appendChild(modal);
@@ -3003,6 +3122,134 @@ function openSignaturePad(opts) {
   // Stash callback in module-level state
   window._sigCallback = opts.onSave;
   window._sigAskName = !!opts.askName;
+  window._sigUploadedDataUrl = null;
+}
+
+// Switch between draw and upload modes
+function switchSigMode(mode) {
+  const drawTab = document.getElementById("sig-tab-draw");
+  const uploadTab = document.getElementById("sig-tab-upload");
+  const drawPane = document.getElementById("sig-mode-draw");
+  const uploadPane = document.getElementById("sig-mode-upload");
+  if (!drawTab || !uploadTab) return;
+  if (mode === "upload") {
+    drawTab.classList.remove("active");
+    uploadTab.classList.add("active");
+    drawPane.style.display = "none";
+    uploadPane.style.display = "";
+  } else {
+    drawTab.classList.add("active");
+    uploadTab.classList.remove("active");
+    drawPane.style.display = "";
+    uploadPane.style.display = "none";
+  }
+}
+
+// Handle an uploaded signature image file
+function handleSignatureUpload(ev) {
+  const file = ev.target.files && ev.target.files[0];
+  if (!file) return;
+  if (!file.type.startsWith("image/")) {
+    alert("Bitte eine Bilddatei auswählen (PNG oder JPG).");
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => {
+      // Normalize to the standard signature size, trim whitespace
+      const normalized = normalizeSignatureImage(img);
+      window._sigUploadedDataUrl = normalized;
+      // Show preview
+      const previewImg = document.getElementById("sig-upload-img");
+      const emptyBox = document.getElementById("sig-upload-empty");
+      const previewBox = document.getElementById("sig-upload-preview");
+      const saveBtn = document.getElementById("sig-upload-save-btn");
+      if (previewImg) previewImg.src = normalized;
+      if (emptyBox) emptyBox.style.display = "none";
+      if (previewBox) previewBox.style.display = "";
+      if (saveBtn) saveBtn.disabled = false;
+    };
+    img.onerror = () => alert("Das Bild konnte nicht geladen werden. Bitte ein anderes versuchen.");
+    img.src = e.target.result;
+  };
+  reader.onerror = () => alert("Datei konnte nicht gelesen werden.");
+  reader.readAsDataURL(file);
+}
+
+// Normalize an uploaded signature image: fit to standard size on white background
+function normalizeSignatureImage(img) {
+  const TARGET_W = 400;
+  const TARGET_H = 133;
+  const tmp = document.createElement("canvas");
+  tmp.width = TARGET_W;
+  tmp.height = TARGET_H;
+  const ctx = tmp.getContext("2d");
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, TARGET_W, TARGET_H);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  // Fit image preserving aspect ratio (contain)
+  const scale = Math.min(TARGET_W / img.width, TARGET_H / img.height);
+  const drawW = img.width * scale;
+  const drawH = img.height * scale;
+  const offX = (TARGET_W - drawW) / 2;
+  const offY = (TARGET_H - drawH) / 2;
+  ctx.drawImage(img, offX, offY, drawW, drawH);
+  return tmp.toDataURL("image/jpeg", 0.85);
+}
+
+// Save the uploaded signature
+function saveUploadedSignature() {
+  const dataUrl = window._sigUploadedDataUrl;
+  if (!dataUrl) {
+    alert("Bitte zuerst ein Bild auswählen.");
+    return;
+  }
+  let signerName = "";
+  if (window._sigAskName) {
+    const inp = document.getElementById("sig-name-input");
+    signerName = inp ? inp.value.trim() : "";
+    if (!signerName) {
+      alert("Bitte den Namen der unterschreibenden Person eintragen.");
+      if (inp) inp.focus();
+      return;
+    }
+  }
+  // Optionally save to Stammdaten
+  const saveCheckbox = document.getElementById("sig-save-to-stammdaten");
+  if (saveCheckbox && saveCheckbox.checked) {
+    state.shared.savedSignature = dataUrl;
+    state.shared.savedSignatureName = signerName || state.shared.name || "";
+    Storage.set(SHARED_STORAGE_KEY, JSON.stringify(state.shared));
+  }
+  const timestamp = new Date().toISOString();
+  const device = collectDeviceFingerprint();
+  const cb = window._sigCallback;
+  cancelSignaturePad();
+  if (typeof cb === "function") cb(dataUrl, timestamp, signerName, device, "upload");
+}
+
+// Use the signature saved in Stammdaten (1-click)
+function useSavedSignature() {
+  const dataUrl = state.shared && state.shared.savedSignature;
+  if (!dataUrl) return;
+  let signerName = (state.shared && state.shared.savedSignatureName) || "";
+  if (window._sigAskName) {
+    const inp = document.getElementById("sig-name-input");
+    const typed = inp ? inp.value.trim() : "";
+    if (typed) signerName = typed;
+    if (!signerName) {
+      alert("Bitte den Namen der unterschreibenden Person eintragen.");
+      if (inp) inp.focus();
+      return;
+    }
+  }
+  const timestamp = new Date().toISOString();
+  const device = collectDeviceFingerprint();
+  const cb = window._sigCallback;
+  cancelSignaturePad();
+  if (typeof cb === "function") cb(dataUrl, timestamp, signerName, device, "saved");
 }
 
 function setupSignatureCanvas() {
@@ -3132,7 +3379,7 @@ function saveSignaturePad() {
   const device = collectDeviceFingerprint();
   const cb = window._sigCallback;
   cancelSignaturePad();
-  if (typeof cb === "function") cb(dataUrl, timestamp, signerName, device);
+  if (typeof cb === "function") cb(dataUrl, timestamp, signerName, device, "draw");
 }
 
 // Collect a lightweight device fingerprint for stronger signature evidence
@@ -3252,8 +3499,8 @@ function signDocument(docId, key, opts) {
     subtitle: opts.subtitle || "",
     askName: opts.askName !== false,
     defaultName: opts.defaultName || "",
-    onSave: (dataUrl, timestamp, signerName, device) => {
-      setSignature(docId, key, { dataUrl, timestamp, signerName, device });
+    onSave: (dataUrl, timestamp, signerName, device, method) => {
+      setSignature(docId, key, { dataUrl, timestamp, signerName, device, method: method || "draw" });
       render();
     }
   });
@@ -3286,8 +3533,8 @@ function signRow(docId, sectionId, rowIdx, opts) {
     subtitle: opts.subtitle || "",
     askName: true,
     defaultName: opts.defaultName || "",
-    onSave: (dataUrl, timestamp, signerName, device) => {
-      setSignature(docId, key, { dataUrl, timestamp, signerName, device });
+    onSave: (dataUrl, timestamp, signerName, device, method) => {
+      setSignature(docId, key, { dataUrl, timestamp, signerName, device, method: method || "draw" });
       render();
     }
   });
@@ -3439,7 +3686,7 @@ let showArchived = false;
 function toggleShowArchived() { showArchived = !showArchived; render(); }
 
 // === VERSION INFO ===
-const APP_VERSION = "v3.14";
+const APP_VERSION = "v3.15";
 
 // === ONBOARDING ===
 let onboardingActive = false;
@@ -3478,6 +3725,120 @@ function finishOnboarding() {
 
 // === QUICK ADD MODALS ===
 let quickAddOpen = null; // null | "schadens" | "sozial" | "termin"
+
+// === AVERAGE CALCULATOR (for EAR money fields) ===
+let avgCalcTarget = null; // { secId, fieldId } or null
+
+function openAvgCalculator(secId, fieldId) {
+  avgCalcTarget = { secId, fieldId };
+  render();
+  setTimeout(() => {
+    const first = document.getElementById("avg-val-0");
+    if (first) first.focus();
+  }, 50);
+}
+function closeAvgCalculator() {
+  avgCalcTarget = null;
+  render();
+}
+// Live-update the computed average as the user types
+function updateAvgPreview() {
+  const vals = [];
+  for (let i = 0; i < 6; i++) {
+    const el = document.getElementById("avg-val-" + i);
+    if (el && el.value.trim()) {
+      const n = parseMoney(el.value);
+      if (!isNaN(n)) vals.push(n);
+    }
+  }
+  const preview = document.getElementById("avg-preview");
+  const applyBtn = document.getElementById("avg-apply-btn");
+  if (!preview) return;
+  if (vals.length === 0) {
+    preview.textContent = "–";
+    if (applyBtn) applyBtn.disabled = true;
+    return;
+  }
+  const sum = vals.reduce((a, b) => a + b, 0);
+  const avg = sum / vals.length;
+  preview.textContent = formatMoney(avg) + " €";
+  preview.dataset.avg = avg;
+  if (applyBtn) applyBtn.disabled = false;
+  // Also update the count hint
+  const cntHint = document.getElementById("avg-count-hint");
+  if (cntHint) cntHint.textContent = `Durchschnitt aus ${vals.length} Wert${vals.length !== 1 ? "en" : ""}`;
+}
+function applyAvgCalculator() {
+  if (!avgCalcTarget) return;
+  const preview = document.getElementById("avg-preview");
+  if (!preview || !preview.dataset.avg) {
+    alert("Bitte zuerst mindestens einen Wert eingeben.");
+    return;
+  }
+  const avg = parseFloat(preview.dataset.avg);
+  if (isNaN(avg)) return;
+  // Format to 2 decimals, German style
+  const formatted = avg.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  setAnswer(avgCalcTarget.secId, avgCalcTarget.fieldId, formatted);
+  const secId = avgCalcTarget.secId;
+  avgCalcTarget = null;
+  saveActiveDoc();
+  render();
+  showSaveToast("✓ Mittelwert übernommen");
+}
+
+function renderAvgCalculatorModal() {
+  if (!avgCalcTarget) return "";
+  // Find the field label
+  const doc = DOCS[state.activeDocId];
+  let fieldLabel = "";
+  if (doc) {
+    const sec = doc.sections.find(s => s.id === avgCalcTarget.secId);
+    if (sec && sec.fields) {
+      const f = sec.fields.find(ff => ff.id === avgCalcTarget.fieldId);
+      if (f) fieldLabel = f.label;
+    }
+  }
+  // 6 input rows, first 3 visible as "typical", rest optional
+  let inputs = "";
+  for (let i = 0; i < 6; i++) {
+    inputs += `
+      <div class="avg-input-row">
+        <span class="avg-input-num">${i + 1}.</span>
+        <input type="text" id="avg-val-${i}" inputmode="decimal" placeholder="${i < 3 ? "z.B. 1.800,00" : "(optional)"}"
+          oninput="updateAvgPreview()" onkeydown="if(event.key==='Enter'){const n=document.getElementById('avg-val-'+${i + 1});if(n)n.focus();else applyAvgCalculator();}" />
+        <span class="avg-input-cur">€</span>
+      </div>`;
+  }
+  return `
+    <div class="modal-backdrop" onclick="if(event.target===this) closeAvgCalculator()">
+      <div class="modal" style="max-width:440px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+          <h3 style="margin:0;">Ø Mittelwert berechnen</h3>
+          <button class="modal-close-btn" onclick="closeAvgCalculator()" title="Schließen">✕</button>
+        </div>
+        <p style="margin:0 0 14px; font-size:13px; color:var(--text-soft); line-height:1.5;">
+          ${fieldLabel ? `Für: <strong>${esc(fieldLabel)}</strong><br>` : ""}
+          Trage die Beträge mehrerer Monate ein (z.B. aus 3 Kontoauszügen). Die App berechnet den Durchschnitt - sinnvoll bei schwankendem Einkommen.
+        </p>
+        <div class="avg-inputs">
+          ${inputs}
+        </div>
+        <div class="avg-result">
+          <div>
+            <div style="font-size:12px; color:var(--text-soft);" id="avg-count-hint">Noch keine Werte</div>
+            <div style="font-size:24px; font-weight:700; color:var(--primary);" id="avg-preview">–</div>
+          </div>
+          <button onclick="applyAvgCalculator()" id="avg-apply-btn" disabled>✓ Übernehmen</button>
+        </div>
+        <p style="margin:12px 0 0; font-size:12px; color:var(--text-soft); line-height:1.5;">
+          💡 Tipp: Bei stark schwankendem Einkommen empfiehlt es sich, die letzten 3 Monate zu mitteln. Den Beleg (z.B. Kontoauszug) kannst du beim entsprechenden Dokument als Anhang hinzufügen.
+        </p>
+      </div>
+    </div>
+  `;
+}
+
 let quickAddTerminKind = "thera"; // "thera" | "bhtermine" | "sozial" - which doc the termin goes to
 function openQuickAdd(kind) {
   quickAddOpen = kind;
@@ -4206,6 +4567,33 @@ function toggleHiddenDoc(docId) {
 function isDocHidden(docId) {
   return (state.settings.hiddenDocs || []).indexOf(docId) >= 0;
 }
+// Open the signature pad to create/update the saved-in-Stammdaten signature
+function openSavedSignatureEditor() {
+  openSignaturePad({
+    title: "Meine Unterschrift hinterlegen",
+    subtitle: "Zeichne oder lade deine Unterschrift hoch. Sie wird in deinen Stammdaten gespeichert.",
+    askName: true,
+    defaultName: (state.shared && (state.shared.savedSignatureName || state.shared.name)) || "",
+    onSave: (dataUrl, timestamp, signerName, device, method) => {
+      state.shared.savedSignature = dataUrl;
+      state.shared.savedSignatureName = signerName || (state.shared && state.shared.name) || "";
+      Storage.set(SHARED_STORAGE_KEY, JSON.stringify(state.shared));
+      markDataChanged();
+      render();
+      showSaveToast("✓ Unterschrift gespeichert");
+    }
+  });
+}
+
+function deleteSavedSignature() {
+  if (!confirm("Gespeicherte Unterschrift wirklich löschen?\n\nBereits gesetzte Unterschriften in Dokumenten bleiben erhalten - nur die Vorlage für die 1-Klick-Unterschrift wird entfernt.")) return;
+  delete state.shared.savedSignature;
+  delete state.shared.savedSignatureName;
+  Storage.set(SHARED_STORAGE_KEY, JSON.stringify(state.shared));
+  render();
+  showSaveToast("Unterschrift gelöscht");
+}
+
 function resetSettingsToDefaults() {
   if (!confirm("Alle Einstellungen auf Standard zurücksetzen?\n\nDeine Daten bleiben unberührt - nur die Anzeige-Einstellungen werden zurückgesetzt.")) return;
   state.settings = {
@@ -5268,6 +5656,12 @@ function render() {
     wrap.innerHTML = renderResetModal();
     document.body.appendChild(wrap);
   }
+  if (avgCalcTarget) {
+    const wrap = document.createElement("div");
+    wrap.id = "modalOverlay";
+    wrap.innerHTML = renderAvgCalculatorModal();
+    document.body.appendChild(wrap);
+  }
   attachListeners();
   attachAutoFormatListeners();
 }
@@ -5705,6 +6099,29 @@ function renderSettingsView() {
         ${showToggle("showStats", "📈 Monats-Statistiken", "Zahlen vom aktuellen Monat (Zahlungen, Stunden, Termine)")}
         ${showToggle("showInstallBanner", "📲 Installations-Hinweis", "Banner mit Anleitung wie die App installiert wird (PWA)")}
         ${showToggle("showBackupReminder", "💾 Backup-Erinnerungs-Banner", "Banner oben auf der Startseite (nicht das Intervall)")}
+      </div>
+
+      <div class="settings-section">
+        <h2>✍️ Meine Unterschrift</h2>
+        <p class="settings-section-desc">Hinterlege deine Unterschrift einmal - dann kannst du beim Unterschreiben mit einem Klick darauf zugreifen, ohne jedes Mal neu zu zeichnen.</p>
+        ${state.shared && state.shared.savedSignature ? `
+          <div class="sig-saved-box">
+            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+              <img src="${state.shared.savedSignature}" alt="Gespeicherte Unterschrift" class="sig-saved-preview" />
+              <div style="flex:1; min-width:140px;">
+                <div style="font-size:13px; font-weight:600; color:var(--text);">✓ Unterschrift gespeichert</div>
+                <div style="font-size:12px; color:var(--text-soft);">${state.shared.savedSignatureName ? esc(state.shared.savedSignatureName) : "ohne Name"}</div>
+              </div>
+            </div>
+            <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">
+              <button class="btn btn-secondary" onclick="openSavedSignatureEditor()" style="font-size:13px;">✏️ Ändern</button>
+              <button class="btn btn-secondary" onclick="deleteSavedSignature()" style="font-size:13px;">🗑 Löschen</button>
+            </div>
+          </div>
+        ` : `
+          <button class="btn btn-success" onclick="openSavedSignatureEditor()" style="margin-top:4px;">✍️ Unterschrift hinterlegen</button>
+        `}
+        <p style="margin:12px 0 0; font-size:12px; color:var(--text-soft); line-height:1.5;">💡 Die gespeicherte Unterschrift ist nur für <strong>dich</strong> gedacht. Therapeut:innen oder Einrichtungen unterschreiben weiterhin direkt am Gerät - so bleibt der Beweiswert erhalten.</p>
       </div>
 
       <div class="settings-section">
@@ -6699,6 +7116,10 @@ function renderFieldsSection(sec, type) {
       ? `<textarea data-fkey="${sec.id}.${f.id}" class="${inputCls}" rows="6" style="width:100%; min-height:140px; resize:vertical;" ${spellAttrs} ${skipped ? "disabled" : ""}>${esc(value)}</textarea>`
       : `<input data-fkey="${sec.id}.${f.id}" type="${inputType}" class="${inputCls}" value="${esc(value)}" placeholder="${placeholder}" ${spellAttrs} ${skipped ? "disabled" : ""} />`;
     const currency = type === "money" ? `<span class="currency">€</span>` : "";
+    // Average calculator button - only for money fields (helps with 3-month averaging)
+    const avgBtn = (type === "money" && !skipped)
+      ? `<button class="avg-calc-btn" onclick="openAvgCalculator('${sec.id}','${f.id}')" title="Durchschnitt aus mehreren Monaten berechnen">Ø Mittelwert</button>`
+      : "";
     html += `
       <div class="field ${skipped ? 'skipped' : ''}">
         <label>${esc(f.label)}${f.shared ? ' <span title="Wird in allen Dokumenten geteilt" style="color:var(--primary); font-size:11px;">🔗</span>' : ''}</label>
@@ -6706,6 +7127,7 @@ function renderFieldsSection(sec, type) {
           ${inputHtml}${currency}
           <button class="skip-btn ${skipped ? 'active' : ''}" onclick="toggleSkip('${sec.id}','${f.id}')">${skipped ? '↶ Doch eintragen' : '✕ Nicht zutreffend'}</button>
         </div>
+        ${avgBtn}
       </div>`;
   });
   return html;
@@ -7337,11 +7759,17 @@ function renderPrintVerificationFooter(docId) {
   entries.forEach((e, i) => {
     const sig = e.sig;
     const dev = sig.device || {};
+    const methodLabel = {
+      draw: "Gezeichnet",
+      upload: "Bild hochgeladen",
+      saved: "Gespeicherte Unterschrift"
+    }[sig.method] || "Gezeichnet";
     rows += `<tr>
       <td>${i + 1}</td>
       <td>${esc(describeKey(e.key))}</td>
       <td>${esc(sig.signerName || "(ohne Name)")}</td>
       <td>${esc(fmtSigTimestamp(sig.timestamp))}</td>
+      <td style="font-size:9pt;">${esc(methodLabel)}</td>
       <td style="font-size:9pt;">${esc((dev.userAgentShort || "") + (dev.timezone ? " · " + dev.timezone : ""))}</td>
     </tr>`;
   });
@@ -7354,7 +7782,7 @@ function renderPrintVerificationFooter(docId) {
         Diese Übersicht zeigt alle in diesem Dokument enthaltenen digitalen Unterschriften zum Zeitpunkt des Ausdrucks. Jede Zeile dokumentiert, wann und auf welchem Gerät unterzeichnet wurde - vergleichbar mit dem Logbuch eines DHL-Paket-Tablets.
       </p>
       <table>
-        <tr><th>Nr</th><th>Bereich</th><th>Unterzeichnet von</th><th>Zeitpunkt</th><th>Gerät / Zeitzone</th></tr>
+        <tr><th>Nr</th><th>Bereich</th><th>Unterzeichnet von</th><th>Zeitpunkt</th><th>Erfassungsart</th><th>Gerät / Zeitzone</th></tr>
         ${rows}
       </table>
       <p style="font-size:9pt; font-style:italic; color:#888; margin-top:10pt;">
