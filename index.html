@@ -1064,6 +1064,17 @@
     border-radius: 10px 10px 0 0; flex-wrap: wrap; gap: 10px;
   }
   .print-toolbar h3 { font-size: 16px; }
+  /* Attachment print toggle - clear checkbox row below toolbar */
+  .attach-print-toggle {
+    display: flex; align-items: flex-start; gap: 12px;
+    margin: 0 0 14px; padding: 12px 16px;
+    background: var(--primary-soft); border: 1px solid var(--primary-light);
+    border-radius: 10px; cursor: pointer;
+  }
+  .attach-print-toggle input[type="checkbox"] {
+    width: 20px; height: 20px; margin-top: 1px; cursor: pointer;
+    accent-color: var(--primary); flex-shrink: 0;
+  }
   .print-toolbar button { background: white; color: var(--primary); border: none; padding: 8px 16px; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 13px; }
   .print-toolbar button:hover { background: #f0f0f0; }
   /* PRINT MEDIA: only show print-view, hide everything else */
@@ -3548,8 +3559,10 @@ function removeRowSignature(docId, sectionId, rowIdx) {
   removeSignature(docId, `row_${sectionId}_${rowIdx}`);
 }
 
-async function downloadDocBundle(docId) {
-  const btn = event && event.target;
+async function downloadDocBundle(docId, ev) {
+  // Get the button reliably - from the passed event, or the global event as fallback
+  const evt = ev || (typeof event !== "undefined" ? event : null);
+  const btn = evt && evt.target ? evt.target : null;
   const origText = btn ? btn.textContent : "";
   if (btn) { btn.disabled = true; btn.textContent = "📦 Erstelle ZIP..."; }
   try {
@@ -3566,7 +3579,7 @@ async function downloadDocBundle(docId) {
     if (btn) { btn.textContent = "✓ ZIP heruntergeladen"; setTimeout(() => { btn.disabled = false; btn.textContent = origText; }, 2200); }
   } catch (e) {
     console.error(e);
-    alert("ZIP-Erstellung fehlgeschlagen: " + (e.message || "Unbekannter Fehler"));
+    alert("ZIP-Erstellung fehlgeschlagen: " + (e.message || "Unbekannter Fehler") + "\n\nMögliche Ursache: keine Internetverbindung (die ZIP-Funktion lädt einmalig eine Hilfsbibliothek nach). Bitte mit Internet erneut versuchen.");
     if (btn) { btn.disabled = false; btn.textContent = origText; }
   }
 }
@@ -3686,7 +3699,7 @@ let showArchived = false;
 function toggleShowArchived() { showArchived = !showArchived; render(); }
 
 // === VERSION INFO ===
-const APP_VERSION = "v3.15";
+const APP_VERSION = "v3.16";
 
 // === ONBOARDING ===
 let onboardingActive = false;
@@ -5602,8 +5615,9 @@ function render() {
   if (state.pinLocked) {
     document.getElementById("printView").classList.remove("show", "landscape-mode");
     document.getElementById("app").innerHTML = "";
-    let existing = document.getElementById("modalOverlay");
-    if (existing) existing.remove();
+    document.querySelectorAll("#modalOverlay").forEach(el => el.remove());
+    const orphanSig = document.getElementById("sig-modal");
+    if (orphanSig) orphanSig.remove();
     let pinExisting = document.getElementById("pinOverlay");
     if (pinExisting) pinExisting.remove();
     const wrap = document.createElement("div");
@@ -5635,31 +5649,27 @@ function render() {
   else if (state.view === "anschreiben") app.innerHTML = renderAnschreibenView();
   else if (state.view === "belege") app.innerHTML = renderBelegeView();
   else if (state.view === "settings") app.innerHTML = renderSettingsView();
-  // Render modal overlay if open
-  let existing = document.getElementById("modalOverlay");
-  if (existing) existing.remove();
-  if (quickAddOpen) {
-    const wrap = document.createElement("div");
-    wrap.id = "modalOverlay";
-    wrap.innerHTML = renderQuickAddModal();
-    document.body.appendChild(wrap);
+
+  // Render modal overlay if open.
+  // IMPORTANT: remove ALL existing overlays (not just one) - if duplicates ever
+  // accumulated, a leftover invisible backdrop would block all clicks on the page.
+  document.querySelectorAll("#modalOverlay").forEach(el => el.remove());
+  // Clean up any orphaned signature modal that is no longer in use
+  // (sig-modal is self-managed; if no signature callback is active it's orphaned)
+  if (!window._sigCallback) {
+    const orphanSig = document.getElementById("sig-modal");
+    if (orphanSig) orphanSig.remove();
   }
-  if (onboardingActive) {
+  // Only ONE modal can be open at a time - use else-if so we never append two overlays
+  let modalHtml = null;
+  if (quickAddOpen) modalHtml = renderQuickAddModal();
+  else if (onboardingActive) modalHtml = renderOnboardingModal();
+  else if (resetModalOpen) modalHtml = renderResetModal();
+  else if (avgCalcTarget) modalHtml = renderAvgCalculatorModal();
+  if (modalHtml) {
     const wrap = document.createElement("div");
     wrap.id = "modalOverlay";
-    wrap.innerHTML = renderOnboardingModal();
-    document.body.appendChild(wrap);
-  }
-  if (resetModalOpen) {
-    const wrap = document.createElement("div");
-    wrap.id = "modalOverlay";
-    wrap.innerHTML = renderResetModal();
-    document.body.appendChild(wrap);
-  }
-  if (avgCalcTarget) {
-    const wrap = document.createElement("div");
-    wrap.id = "modalOverlay";
-    wrap.innerHTML = renderAvgCalculatorModal();
+    wrap.innerHTML = modalHtml;
     document.body.appendChild(wrap);
   }
   attachListeners();
@@ -7461,16 +7471,25 @@ function renderPreviewToolbar() {
       <h3>👁 Druckansicht – ${esc(DOCS[state.activeDocId].title)}</h3>
       <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
         <button onclick="closePreview()">← Zurück zum Editor</button>
-        ${hasAttachments && attCount > 0 ? `<button onclick="togglePrintAttachments()" title="Belege als zusätzliche Seiten ans Druckdokument anhängen">${toggleLabel} (${attCount})</button>` : ""}
         ${canShare ? `<button onclick="shareDocument('${id}')" title="Dokument direkt per Mail / WhatsApp / AirDrop teilen">📤 Teilen</button>` : ""}
-        ${canShare && hasAttachments && attCount > 0 ? `<button onclick="downloadDocBundle('${id}')" title="Dokument + alle Belege als ZIP-Datei herunterladen">📦 ZIP mit Belegen</button>` : ""}
+        ${canShare && hasAttachments && attCount > 0 ? `<button onclick="downloadDocBundle('${id}', event)" title="Dokument + alle Belege als ZIP-Datei herunterladen">📦 ZIP mit Belegen</button>` : ""}
         <button onclick="confirmAndPrint()">🖨 Drucken / als PDF</button>
       </div>
     </div>
     <div style="height:14px"></div>
+    ${hasAttachments && attCount > 0 ? `
+    <div class="attach-print-toggle" onclick="togglePrintAttachments()">
+      <input type="checkbox" ${state.printWithAttachments ? "checked" : ""} onclick="event.stopPropagation(); togglePrintAttachments();" />
+      <div>
+        <div style="font-weight:600; font-size:14px;">📎 Belege mitdrucken (${attCount} ${attCount === 1 ? "Beleg" : "Belege"})</div>
+        <div style="font-size:12px; color:var(--text-soft);">${state.printWithAttachments
+          ? `Alle ${attCount} Belege werden als zusätzliche Seiten an das Dokument angehängt - wichtig beim Einreichen.`
+          : `Belege werden derzeit NICHT mitgedruckt. Anhaken, um sie ans Dokument anzuhängen.`}</div>
+      </div>
+    </div>
+    ` : ""}
     <div style="text-align:center; color:var(--text-soft); font-size:13px; padding:0 20px 14px;">
       Klick auf <strong>„Drucken / als PDF"</strong> – im Druckdialog deines Browsers kannst du dann „Als PDF speichern" wählen.
-      ${hasAttachments && attCount > 0 ? `<br><span style="font-size:12px;">Aktuell ${state.printWithAttachments ? `<strong>${attCount} Beleg(e) werden angehängt</strong>` : `Belege werden <strong>nicht</strong> angehängt`}.</span>` : ""}
     </div>
     ${showPrivacy ? `
     <div style="margin:0 20px 14px; padding:12px 16px; background:rgba(217, 119, 6, 0.1); border:1px solid var(--warn); border-radius:10px; font-size:13px; color:var(--text);">
@@ -7479,7 +7498,10 @@ function renderPreviewToolbar() {
     ` : ""}
   `;
 }
-// Confirm before printing sensitive documents
+// Confirm before printing sensitive documents.
+// The privacy warning is already shown as a banner in the toolbar, so this is a
+// light extra confirmation. If the browser suppresses dialogs, we still print
+// (a suppressed confirm() must not silently block the whole print action).
 function confirmAndPrint() {
   const id = state.activeDocId;
   const sensitiveTypes = ["thera", "schadens"];
@@ -7487,9 +7509,19 @@ function confirmAndPrint() {
     const msg = id === "thera"
       ? "Du druckst gleich ein Dokument mit sensiblen Gesundheitsdaten (Therapie-Informationen). Stelle sicher, dass es in die richtigen Hände kommt.\n\nFortfahren?"
       : "Du druckst gleich ein Dokument mit Finanz- und Auflage-Details. Achte beim Versand auf Vertraulichkeit.\n\nFortfahren?";
-    if (!confirm(msg)) return;
+    let answer = true;
+    try {
+      answer = confirm(msg);
+    } catch (e) {
+      answer = true; // dialog suppressed -> proceed anyway
+    }
+    if (answer === false) return; // only abort on explicit "Abbrechen"
   }
-  window.print();
+  try {
+    window.print();
+  } catch (e) {
+    alert("Der Druck konnte nicht gestartet werden. Bitte nutze die Druckfunktion deines Browsers (Menü → Drucken oder Strg+P).");
+  }
 }
 
 function countAllAttachments(docId) {
