@@ -3603,8 +3603,38 @@ async function downloadDocBundle(docId, ev) {
 
 async function shareDocument(docId) {
   const doc = DOCS[docId];
+  // Desktop browsers (e.g. Firefox/Chrome on Windows) usually have no Web Share API.
+  // Instead of showing an alert (which the browser may suppress), the button
+  // directly downloads the document so the click always does something useful.
   if (!navigator.share) {
-    alert("Teilen wird auf diesem Gerät nicht unterstützt.\n\nNutze stattdessen den Knopf „📦 ZIP mit Belegen“ - die ZIP-Datei kannst du dann manuell per Mail anhängen oder über andere Wege versenden.");
+    const docsWithAttachments = ["schadens", "sozial", "kosten", "asservate"];
+    const hasAtts = docsWithAttachments.includes(docId) && countAllAttachments(docId) > 0;
+    if (hasAtts) {
+      // Has attachments -> download the full ZIP bundle
+      await downloadDocBundle(docId);
+      showSaveToast("📦 Als ZIP heruntergeladen - per Mail anhängbar");
+      return;
+    }
+    // No attachments -> download just the Word document
+    try {
+      const blob = await buildDocBlob(docId);
+      if (blob) {
+        const userName = (state.shared.name || "").replace(/[^a-zA-Z0-9äöüÄÖÜß_-]/g, "_");
+        const docTitle = doc.title.replace(/[^a-zA-Z0-9äöüÄÖÜß_-]/g, "_");
+        const filename = `${docTitle}${userName ? "_" + userName : ""}.docx`;
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url; a.download = filename;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showSaveToast("📄 Word-Dokument heruntergeladen");
+      } else {
+        showSaveToast("Bitte „🖨 Drucken / als PDF\" nutzen");
+      }
+    } catch (e) {
+      console.error(e);
+      showSaveToast("Word-Export nicht möglich - bitte „Drucken / als PDF\" nutzen");
+    }
     return;
   }
   try {
@@ -3716,7 +3746,7 @@ let showArchived = false;
 function toggleShowArchived() { showArchived = !showArchived; render(); }
 
 // === VERSION INFO ===
-const APP_VERSION = "v3.17";
+const APP_VERSION = "v3.18";
 
 // === ONBOARDING ===
 let onboardingActive = false;
@@ -7483,12 +7513,18 @@ function renderPreviewToolbar() {
   const canShare = id !== "uebersicht";
   const sensitiveTypes = ["thera", "schadens"]; // contains health/legal info
   const showPrivacy = sensitiveTypes.includes(id);
+  // Web Share API is mobile-mostly. On desktop the "share" button downloads instead.
+  const hasWebShare = typeof navigator !== "undefined" && !!navigator.share;
+  const shareLabel = hasWebShare ? "📤 Teilen" : "📄 Word herunterladen";
+  const shareTitle = hasWebShare
+    ? "Dokument direkt per Mail / WhatsApp / AirDrop teilen"
+    : "Word-Dokument herunterladen - kannst du dann per Mail anhängen";
   return `
     <div class="print-toolbar">
       <h3>👁 Druckansicht – ${esc(DOCS[state.activeDocId].title)}</h3>
       <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
         <button onclick="closePreview()">← Zurück zum Editor</button>
-        ${canShare ? `<button onclick="shareDocument('${id}')" title="Dokument direkt per Mail / WhatsApp / AirDrop teilen">📤 Teilen</button>` : ""}
+        ${canShare ? `<button onclick="shareDocument('${id}')" title="${shareTitle}">${shareLabel}</button>` : ""}
         ${canShare && hasAttachments && attCount > 0 ? `<button onclick="downloadDocBundle('${id}', event)" title="Dokument + alle Belege als ZIP-Datei herunterladen">📦 ZIP mit Belegen</button>` : ""}
         <button onclick="confirmAndPrint()">🖨 Drucken / als PDF</button>
       </div>
@@ -7515,25 +7551,11 @@ function renderPreviewToolbar() {
     ` : ""}
   `;
 }
-// Confirm before printing sensitive documents.
-// The privacy warning is already shown as a banner in the toolbar, so this is a
-// light extra confirmation. If the browser suppresses dialogs, we still print
-// (a suppressed confirm() must not silently block the whole print action).
+// Print the document. The privacy warning for sensitive documents is already
+// shown as a visible banner in the toolbar, so we do NOT use a blocking confirm()
+// dialog here - a suppressed confirm() (browser setting) would otherwise silently
+// prevent printing entirely.
 function confirmAndPrint() {
-  const id = state.activeDocId;
-  const sensitiveTypes = ["thera", "schadens"];
-  if (sensitiveTypes.includes(id)) {
-    const msg = id === "thera"
-      ? "Du druckst gleich ein Dokument mit sensiblen Gesundheitsdaten (Therapie-Informationen). Stelle sicher, dass es in die richtigen Hände kommt.\n\nFortfahren?"
-      : "Du druckst gleich ein Dokument mit Finanz- und Auflage-Details. Achte beim Versand auf Vertraulichkeit.\n\nFortfahren?";
-    let answer = true;
-    try {
-      answer = confirm(msg);
-    } catch (e) {
-      answer = true; // dialog suppressed -> proceed anyway
-    }
-    if (answer === false) return; // only abort on explicit "Abbrechen"
-  }
   try {
     window.print();
   } catch (e) {
@@ -9095,13 +9117,11 @@ let docxLoading = null;
 function loadDocxLib() {
   if (window.docx) return Promise.resolve();
   if (docxLoading) return docxLoading;
-  // docx 9.x ships its browser build as index.umd.cjs (NOT index.umd.js).
-  // Primary: jsDelivr (mirrors npm exactly, correct MIME type).
-  // Fallback: unpkg, then cdnjs iife build.
+  // docx 9.x: the browser build is index.iife.js. We must NOT use .cjs files -
+  // CDNs serve them as "application/node" which browsers refuse to run as <script>.
   const sources = [
-    "https://cdn.jsdelivr.net/npm/docx@9.5.1/dist/index.umd.cjs",
-    "https://unpkg.com/docx@9.5.1/dist/index.umd.cjs",
-    "https://cdnjs.cloudflare.com/ajax/libs/docx/9.5.1/index.iife.js"
+    "https://cdn.jsdelivr.net/npm/docx@9.5.1/dist/index.iife.js",
+    "https://unpkg.com/docx@9.5.1/dist/index.iife.js"
   ];
   docxLoading = new Promise((resolve, reject) => {
     let idx = 0;
@@ -9114,7 +9134,6 @@ function loadDocxLib() {
       const s = document.createElement("script");
       s.src = url;
       s.onload = () => {
-        // Verify the library actually loaded a usable global
         if (window.docx && (window.docx.Document || window.docx.Packer)) {
           resolve();
         } else {
