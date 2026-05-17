@@ -259,6 +259,12 @@
     font-size: 14px; font-family: inherit; width: 100%;
   }
   .row-grid .field-mini input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary-soft); }
+  .row-grid .field-mini select.field-mini-select {
+    border: 1px solid var(--border); border-radius: 6px; padding: 7px 10px;
+    font-size: 14px; font-family: inherit; width: 100%;
+    background: var(--card); color: var(--text); cursor: pointer;
+  }
+  .row-grid .field-mini select.field-mini-select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary-soft); }
   /* Wide textarea fields (e.g. notes) span full row width */
   .row-grid .field-mini-wide {
     grid-column: 1 / -1;
@@ -1173,6 +1179,7 @@ const DOCS = {
         { id: "emrente", label: "Erwerbsminderungsrente" },
         { id: "witwenrente", label: "Witwen- / Waisenrente" },
         { id: "betriebsrente", label: "Betriebsrente" },
+        { id: "unfallrente", label: "Unfallrente / Rente der Berufsgenossenschaft" },
         { id: "privatrente", label: "Private Rente" },
       ]},
       { id: "sonst_ein", title: "Sonstige Einnahmen", icon: "💰", type: "money", side: "ein", fields: [
@@ -1182,6 +1189,7 @@ const DOCS = {
         { id: "geschenke", label: "Geldgeschenke (regelmäßig)" },
         { id: "unterstuetzung", label: "Unterstützung von Familie / Freunden" },
         { id: "sachleistung", label: "Sachleistungen (geschätzt: Kost, Logis)" },
+        { id: "erstattung", label: "Erstattungen / Rückzahlungen (Versicherung, Nebenkosten ...)" },
         { id: "sonst_ein_1", label: "Sonstiges 1" },
         { id: "sonst_ein_2", label: "Sonstiges 2" },
       ]},
@@ -1205,6 +1213,7 @@ const DOCS = {
         { id: "gas", label: "Gas" },
         { id: "gez", label: "Rundfunkbeitrag (GEZ)" },
         { id: "schornstein", label: "Schornsteinfeger / Wartung" },
+        { id: "wasser", label: "Wasser / Abwasser" },
         { id: "renovierung", label: "Hausrat / Renovierung (anteilig)" },
       ]},
       { id: "vers", title: "Versicherungen", icon: "🛡️", type: "money", side: "aus", fields: [
@@ -1231,6 +1240,8 @@ const DOCS = {
         { id: "parken", label: "Parkgebühren" },
         { id: "mietwagen", label: "Mietwagen / Carsharing" },
         { id: "taxi", label: "Taxi / Fahrdienst (Uber o.ä.)" },
+        { id: "leasing", label: "Auto-Finanzierung / Leasingrate" },
+        { id: "panne", label: "Automobilclub / Pannenhilfe (ADAC o.ä.)" },
       ]},
       { id: "tk", title: "Telekommunikation & Medien", icon: "📱", type: "money", side: "aus", fields: [
         { id: "handy", label: "Mobilfunk" },
@@ -1289,6 +1300,7 @@ const DOCS = {
         { id: "privat_schulden", label: "Privatschulden (Familie / Freunde)" },
         { id: "schuldnerb", label: "Schuldenberatung / Insolvenzverwalter" },
         { id: "kontofuehrung", label: "Kontoführungsgebühren" },
+        { id: "mahngebuehren", label: "Mahngebühren / Verzugszinsen" },
         { id: "bauspar", label: "Bauspar- / Sparvertrag (Rate)" },
       ]},
       { id: "justiz", title: "Bewährungsauflagen / Justiz", icon: "⚖️", type: "money", side: "aus", fields: [
@@ -1315,6 +1327,15 @@ const DOCS = {
         { id: "sonst_aus_2", label: "Sonstiges 2" },
         { id: "sparen", label: "Sparen / Rücklagen" },
       ]},
+      { id: "eigene", title: "Eigene Einträge", icon: "➕", type: "rows",
+        hint: "Hier kannst du eigene Einnahmen oder Ausgaben anlegen, die in keine der Kategorien oben passen. Wähle je Eintrag, ob es eine Einnahme oder eine Ausgabe ist; der Betrag fließt automatisch in die Gesamtsumme und das Saldo ein.",
+        columns: [
+          { id: "bezeichnung", label: "Bezeichnung", placeholder: "z. B. Mitgliedsbeitrag Sportverein" },
+          { id: "art", label: "Einnahme oder Ausgabe?", type: "select", options: ["Ausgabe", "Einnahme"] },
+          { id: "betrag", label: "Betrag (EUR / Monat)", placeholder: "z. B. 25,00" },
+          { id: "notiz", label: "Anmerkung (optional)", type: "textarea", placeholder: "" },
+        ]
+      },
       { id: "anmerkung", title: "Anmerkungen", icon: "✍️", type: "freetext", fields: [
         { id: "notes", label: "Erläuterungen, Besonderheiten, Ratenzahlungen, geplante Veränderungen ...", type: "textarea" }
       ]},
@@ -3780,7 +3801,7 @@ let showArchived = false;
 function toggleShowArchived() { showArchived = !showArchived; render(); }
 
 // === VERSION INFO ===
-const APP_VERSION = "v3.22";
+const APP_VERSION = "v3.23";
 
 // === ONBOARDING ===
 let onboardingActive = false;
@@ -5685,7 +5706,27 @@ function totalsBySide() {
   // Add household member income from rows
   const hhRows = (getDocState().rows && getDocState().rows.haushalt_ein) || [];
   hhRows.forEach(r => { einHH += parseMoney(r.betrag || ""); });
+  // Add the user's own custom entries
+  const ce = customEntryTotals();
+  ein += ce.ein;
+  aus += ce.aus;
   return { ein, einHH, aus, saldo: (ein + einHH) - aus };
+}
+// Sums up the user-created "Eigene Einträge" rows, split by direction.
+function customEntryTotals() {
+  const out = { ein: 0, aus: 0, einRows: [], ausRows: [] };
+  if (state.activeDocId !== "ear") return out;
+  const ds = state.docs.ear;
+  const rows = (ds && ds.rows && ds.rows.eigene) || [];
+  rows.forEach(r => {
+    const n = parseMoney(r.betrag || "");
+    if (!n) return;
+    const label = (r.bezeichnung || "").trim() || "Eigener Eintrag";
+    const isEin = (r.art || "").toLowerCase().indexOf("ein") === 0;
+    if (isEin) { out.ein += n; out.einRows.push({ label, value: n, notiz: (r.notiz || "").trim() }); }
+    else { out.aus += n; out.ausRows.push({ label, value: n, notiz: (r.notiz || "").trim() }); }
+  });
+  return out;
 }
 // Per-section (Bereichs-) subtotals for the EAR. Returns the sum of every
 // money section, split by side, so reviews/printouts can show Zwischensummen.
@@ -5704,6 +5745,10 @@ function earSectionSums() {
     if (sec.side === "ein") { out.ein.push({ id: sec.id, title: sec.title, sum: s }); out.einSum += s; }
     else if (sec.side === "aus") { out.aus.push({ id: sec.id, title: sec.title, sum: s }); out.ausSum += s; }
   });
+  // Custom entries appear as their own pseudo-area on each side
+  const ce = customEntryTotals();
+  if (ce.ein) { out.ein.push({ id: "eigene_ein", title: "Eigene Einträge", sum: ce.ein }); out.einSum += ce.ein; }
+  if (ce.aus) { out.aus.push({ id: "eigene_aus", title: "Eigene Einträge", sum: ce.aus }); out.ausSum += ce.aus; }
   return out;
 }
 
@@ -7293,10 +7338,18 @@ function renderRowsSection(sec) {
         ? `spellcheck="false"`
         : `spellcheck="true" lang="de" autocapitalize="sentences"`;
       const isTextarea = col.type === "textarea";
+      const isSelect = col.type === "select";
       const fieldClass = isTextarea ? "field-mini field-mini-wide" : "field-mini";
-      const inputEl = isTextarea
-        ? `<textarea data-rowkey="${sec.id}|${idx}|${col.id}" rows="2" placeholder="${esc(col.placeholder || "")}" ${spellAttrs}>${esc(row[col.id] || "")}</textarea>`
-        : `<input data-rowkey="${sec.id}|${idx}|${col.id}" type="text" value="${esc(row[col.id] || "")}" placeholder="${esc(col.placeholder || "")}" ${spellAttrs} />`;
+      let inputEl;
+      if (isSelect) {
+        const opts = col.options || [];
+        const cur = row[col.id] || opts[0] || "";
+        inputEl = `<select data-rowkey="${sec.id}|${idx}|${col.id}" class="field-mini-select">${opts.map(o => `<option value="${esc(o)}"${o === cur ? " selected" : ""}>${esc(o)}</option>`).join("")}</select>`;
+      } else if (isTextarea) {
+        inputEl = `<textarea data-rowkey="${sec.id}|${idx}|${col.id}" rows="2" placeholder="${esc(col.placeholder || "")}" ${spellAttrs}>${esc(row[col.id] || "")}</textarea>`;
+      } else {
+        inputEl = `<input data-rowkey="${sec.id}|${idx}|${col.id}" type="text" value="${esc(row[col.id] || "")}" placeholder="${esc(col.placeholder || "")}" ${spellAttrs} />`;
+      }
       cols += `
         <div class="${fieldClass}">
           <label>${esc(col.label)}</label>
@@ -7915,7 +7968,15 @@ function skipAll(secId) {
 }
 function addRow(secId) {
   const rows = getRows(secId);
-  rows.push({});
+  const newRow = {};
+  const doc = DOCS[state.activeDocId];
+  const sec = doc && doc.sections.find(s => s.id === secId);
+  if (sec && sec.columns) {
+    sec.columns.forEach(col => {
+      if (col.type === "select" && col.options && col.options.length) newRow[col.id] = col.options[0];
+    });
+  }
+  rows.push(newRow);
   setRows(secId, rows);
   render();
 }
@@ -8184,15 +8245,37 @@ function renderPrintEAR() {
     });
     hhTable += `<tr><td class="sum" colspan="3">Einnahmen weiterer Haushaltsmitglieder gesamt</td><td class="sum">${moneyOnly(hhSum)}</td></tr></table>`;
   }
-  const totalEin = einR.sum + hhSum;
-  const saldo = totalEin - ausR.sum;
+  // User-created custom entries
+  const ce = customEntryTotals();
+  let customTable = "";
+  const hasCustom = ce.einRows.length > 0 || ce.ausRows.length > 0;
+  if (hasCustom) {
+    customTable = `<table><tr><th style="width:55%">Bezeichnung</th><th>Art</th><th>Betrag (EUR)</th></tr>`;
+    if (ce.einRows.length > 0) {
+      customTable += `<tr><td class="subhead" colspan="3">EIGENE EINNAHMEN</td></tr>`;
+      ce.einRows.forEach(r => {
+        customTable += `<tr><td>${esc(r.label)}${r.notiz ? ` <span style="color:#666; font-style:italic;">(${esc(r.notiz)})</span>` : ""}</td><td>Einnahme</td><td>${moneyOnly(r.value)}</td></tr>`;
+      });
+      customTable += `<tr><td class="subsum" colspan="2">Zwischensumme eigene Einnahmen</td><td class="subsum">${moneyOnly(ce.ein)}</td></tr>`;
+    }
+    if (ce.ausRows.length > 0) {
+      customTable += `<tr><td class="subhead" colspan="3">EIGENE AUSGABEN</td></tr>`;
+      ce.ausRows.forEach(r => {
+        customTable += `<tr><td>${esc(r.label)}${r.notiz ? ` <span style="color:#666; font-style:italic;">(${esc(r.notiz)})</span>` : ""}</td><td>Ausgabe</td><td>${moneyOnly(r.value)}</td></tr>`;
+      });
+      customTable += `<tr><td class="subsum" colspan="2">Zwischensumme eigene Ausgaben</td><td class="subsum">${moneyOnly(ce.aus)}</td></tr>`;
+    }
+    customTable += `</table>`;
+  }
+
+  const totalEin = einR.sum + hhSum + ce.ein;
+  const totalAus = ausR.sum + ce.aus;
+  const saldo = totalEin - totalAus;
 
   const note = ans("anmerkung", "notes");
-  let noteSection = "";
-  if (!note.skipped && note.value) {
-    const noteHtml = note.value.split("\n").map(l => `<p>${esc(l) || "&nbsp;"}</p>`).join("");
-    noteSection = `<h2>${hhFiltered.length > 0 ? "6" : "5"}. Anmerkungen / Erläuterungen</h2>${noteHtml}`;
-  }
+  const noteHtml = (!note.skipped && note.value)
+    ? note.value.split("\n").map(l => `<p>${esc(l) || "&nbsp;"}</p>`).join("")
+    : "";
 
   // Build saldo table - compact overview listing every area subtotal,
   // then the grand totals and the resulting surplus / shortfall.
@@ -8200,52 +8283,59 @@ function renderPrintEAR() {
   let saldoTable = `<table>
       <tr><th style="width:70%">Position</th><th>Betrag (EUR)</th></tr>
       <tr><td class="subhead" colspan="2">EINNAHMEN</td></tr>`;
-  if (einR.groupSums.length === 0) {
+  if (einR.groupSums.length === 0 && !hasHHsaldo && ce.ein === 0) {
     saldoTable += `<tr><td colspan="2" style="text-align:center; color:#888; font-style:italic;">(keine Einträge)</td></tr>`;
   } else {
     einR.groupSums.forEach(g => {
       saldoTable += `<tr><td>${esc(g.title)}</td><td>${moneyOnly(g.sum)}</td></tr>`;
     });
   }
+  if (ce.ein > 0) saldoTable += `<tr><td>Eigene Einträge (Einnahmen)</td><td>${moneyOnly(ce.ein)}</td></tr>`;
   if (hasHHsaldo) {
-    saldoTable += `<tr><td class="subsum">Deine Einnahmen gesamt</td><td class="subsum">${moneyOnly(einR.sum)}</td></tr>`;
+    saldoTable += `<tr><td class="subsum">Deine Einnahmen gesamt</td><td class="subsum">${moneyOnly(einR.sum + ce.ein)}</td></tr>`;
     saldoTable += `<tr><td>Einnahmen weiterer Haushaltsmitglieder</td><td>${moneyOnly(hhSum)}</td></tr>`;
     saldoTable += `<tr><td class="subsum">Gesamteinnahmen Haushalt</td><td class="subsum">${moneyOnly(totalEin)}</td></tr>`;
   } else {
-    saldoTable += `<tr><td class="subsum">Gesamteinnahmen</td><td class="subsum">${moneyOnly(einR.sum)}</td></tr>`;
+    saldoTable += `<tr><td class="subsum">Gesamteinnahmen</td><td class="subsum">${moneyOnly(totalEin)}</td></tr>`;
   }
   saldoTable += `<tr><td class="subhead" colspan="2">AUSGABEN</td></tr>`;
-  if (ausR.groupSums.length === 0) {
+  if (ausR.groupSums.length === 0 && ce.aus === 0) {
     saldoTable += `<tr><td colspan="2" style="text-align:center; color:#888; font-style:italic;">(keine Einträge)</td></tr>`;
   } else {
     ausR.groupSums.forEach(g => {
       saldoTable += `<tr><td>${esc(g.title)}</td><td>${moneyOnly(g.sum)}</td></tr>`;
     });
   }
-  saldoTable += `<tr><td class="subsum">Gesamtausgaben${hasHHsaldo ? " Haushalt" : ""}</td><td class="subsum">${moneyOnly(ausR.sum)}</td></tr>`;
+  if (ce.aus > 0) saldoTable += `<tr><td>Eigene Einträge (Ausgaben)</td><td>${moneyOnly(ce.aus)}</td></tr>`;
+  saldoTable += `<tr><td class="subsum">Gesamtausgaben${hasHHsaldo ? " Haushalt" : ""}</td><td class="subsum">${moneyOnly(totalAus)}</td></tr>`;
   saldoTable += `<tr><td class="sum">ÜBERSCHUSS / FEHLBETRAG${hasHHsaldo ? " (Haushalt)" : ""}</td><td class="sum" style="color:${saldo >= 0 ? '#5BA572' : '#dc2626'}">${moneyOnly(saldo)}</td></tr>
     </table>`;
 
-  // Build sections with dynamic numbering
-  const hhSection = hhFiltered.length > 0 ? `<h2>3. Einnahmen weiterer Haushaltsmitglieder</h2>${hhTable}<div class="pagebreak"></div>` : "";
-  const ausNum = hhFiltered.length > 0 ? "4" : "3";
-  const saldoNum = hhFiltered.length > 0 ? "5" : "4";
-
-  return `
+  // Assemble document with sequential section numbering
+  let secNum = 0;
+  const N = () => ++secNum;
+  let out = `
     <h1>Einnahmen-Ausgaben-Rechnung</h1>
     <div class="subtitle">für die Bewährungshilfe</div>
-    <h2>1. Persönliche Angaben</h2>${infoTable}
-    <h2>2. Deine Einnahmen</h2>${einR.html}
-    <div class="pagebreak"></div>
-    ${hhSection}
-    <h2>${ausNum}. Ausgaben${hhFiltered.length > 0 ? " (Haushalt gesamt)" : ""}</h2>${ausR.html}
-    <div class="pagebreak"></div>
-    <h2>${saldoNum}. Zusammenfassung / Saldo</h2>
-    ${saldoTable}
-    ${noteSection}
+    <h2>${N()}. Persönliche Angaben</h2>${infoTable}
+    <h2>${N()}. Deine Einnahmen</h2>${einR.html}
+    <div class="pagebreak"></div>`;
+  if (hhFiltered.length > 0) {
+    out += `<h2>${N()}. Einnahmen weiterer Haushaltsmitglieder</h2>${hhTable}<div class="pagebreak"></div>`;
+  }
+  out += `<h2>${N()}. Ausgaben${hhFiltered.length > 0 ? " (Haushalt gesamt)" : ""}</h2>${ausR.html}<div class="pagebreak"></div>`;
+  if (hasCustom) {
+    out += `<h2>${N()}. Eigene Einträge</h2>${customTable}<div class="pagebreak"></div>`;
+  }
+  out += `<h2>${N()}. Zusammenfassung / Saldo</h2>${saldoTable}`;
+  if (noteHtml) {
+    out += `<h2>${N()}. Anmerkungen / Erläuterungen</h2>${noteHtml}`;
+  }
+  out += `
     ${renderPrintSignatures("ear", { counterRoleLabel: "Bestätigung (optional)", probandLabel: "Eintragen durch (Proband:in)", hideIfEmpty: false })}
     <p style="font-size:8pt; font-style:italic; color:#666; margin-top:8pt;">Ich versichere, dass die vorstehenden Angaben vollständig und wahrheitsgemäß sind.</p>
   `;
+  return out;
 }
 
 function renderPrintZeit() {
@@ -9675,21 +9765,38 @@ async function buildEarDocx() {
     return new D.Table({ width: { size: c1+c2+c3+c4, type: D.WidthType.DXA }, columnWidths: [c1,c2,c3,c4], rows });
   }
 
-  const totalEin = ein.sum + hhSum;
-  const saldo = totalEin - aus.sum;
+  const ce = customEntryTotals();
+  const hasCustom = ce.einRows.length > 0 || ce.ausRows.length > 0;
+  const totalEin = ein.sum + hhSum + ce.ein;
+  const totalAus = aus.sum + ce.aus;
+  const saldo = totalEin - totalAus;
+  // Custom entries table rows (for moneyTbl)
+  const customRows = [];
+  if (ce.einRows.length > 0) {
+    customRows.push({ label: "EIGENE EINNAHMEN", value: "", sub: true });
+    ce.einRows.forEach(r => customRows.push({ label: r.label + (r.notiz ? "  (" + r.notiz + ")" : ""), value: moneyOnly(r.value) }));
+    customRows.push({ label: "Zwischensumme eigene Einnahmen", value: moneyOnly(ce.ein), subsum: true });
+  }
+  if (ce.ausRows.length > 0) {
+    customRows.push({ label: "EIGENE AUSGABEN", value: "", sub: true });
+    ce.ausRows.forEach(r => customRows.push({ label: r.label + (r.notiz ? "  (" + r.notiz + ")" : ""), value: moneyOnly(r.value) }));
+    customRows.push({ label: "Zwischensumme eigene Ausgaben", value: moneyOnly(ce.aus), subsum: true });
+  }
   const saldoRows = [];
   saldoRows.push({ label: "EINNAHMEN", value: "", sub: true });
   ein.groupSums.forEach(g => saldoRows.push({ label: g.title, value: moneyOnly(g.sum) }));
+  if (ce.ein > 0) saldoRows.push({ label: "Eigene Einträge (Einnahmen)", value: moneyOnly(ce.ein) });
   if (hasHH) {
-    saldoRows.push({ label: "Deine Einnahmen gesamt", value: moneyOnly(ein.sum), subsum: true });
+    saldoRows.push({ label: "Deine Einnahmen gesamt", value: moneyOnly(ein.sum + ce.ein), subsum: true });
     saldoRows.push({ label: "Einnahmen weiterer Haushaltsmitglieder", value: moneyOnly(hhSum) });
     saldoRows.push({ label: "Gesamteinnahmen Haushalt", value: moneyOnly(totalEin), subsum: true });
   } else {
-    saldoRows.push({ label: "Gesamteinnahmen", value: moneyOnly(ein.sum), subsum: true });
+    saldoRows.push({ label: "Gesamteinnahmen", value: moneyOnly(totalEin), subsum: true });
   }
   saldoRows.push({ label: "AUSGABEN", value: "", sub: true });
   aus.groupSums.forEach(g => saldoRows.push({ label: g.title, value: moneyOnly(g.sum) }));
-  saldoRows.push({ label: "Gesamtausgaben" + (hasHH ? " Haushalt" : ""), value: moneyOnly(aus.sum), subsum: true });
+  if (ce.aus > 0) saldoRows.push({ label: "Eigene Einträge (Ausgaben)", value: moneyOnly(ce.aus) });
+  saldoRows.push({ label: "Gesamtausgaben" + (hasHH ? " Haushalt" : ""), value: moneyOnly(totalAus), subsum: true });
   saldoRows.push({ label: "ÜBERSCHUSS / FEHLBETRAG" + (hasHH ? " (Haushalt)" : ""), value: moneyOnly(saldo), sum: true });
 
   const noteVal = v("anmerkung", "notes");
@@ -9708,6 +9815,10 @@ async function buildEarDocx() {
   children.push(new D.Paragraph({ children: [new D.PageBreak()] }));
   children.push(docxH1(`${secNum++}. Ausgaben${hasHH ? " (Haushalt gesamt)" : ""}`), moneyTbl(aus.rows));
   children.push(new D.Paragraph({ children: [new D.PageBreak()] }));
+  if (hasCustom) {
+    children.push(docxH1(`${secNum++}. Eigene Einträge`), moneyTbl(customRows));
+    children.push(new D.Paragraph({ children: [new D.PageBreak()] }));
+  }
   children.push(docxH1(`${secNum++}. Zusammenfassung / Saldo`), moneyTbl(saldoRows));
 
   if (!noteVal.skipped && noteVal.value) {
