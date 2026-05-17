@@ -365,6 +365,12 @@ Custom License – siehe [LICENSE](LICENSE).
 
 ## 📜 Changelog
 
+### v3.17 (Mai 2026) – Bugfix Word- und ZIP-Export
+- 🐛 **Word-Export und „Teilen" repariert:** Die Word-Bibliothek wurde unter einer veralteten Adresse geladen (Dateiname hatte sich geändert). Word-Dokumente, ZIP-Bundles und Teilen funktionieren wieder.
+- 🌐 **Drei CDN-Quellen mit automatischem Fallback:** Wenn ein CDN nicht erreichbar ist, wird automatisch das nächste probiert (jsDelivr → unpkg → cdnjs)
+- ✅ Geladene Bibliothek wird auf Funktionsfähigkeit geprüft, bevor sie genutzt wird
+- 💬 Bei Fehler: klare Meldung mit Hinweis auf „Drucken / als PDF" als Alternative ohne Internet
+
 ### v3.16 (Mai 2026) – Bugfix Druckansicht + Belege-Checkbox
 - 🐛 **Wichtiger Bugfix:** Buttons in der Druckansicht (Teilen / ZIP / Drucken) reagierten teils nicht - ein unsichtbares Overlay konnte Klicks abfangen. Behoben.
 - 📎 **Belege mitdrucken** ist jetzt eine klare, gut sichtbare Checkbox in der Druckansicht - statt eines unscheinbaren Knopfes
@@ -444,5 +450,5 @@ Custom License – siehe [LICENSE](LICENSE).
 
 ---
 
-**Aktuelle Version:** v3.16
+**Aktuelle Version:** v3.17
 **Letztes Update:** Mai 2026
