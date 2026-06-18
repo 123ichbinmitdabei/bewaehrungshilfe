@@ -5342,7 +5342,7 @@ let showArchived = false;
 function toggleShowArchived() { showArchived = !showArchived; render(); }
 
 // === VERSION INFO ===
-const APP_VERSION = "v3.35";
+const APP_VERSION = "v3.37";
 
 // === ONBOARDING ===
 let onboardingActive = false;
@@ -6137,11 +6137,9 @@ async function loadAllState() {
       if (parsed && typeof parsed === "object") state.terminPrep = parsed;
     } catch(e){}
   }
-  // Stammdaten <-> Adressbuch synchronisieren (v3.33)
-  try { syncSharedToContacts(); } catch(e){}
-  // Universal Data Sync (v3.35): einmaliger Reconcile aller Sync-Gruppen,
-  // damit fehlende Werte aus parallelen Quellen befüllt werden
-  try { reconcileAllSyncGroups(); } catch(e){}
+  // Universal Data Sync: zuerst Reconcile (Doc -> shared), dann Sync (shared -> Adressbuch)
+  try { reconcileAllSyncGroups(); } catch(e){ console.error("reconcile failed:", e); }
+  try { syncSharedToContacts(); } catch(e){ console.error("syncSharedToContacts failed:", e); }
   // Load backup reminder state
   const reminderRaw = await Storage.get(BACKUP_REMINDER_KEY);
   if (reminderRaw) {
@@ -7705,99 +7703,79 @@ function updateContactField(id, field, value) {
   }
 }
 function deleteContact(id) {
-  const c = (state.contacts || []).find(x => x.id === id);
-  if (!c) return;
-  confirmAction({
-    title: "Kontakt löschen?",
-    message: "Möchtest du „" + (c.name || c.firma || "diesen Kontakt") + "“ wirklich löschen?",
-    confirmLabel: "🗑 Löschen",
-    danger: true,
-    onConfirm: async () => {
-      // Pending debounced-save abbrechen
-      clearTimeout(updateContactField._t);
-      state.contacts = (state.contacts || []).filter(c => c.id !== id);
-      await saveContacts();
-      render();
-      showSaveToast("Kontakt gelöscht");
-    },
-  });
+  // Zweistufiger Klick: erst-Klick markiert, zweiter Klick innerhalb 3s löscht.
+  // Robuster als Modal (das auf manchen PWAs nicht erschien).
+  if (state.pendingDeleteContactId === id) {
+    // Wirklich löschen
+    clearTimeout(updateContactField._t);
+    clearTimeout(state._pendingDeleteContactTimer);
+    state.pendingDeleteContactId = null;
+    state.contacts = (state.contacts || []).filter(c => c.id !== id);
+    saveContacts();
+    showSaveToast("Kontakt gelöscht");
+    render();
+  } else {
+    // Erst-Klick: rot werden
+    state.pendingDeleteContactId = id;
+    clearTimeout(state._pendingDeleteContactTimer);
+    state._pendingDeleteContactTimer = setTimeout(() => {
+      if (state.pendingDeleteContactId === id) {
+        state.pendingDeleteContactId = null;
+        render();
+      }
+    }, 3000);
+    render();
+  }
 }
 
 // ── Universal Data Sync: Doc-Felder <-> Shared <-> Adressbuch ──────────────
 // Eine zentrale Quelle der Wahrheit. Wenn der User irgendwo (Doc, Stammdaten,
 // Adressbuch) ein Feld ändert, propagiert die Änderung automatisch in alle
-// gemappten Stellen. Reduziert Doppel-Erfassung drastisch.
+// gemappten Stellen.
 //
-// Format: Array von Mappings, jedes mappt eine Reihe paralleler Felder.
-// Wenn eines davon geändert wird, werden die anderen mit demselben Wert
-// überschrieben (nur wenn nicht leer; leere Felder werden befüllt aus
-// den nicht-leeren Counterparts).
-//
-// Feld-Adresse: 
-//   { type: "shared", key: "..." }  → state.shared[key]
-//   { type: "doc", docId: "...", key: "..." }  → state.docs[docId].answers[key]
-//
+// WICHTIG: Die docId+key müssen EXAKT zu den tatsächlichen Doc-Sections und
+// Field-IDs passen (Format: `${sectionId}.${fieldId}`). Sonst kein Sync.
 const DATA_SYNC_GROUPS = [
-  // BH-Daten
-  {
-    name: "Bewährungshelfer:in",
-    fields: [
-      { type: "shared", key: "bewaehrungshelfer" },
-    ],
-  },
-  // Anwalt
-  {
-    name: "Anwalt-Name",
-    fields: [
-      { type: "shared", key: "anwalt" },
-    ],
-  },
-  // Therapeut
+  // ── Therapeut (thera-Doc, section briefkopf) ──
   {
     name: "Therapeut-Name",
     fields: [
       { type: "shared", key: "therapeut" },
-      { type: "doc", docId: "thera", key: "therapeut.name" },
+      { type: "doc", docId: "thera", key: "briefkopf.name" },
     ],
   },
   {
     name: "Therapeut-Telefon",
     fields: [
       { type: "shared", key: "therapeut_telefon" },
-      { type: "doc", docId: "thera", key: "therapeut.telefon" },
+      { type: "doc", docId: "thera", key: "briefkopf.tel" },
     ],
   },
   {
     name: "Therapeut-Email",
     fields: [
       { type: "shared", key: "therapeut_email" },
-      { type: "doc", docId: "thera", key: "therapeut.email" },
+      { type: "doc", docId: "thera", key: "briefkopf.email" },
     ],
   },
   {
     name: "Therapeut-Anschrift",
     fields: [
       { type: "shared", key: "therapeut_anschrift" },
-      { type: "doc", docId: "thera", key: "therapeut.anschrift" },
+      { type: "doc", docId: "thera", key: "briefkopf.praxis" },
     ],
   },
-  // Arbeitgeber
+
+  // ── Anwalt (kosten-Doc, section anwaltskosten) ──
   {
-    name: "Arbeitgeber-Firma",
+    name: "Anwalt-Name",
     fields: [
-      { type: "shared", key: "arbeitgeber" },
-      { type: "doc", docId: "ear", key: "arbeit.arbeitgeber" },
-      { type: "doc", docId: "kosten", key: "erklaerung_wirtschaft.arbeitgeber" },
+      { type: "shared", key: "anwalt" },
+      { type: "doc", docId: "kosten", key: "anwaltskosten.verteidiger_name" },
     ],
   },
-  {
-    name: "Arbeitgeber-Lohn-Netto",
-    fields: [
-      { type: "shared", key: "arbeit_lohn_netto" },
-      { type: "doc", docId: "ear", key: "arbeit.lohn" },
-    ],
-  },
-  // Gerichtskasse (Verfahrenskosten)
+
+  // ── Gerichtskasse (kosten-Doc, section verfahren) ──
   {
     name: "Gerichtskasse-Behörde",
     fields: [
@@ -7819,12 +7797,20 @@ const DATA_SYNC_GROUPS = [
       { type: "doc", docId: "kosten", key: "verfahren.az_landesjustizkasse" },
     ],
   },
-  // Staatsanwaltschaft
+
+  // ── Staatsanwaltschaft (kosten-Doc, section verfahren) ──
   {
-    name: "Staatsanwaltschaft",
+    name: "Staatsanwaltschaft-Behörde",
     fields: [
       { type: "shared", key: "staatsanwaltschaft" },
-      { type: "doc", docId: "kosten", key: "verfahren.behoerde_staatsanwaltschaft" },
+      { type: "doc", docId: "kosten", key: "verfahren.behoerde_sta" },
+    ],
+  },
+  {
+    name: "Staatsanwaltschaft-Anschrift",
+    fields: [
+      { type: "shared", key: "staatsanwaltschaft_anschrift" },
+      { type: "doc", docId: "kosten", key: "verfahren.behoerde_sta_anschrift" },
     ],
   },
   {
@@ -7834,14 +7820,6 @@ const DATA_SYNC_GROUPS = [
       { type: "doc", docId: "kosten", key: "verfahren.az_sta" },
     ],
   },
-  // Gericht
-  {
-    name: "Gericht",
-    fields: [
-      { type: "shared", key: "gericht" },
-      { type: "doc", docId: "kosten", key: "verfahren.behoerde_gericht" },
-    ],
-  },
   {
     name: "Aktenzeichen Gericht",
     fields: [
@@ -7849,26 +7827,20 @@ const DATA_SYNC_GROUPS = [
       { type: "doc", docId: "kosten", key: "verfahren.az_gericht" },
     ],
   },
-  // Stammdaten klassisch
+
+  // ── Arbeitgeber (kosten-Doc, section erklaerung_wirtschaft) ──
   {
-    name: "Name",
+    name: "Arbeitgeber-Firma",
     fields: [
-      { type: "shared", key: "name" },
-      { type: "doc", docId: "kosten", key: "erklaerung_wirtschaft.name" },
+      { type: "shared", key: "arbeitgeber" },
+      { type: "doc", docId: "kosten", key: "erklaerung_wirtschaft.arbeitgeber" },
     ],
   },
   {
-    name: "Anschrift",
+    name: "Arbeit-Lohn-Netto",
     fields: [
-      { type: "shared", key: "anschrift" },
-      { type: "doc", docId: "kosten", key: "erklaerung_wirtschaft.anschrift" },
-    ],
-  },
-  {
-    name: "Geburtsdatum",
-    fields: [
-      { type: "shared", key: "geburtsdatum" },
-      { type: "doc", docId: "kosten", key: "erklaerung_wirtschaft.geburtsdatum" },
+      { type: "shared", key: "arbeit_lohn_netto" },
+      { type: "doc", docId: "ear", key: "arbeit.lohn" },
     ],
   },
 ];
@@ -8056,6 +8028,8 @@ function syncContactToShared(contact) {
 function syncSharedToContacts() {
   if (!state.contacts) state.contacts = [];
   const s = state.shared || {};
+  let added = 0, updated = 0;
+  const addedRoles = [];
   Object.entries(CONTACT_SHARED_MAP).forEach(([rolle, fieldMap]) => {
     // Werte aus shared sammeln
     const values = {};
@@ -8078,17 +8052,57 @@ function syncSharedToContacts() {
         notiz: "Automatisch aus Stammdaten erstellt",
       };
       state.contacts.unshift(contact);
+      added++;
+      addedRoles.push(rolle);
     } else {
       // shared ist die "Quelle" — alle gesetzten Werte werden übernommen
+      let didUpdate = false;
       Object.entries(values).forEach(([contactField, val]) => {
-        if (val) contact[contactField] = val;
+        if (val && contact[contactField] !== val) {
+          contact[contactField] = val;
+          didUpdate = true;
+        }
       });
+      if (didUpdate) updated++;
     }
   });
   saveContacts();
+  return { added, updated, addedRoles };
+}
+
+// Manueller Sync-Knopf: läuft alles + zeigt klares Feedback (Toast).
+// Diagnose: wenn nichts gefunden wird, sagt es das auch.
+function manualSyncFromDocs() {
+  try {
+    const reconcileChanges = reconcileAllSyncGroups();
+    const result = syncSharedToContacts();
+    const roleLabels = { bh:"Bewährungshelfer:in", anwalt:"Anwalt", therapeut:"Therapeut:in",
+      gerichtskasse:"Gerichtskasse", staatsanwaltschaft:"Staatsanwaltschaft", gericht:"Gericht",
+      jobcenter:"Jobcenter", sozialberatung:"Soziale Beratung", arbeitgeber:"Arbeitgeber", polizei:"Polizei" };
+    let msg;
+    if (result.added > 0) {
+      const names = result.addedRoles.map(r => roleLabels[r] || r).join(", ");
+      msg = result.added + (result.added === 1 ? " neuer Kontakt" : " neue Kontakte") + ": " + names;
+    } else if (result.updated > 0) {
+      msg = result.updated + (result.updated === 1 ? " Kontakt" : " Kontakte") + " aktualisiert";
+    } else if (reconcileChanges > 0) {
+      msg = "Sync OK, " + reconcileChanges + " Felder zwischen Docs+Stammdaten abgeglichen";
+    } else {
+      msg = "Keine neuen Personendaten in deinen Dokumenten gefunden. Trag erst was im Wizard ein.";
+    }
+    showSaveToast(msg);
+    render();
+  } catch(e) {
+    showSaveToast("Sync-Fehler: " + e.message);
+    console.error("manualSyncFromDocs:", e);
+  }
 }
 
 function renderContactsView() {
+  // Bei jedem Render: zuerst Adressbuch aus shared rekonstruieren - so sieht
+  // der User immer aktuelle Daten, egal woher sie kamen (Doc, Onboarding, ...).
+  try { reconcileAllSyncGroups(); } catch(e){}
+  try { syncSharedToContacts(); } catch(e){}
   const contacts = state.contacts || [];
   let body = "";
   if (contacts.length === 0) {
@@ -8125,7 +8139,9 @@ function renderContactsView() {
             <textarea oninput="updateContactField('${c.id}','anschrift',this.value)" placeholder="Anschrift (Straße, PLZ Ort)" rows="2" style="width:100%; padding:7px 10px; border:1px solid var(--border); border-radius:6px; font-size:13px; background:var(--input-bg); color:var(--text); margin-top:6px; resize:vertical;">${esc(c.anschrift || "")}</textarea>
             <textarea oninput="updateContactField('${c.id}','notiz',this.value)" placeholder="Notizen (z.B. Sprechzeiten, Aktenzeichen, Bemerkungen)" rows="2" style="width:100%; padding:7px 10px; border:1px solid var(--border); border-radius:6px; font-size:12px; background:var(--input-bg); color:var(--text); margin-top:6px; resize:vertical;">${esc(c.notiz || "")}</textarea>
             <div style="display:flex; gap:6px; margin-top:8px; justify-content:flex-end;">
-              <button class="btn btn-secondary" style="font-size:12px; padding:5px 10px;" onclick="deleteContact('${c.id}')">🗑 Löschen</button>
+              ${state.pendingDeleteContactId === c.id
+                ? `<button class="btn" style="font-size:12px; padding:5px 10px; background:var(--danger); color:#fff; font-weight:600;" onclick="deleteContact('${c.id}')">❓ Wirklich löschen? (nochmal klicken)</button>`
+                : `<button class="btn btn-secondary" style="font-size:12px; padding:5px 10px;" onclick="deleteContact('${c.id}')">🗑 Löschen</button>`}
             </div>
           </div>`;
       });
@@ -8145,6 +8161,16 @@ function renderContactsView() {
         <div class="sub">Wichtige Ansprechpartner — werden in Briefen automatisch verwendet</div>
       </div>
       <button class="btn btn-secondary" onclick="goHome()">← Zur Übersicht</button>
+    </div>
+    <div style="background:linear-gradient(135deg, var(--primary-soft), var(--card)); border:2px solid var(--primary); border-radius:12px; padding:14px; margin-bottom:14px;">
+      <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+        <span style="font-size:24px;">🔄</span>
+        <div style="flex:1; min-width:180px;">
+          <div style="font-weight:600; font-size:14px;">Daten aus Dokumenten holen</div>
+          <div style="font-size:12px; color:var(--text-soft); margin-top:2px;">Therapeut, Anwalt, Gerichtskasse, Staatsanwaltschaft … aus deinen Wizards übernehmen</div>
+        </div>
+        <button class="btn btn-primary" onclick="manualSyncFromDocs()" style="font-weight:600;">🔄 Jetzt aktualisieren</button>
+      </div>
     </div>
     <div style="background:var(--card); border:1px solid var(--border); border-radius:12px; padding:14px; margin-bottom:14px;">
       <div style="font-size:12px; color:var(--text-soft); margin-bottom:8px;">+ Neuer Kontakt:</div>
@@ -8491,22 +8517,27 @@ function updateCustomTemplateText(key, text) {
   updateCustomTemplateText._t = setTimeout(() => saveCustomTemplates(), 400);
 }
 function deleteCustomTemplate(key) {
-  const tpl = state.customTemplates?.[key];
-  const title = tpl?.title || key;
-  confirmAction({
-    title: "Eigene Vorlage löschen?",
-    message: "Möchtest du die Vorlage „" + title + "“ wirklich löschen?",
-    confirmLabel: "🗑 Löschen",
-    danger: true,
-    onConfirm: () => {
-      if (state.customTemplates) delete state.customTemplates[key];
-      delete ANSCHREIBEN_TEMPLATES[key];
-      saveCustomTemplates();
-      if (activeAnschreiben === key) activeAnschreiben = null;
-      showSaveToast("Vorlage gelöscht");
-      render();
-    },
-  });
+  // Zweistufiger Klick statt Modal
+  if (state.pendingDeleteTplKey === key) {
+    clearTimeout(state._pendingDeleteTplTimer);
+    state.pendingDeleteTplKey = null;
+    if (state.customTemplates) delete state.customTemplates[key];
+    delete ANSCHREIBEN_TEMPLATES[key];
+    saveCustomTemplates();
+    if (activeAnschreiben === key) activeAnschreiben = null;
+    showSaveToast("Vorlage gelöscht");
+    render();
+  } else {
+    state.pendingDeleteTplKey = key;
+    clearTimeout(state._pendingDeleteTplTimer);
+    state._pendingDeleteTplTimer = setTimeout(() => {
+      if (state.pendingDeleteTplKey === key) {
+        state.pendingDeleteTplKey = null;
+        render();
+      }
+    }, 3000);
+    render();
+  }
 }
 // Wird beim App-Start aufgerufen, registriert alle gespeicherten Custom-Vorlagen
 // in ANSCHREIBEN_TEMPLATES.
@@ -11133,19 +11164,24 @@ async function _doPrintAnschreiben(text, tpl) {
   const oldTitle = document.title;
   document.title = tpl.title + " — " + (state.shared?.name || "");
 
-  // Drucken — Browser-eigener Dialog
-  try {
-    window.print();
-  } catch(e) {
-    alert("Drucken fehlgeschlagen: " + e.message);
-  }
+  // Force Reflow + delayed print (siehe openPrintWindow)
+  void container.offsetHeight;
+  requestAnimationFrame(() => {
+    setTimeout(() => {
+      try {
+        window.print();
+      } catch(e) {
+        alert("Drucken fehlgeschlagen: " + e.message);
+      }
+    }, 100);
+  });
 
-  // Nach Druckdialog (ob OK oder Abbruch): aufräumen
+  // Nach Druckdialog: aufräumen
   setTimeout(() => {
     document.title = oldTitle;
     const c = document.getElementById("inline-print-container");
     if (c) c.remove();
-  }, 500);
+  }, 2000);
 
   if (activeAnschreiben) recordBriefSent(activeAnschreiben, "drucken");
 }
@@ -11572,7 +11608,9 @@ function renderAnschreibenView() {
             <button class="btn btn-secondary" onclick="downloadAnschreibenTxt()">💾 Als Text-Datei</button>
             <button class="btn btn-primary" onclick="printAnschreiben()">🖨 Drucken / als PDF${selectedIds.size > 0 ? ` (mit ${selectedIds.size} Anhang${selectedIds.size === 1 ? "" : "en"})` : ""}</button>
             ${state.shared.bh_email ? `<button class="btn btn-secondary" onclick="emailAnschreiben()">📧 Per Mail</button>` : ""}
-            ${isCustomTpl ? `<button class="btn btn-secondary" onclick="deleteCustomTemplate('${activeAnschreiben}')" style="margin-left:auto; color:var(--danger);">🗑 Vorlage löschen</button>` : ""}
+            ${isCustomTpl ? (state.pendingDeleteTplKey === activeAnschreiben
+              ? `<button class="btn" onclick="deleteCustomTemplate('${activeAnschreiben}')" style="margin-left:auto; background:var(--danger); color:#fff; font-weight:600;">❓ Wirklich löschen? (nochmal klicken)</button>`
+              : `<button class="btn btn-secondary" onclick="deleteCustomTemplate('${activeAnschreiben}')" style="margin-left:auto; color:var(--danger);">🗑 Vorlage löschen</button>`) : ""}
           </div>
         </div>`;
     }
@@ -11646,6 +11684,9 @@ function renderOnboardingModal() {
 }
 
 function renderWizard() {
+  // Vor dem Wizard-Render: Sync-Felder aus shared in das Doc übernehmen,
+  // damit Werte aus Adressbuch / Stammdaten / anderen Docs sichtbar sind.
+  try { reconcileAllSyncGroups(); } catch(e){}
   const doc = DOCS[state.activeDocId];
   const ds = getDocState();
   // Defensive: clamp index in case it's out of bounds
@@ -12239,89 +12280,95 @@ async function confirmAndPrint() {
 }
 
 function openPrintWindow(pv, id) {
-  const isLandscape = pv.classList.contains("landscape-mode");
+  // Inline-Print statt window.open() - Pop-up-Blocker (iOS/Safari/PWA) hatten
+  // das alte Verfahren regelmäßig blockiert. Wir injizieren den Inhalt jetzt
+  // in den DOM der aktuellen Seite; @media print im app-CSS blendet alle
+  // anderen Elemente aus.
   const docTitle = (DOCS[id] && DOCS[id].title) || "Dokument";
-  const printCss = `
-    * { box-sizing: border-box; }
-    body { font-family: Arial, Helvetica, sans-serif; font-size: 10pt; color: #000; background: #fff; margin: 0; padding: 1.2cm; }
-    h1 { font-size: 18pt; color: #1F3864; text-align: center; margin: 0 0 4pt; }
-    .subtitle { font-size: 11pt; color: #555; font-style: italic; text-align: center; margin-bottom: 16pt; }
-    h2 { font-size: 12pt; color: #fff; background: #2E5984; padding: 4pt 8pt; margin: 12pt 0 6pt; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    table { border-collapse: collapse; width: 100%; margin-bottom: 8pt; }
-    td, th { border: 1px solid #999; padding: 4pt 6pt; vertical-align: top; font-size: 9pt; line-height: 1.35; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    th { background: #B8CCE4; font-weight: bold; text-align: left; }
-    td.label { background: #F2F2F2; font-weight: bold; width: 30%; }
-    td.subhead { background: #DDEBF7; font-weight: bold; }
-    td.sum { background: #FFF2CC; font-weight: bold; }
-    .strike { text-decoration: line-through; color: #888; }
-    .pagebreak { page-break-before: always; break-before: page; }
-    .signature { display: grid; grid-template-columns: 1fr 1fr; gap: 30pt; margin-top: 50pt; }
-    .signature > div { border-top: 1px solid #999; padding-top: 4pt; font-size: 8pt; color: #666; }
-    .signature img { max-height: 60pt; }
-    .checkbox-list { line-height: 1.6; }
-    .checkbox-list .item { margin-bottom: 2pt; }
-    .empty-line { border-bottom: 1px solid #ccc; height: 16pt; margin-bottom: 4pt; }
-    .briefkopf { border: 2pt solid #2E5984; padding: 16pt; background: #F8F9FB; margin-bottom: 18pt; text-align: center; min-height: 80pt; }
-    .briefkopf .label { font-size: 9pt; font-style: italic; color: #888; }
-    .attachment-page { page-break-before: always; padding-top: 20pt; text-align: center; page-break-inside: avoid; }
-    .attachment-page img { max-width: 100%; max-height: 80vh; border: 1px solid #999; }
-    .attachment-caption { font-size: 10pt; color: #555; margin-top: 8pt; font-style: italic; }
-    .attachment-pdf-note { border: 1pt dashed #999; padding: 12pt; margin-top: 8pt; font-size: 10pt; color: #555; }
-    .verification-footer { margin-top: 20pt; }
-    .verification-footer h2 { margin-top: 0; }
-    .sig-inline-img { max-height: 48pt; display: block; }
-    img { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    @page { size: A4${isLandscape ? " landscape" : ""}; margin: 1.5cm; }
-    /* On-screen print controls - hidden when actually printing */
-    .print-controls {
-      position: fixed; top: 0; left: 0; right: 0;
-      background: #2E5984; color: #fff; padding: 10px 16px;
-      display: flex; gap: 10px; align-items: center; justify-content: center;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.2); z-index: 9999;
-    }
-    .print-controls button {
-      background: #fff; color: #2E5984; border: none; padding: 8px 18px;
-      border-radius: 6px; font-weight: 700; font-size: 14px; cursor: pointer;
-    }
-    .print-controls span { font-size: 13px; }
-    body.has-controls { padding-top: 70px; }
-    @media print { .print-controls { display: none !important; } body.has-controls { padding-top: 1.2cm; } }
-  `;
-  // Auto-Print entfernt - der Browser blockiert das oft mit Pop-up-Blocker,
-  // und der User sieht dann nur die Vorschau ohne Drucken-Dialog. Stattdessen
-  // klare Toolbar mit Drucken-Knopf.
-  const printScript = "// print on user click via toolbar";
-  const controlsBar =
-    '<div class="print-controls">' +
-    '<span>📄 Druckvorschau</span>' +
-    '<button onclick="window.print()">🖨 Drucken / als PDF</button>' +
-    '<button onclick="window.close()">Schließen</button>' +
-    '</div>';
-  const win = window.open("", "_blank");
-  if (!win) {
-    try { window.print(); } catch (e) {
-      alert("Das Druckfenster wurde vom Browser blockiert. Bitte Pop-ups für diese Seite erlauben - oder direkt mit Strg+P drucken.");
-    }
+
+  // CSS für die Print-Ansicht (wird inline mitgegeben, gilt nur unter
+  // @media print weil der Container sonst display:none ist)
+  const printCss =
+    '<style id="inline-doc-print-css">' +
+    '@media print {' +
+      '#inline-print-container.doc-print h1 { font-size: 18pt; color: #1F3864; text-align: center; margin: 0 0 4pt; }' +
+      '#inline-print-container.doc-print .subtitle { font-size: 11pt; color: #555; font-style: italic; text-align: center; margin-bottom: 16pt; }' +
+      '#inline-print-container.doc-print h2 { font-size: 12pt; color: #fff; background: #2E5984; padding: 4pt 8pt; margin: 12pt 0 6pt; -webkit-print-color-adjust: exact; print-color-adjust: exact; }' +
+      '#inline-print-container.doc-print table { border-collapse: collapse; width: 100%; margin-bottom: 8pt; }' +
+      '#inline-print-container.doc-print td, #inline-print-container.doc-print th { border: 1px solid #999; padding: 4pt 6pt; vertical-align: top; font-size: 9pt; line-height: 1.35; -webkit-print-color-adjust: exact; print-color-adjust: exact; }' +
+      '#inline-print-container.doc-print th { background: #B8CCE4; font-weight: bold; text-align: left; }' +
+      '#inline-print-container.doc-print td.label { background: #F2F2F2; font-weight: bold; width: 30%; }' +
+      '#inline-print-container.doc-print td.subhead { background: #DDEBF7; font-weight: bold; }' +
+      '#inline-print-container.doc-print td.sum { background: #FFF2CC; font-weight: bold; }' +
+      '#inline-print-container.doc-print .strike { text-decoration: line-through; color: #888; }' +
+      '#inline-print-container.doc-print .pagebreak { page-break-before: always; break-before: page; }' +
+      '#inline-print-container.doc-print .signature { display: grid; grid-template-columns: 1fr 1fr; gap: 30pt; margin-top: 50pt; }' +
+      '#inline-print-container.doc-print .signature > div { border-top: 1px solid #999; padding-top: 4pt; font-size: 8pt; color: #666; }' +
+      '#inline-print-container.doc-print .signature img { max-height: 60pt; }' +
+      '#inline-print-container.doc-print .checkbox-list { line-height: 1.6; }' +
+      '#inline-print-container.doc-print .empty-line { border-bottom: 1px solid #ccc; height: 16pt; margin-bottom: 4pt; }' +
+      '#inline-print-container.doc-print .briefkopf { border: 2pt solid #2E5984; padding: 16pt; background: #F8F9FB; margin-bottom: 18pt; text-align: center; min-height: 80pt; -webkit-print-color-adjust: exact; print-color-adjust: exact; }' +
+      '#inline-print-container.doc-print .attachment-page { page-break-before: always; padding-top: 20pt; text-align: center; page-break-inside: avoid; }' +
+      '#inline-print-container.doc-print .attachment-page img { max-width: 100%; max-height: 80vh; border: 1px solid #999; }' +
+      '#inline-print-container.doc-print .attachment-caption { font-size: 10pt; color: #555; margin-top: 8pt; font-style: italic; }' +
+      (pv.classList.contains("landscape-mode") ? '@page { size: A4 landscape; margin: 1.2cm; }' : '@page { size: A4; margin: 1.2cm; }') +
+    '}' +
+    '</style>';
+
+  // Alten Container entfernen, neuen anhängen
+  const oldContainer = document.getElementById("inline-print-container");
+  if (oldContainer) oldContainer.remove();
+  const oldCss = document.getElementById("inline-doc-print-css");
+  if (oldCss) oldCss.remove();
+  document.head.insertAdjacentHTML("beforeend", printCss);
+
+  const container = document.createElement("div");
+  container.id = "inline-print-container";
+  container.classList.add("doc-print");
+  container.innerHTML = pv.innerHTML;
+  document.body.appendChild(container);
+
+  // Diagnose: wenn der Container leer ist, hat die Doc-Preview nichts gerendert
+  if (!container.innerHTML.trim()) {
+    container.remove();
+    const css = document.getElementById("inline-doc-print-css");
+    if (css) css.remove();
+    alert("Drucken nicht möglich: Doc-Vorschau ist leer. Bitte erst „👁 Anzeigen“ klicken und dann Drucken.");
     return;
   }
-  win.document.open();
-  win.document.write(
-    '<!DOCTYPE html><html lang="de"><head><meta charset="utf-8">' +
-    '<title>' + esc(docTitle) + '</title>' +
-    '<style>' + printCss + '</style>' +
-    '</head><body class="has-controls">' +
-    controlsBar +
-    pv.innerHTML +
-    '</body></html>'
-  );
-  win.document.close();
-  win.focus();
-  // After the print window has its own copy, restore a fresh placeholder DOM
-  // in the main window's printView so subsequent print clicks re-render PDFs
-  // from scratch (otherwise the user would only see embedded images on the
-  // second click — visually fine but loses the "Belege werden eingebettet"
-  // overlay state and prevents updates if attachments changed in between).
-  render();
+
+  // Doc-Title temporär ändern, damit PDF-Filename passt
+  const oldTitle = document.title;
+  document.title = docTitle + " — " + (state.shared?.name || "");
+
+  // Force Browser-Reflow: ohne diesen werden CSS-Änderungen vor window.print()
+  // teilweise nicht angewendet (insb. das neu eingefügte @media print Style-Tag).
+  void container.offsetHeight;
+
+  // Window.print() in einem requestAnimationFrame, damit der Browser den
+  // Reflow erst abschließen kann. Sonst zeigen manche Browser (Safari, einige
+  // Chromium-Forks) eine leere Druckvorschau.
+  requestAnimationFrame(() => {
+    setTimeout(() => {
+      try {
+        window.print();
+      } catch(e) {
+        alert("Drucken fehlgeschlagen: " + e.message + "\nBitte mit Strg+P versuchen.");
+      }
+    }, 100);
+  });
+
+  // Aufräumen nach längerem Delay (Browser hat Druckdialog dann durch)
+  setTimeout(() => {
+    document.title = oldTitle;
+    const c = document.getElementById("inline-print-container");
+    if (c) c.remove();
+    const css = document.getElementById("inline-doc-print-css");
+    if (css) css.remove();
+    // Print-View neu rendern, damit PDF-Belege beim nächsten Druck nicht
+    // mit alten Cached-Images stehen bleiben
+    render();
+  }, 2000);
 }
 
 function countAllAttachments(docId) {
@@ -12621,10 +12668,10 @@ function openDocPreview(id) {
   state.activeDocId = id; state.view = "preview"; render(); window.scrollTo(0,0);
 }
 async function quickPdf(id) {
-  // Open preview and immediately trigger print dialog (defaults to "Save as PDF")
+  // Open preview and trigger inline-print via openPrintWindow (Pop-up-safe)
   state.activeDocId = id; state.view = "preview"; render();
-  // Wait one frame for the print view to render
-  setTimeout(() => { window.print(); }, 300);
+  // Warten bis die Print-View gerendert ist, dann durch confirmAndPrint laufen
+  setTimeout(() => { confirmAndPrint(); }, 350);
 }
 
 // === EXPORT / IMPORT ===
