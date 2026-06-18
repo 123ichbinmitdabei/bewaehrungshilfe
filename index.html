@@ -693,13 +693,18 @@
   .save-toast {
     position: fixed; bottom: 20px; right: 20px;
     background: var(--accent); color: white;
-    padding: 10px 18px; border-radius: 999px;
-    font-size: 13px; font-weight: 600;
-    box-shadow: 0 4px 12px rgba(91,165,114,0.4);
-    z-index: 998; animation: slideIn .25s ease, fadeOut .3s ease 1.5s forwards;
+    padding: 11px 20px; border-radius: 999px;
+    font-size: 14px; font-weight: 600;
+    box-shadow: 0 6px 16px rgba(91,165,114,0.45);
+    z-index: 998; animation: slideIn .25s ease, fadeOut .35s ease 2.2s forwards;
   }
-  @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+  @keyframes slideIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
   @keyframes fadeOut { to { opacity: 0; transform: translateY(-10px); } }
+  @media (max-width: 720px) {
+    .save-toast { left: 50%; right: auto; transform: translateX(-50%); }
+    @keyframes slideIn { from { opacity: 0; transform: translateX(-50%) translateY(12px); } to { opacity: 1; transform: translateX(-50%); } }
+    @keyframes fadeOut { to { opacity: 0; transform: translateX(-50%) translateY(-10px); } }
+  }
   /* Past appointment marker */
   .past-marker {
     display: inline-block; font-size: 10px; padding: 1px 8px;
@@ -3892,6 +3897,100 @@ function exportAllToCalendar(docId, sectionId) {
   showSaveToast(`✓ ${events.length} Termin(e) exportiert`);
 }
 
+// Aggregierter ICS-Export: ALLE Termine aus ALLEN Docs in einer .ics-Datei.
+// Quellen: BH-Termine, Sozialstunden-Einsätze, Therapie-Termine, kommende
+// Bewährungs-Stichtage. Verlangt keine Args — durchläuft alle bekannten Docs.
+function exportAllTermineToCalendar() {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const events = [];
+  // BH-Termine
+  (state.docs.bhtermine?.rows?.termine || []).forEach((row, idx) => {
+    if (!row.datum) return;
+    const d = parseDateGuess(row.datum);
+    if (!d || d < today) return;
+    if (row.status && /abgesagt|verpasst|verschoben/i.test(row.status)) return;
+    const ev = buildEventFromRow("bhtermine", "termine", idx, row);
+    if (ev) events.push(ev);
+  });
+  // Therapie-Termine
+  (state.docs.thera?.rows?.termine || []).forEach((row, idx) => {
+    if (!row.datum) return;
+    const d = parseDateGuess(row.datum);
+    if (!d || d < today) return;
+    if (row.status && /abgesagt|verpasst|ausgefallen/i.test(row.status)) return;
+    const ev = buildEventFromRow("thera", "termine", idx, row);
+    if (ev) events.push(ev);
+  });
+  // Sozialstunden-Einsätze
+  (state.docs.sozial?.rows?.eintraege || []).forEach((row, idx) => {
+    if (!row.datum) return;
+    const d = parseDateGuess(row.datum);
+    if (!d || d < today) return;
+    const ev = buildEventFromRow("sozial", "eintraege", idx, row);
+    if (ev) events.push(ev);
+  });
+  // Nächster geplanter BH-Termin (aus answers, falls noch nicht in Tabelle)
+  const nDatum = state.docs.bhtermine?.answers?.["naechster.datum"];
+  if (nDatum) {
+    const d = parseDateGuess(nDatum);
+    if (d && d >= today) {
+      const [h, mi] = parseTimeStr(state.docs.bhtermine.answers["naechster.uhrzeit"] || "10:00");
+      const ev = buildIcsEvent({
+        date: d, hour: h ?? 10, minute: mi ?? 0, durationMinutes: 60,
+        summary: "BH-Termin (nächster)",
+        description: state.docs.bhtermine.answers["naechster.vorbereitung"] || "",
+        location: state.docs.bhtermine.answers["naechster.ort"] || "",
+        uid: "bh-naechster-" + d.getTime() + "@bewaehrungshilfe-app",
+      });
+      if (ev) events.push(ev);
+    }
+  }
+  // Bewährungs-Stichtage als Ganztags-Events
+  const bewEnde = state.shared?.bewaehrung_ende;
+  if (bewEnde) {
+    const d = parseDateGuess(bewEnde);
+    if (d && d >= today) {
+      events.push(buildIcsEvent({
+        date: d, hour: 12, minute: 0, durationMinutes: 60,
+        summary: "📅 Ende der Bewährungszeit",
+        description: "Aktenzeichen: " + (state.shared?.aktenzeichen || "—"),
+        uid: "bew-ende-" + d.getTime() + "@bewaehrungshilfe-app",
+      }));
+    }
+  }
+  // Zahlungsfristen aus Verfahrenskosten
+  const kAns = state.docs.kosten?.answers || {};
+  ["geldstrafe.frist_zahlung", "gerichtskosten.frist_zahlung"].forEach(key => {
+    const v = kAns[key];
+    if (!v) return;
+    const d = parseDateGuess(v);
+    if (!d || d < today) return;
+    const label = key.startsWith("geldstrafe") ? "Geldstrafe-Frist" : "Gerichtskosten-Frist";
+    events.push(buildIcsEvent({
+      date: d, hour: 12, minute: 0, durationMinutes: 60,
+      summary: "💸 " + label,
+      description: "Kassenzeichen: " + (kAns["verfahren.az_landesjustizkasse"] || "—"),
+      uid: "kosten-" + key + "-" + d.getTime() + "@bewaehrungshilfe-app",
+    }));
+  });
+
+  if (events.length === 0) {
+    alert("Keine zukünftigen Termine zum Exportieren gefunden.\n\nHinweis: Nur Termine mit Datum heute oder später werden mitgenommen, und abgesagte/verpasste werden übersprungen.");
+    return;
+  }
+  const ics = [
+    "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Bewährungshilfe-Assistent//DE",
+    "CALSCALE:GREGORIAN", "METHOD:PUBLISH",
+    "X-WR-CALNAME:Bewährungshilfe-Assistent — Termine",
+    ...events,
+    "END:VCALENDAR"
+  ].filter(Boolean).join("\r\n");
+  const userName = (state.shared?.name || "").replace(/[^a-zA-Z0-9äöüÄÖÜß_-]/g, "_");
+  const stamp = todayISO();
+  downloadIcs(`Alle-Termine${userName ? "_" + userName : ""}_${stamp}.ics`, ics);
+  showSaveToast(`✓ ${events.length} Termin(e) als ICS exportiert`);
+}
+
 // === RESCHEDULE / REPLACEMENT APPOINTMENTS ===
 
 // Open a small dialog to pick new date+time, then either create a new row or update existing
@@ -5119,7 +5218,7 @@ let showArchived = false;
 function toggleShowArchived() { showArchived = !showArchived; render(); }
 
 // === VERSION INFO ===
-const APP_VERSION = "v3.30";
+const APP_VERSION = "v3.31";
 
 // === ONBOARDING ===
 let onboardingActive = false;
@@ -5873,6 +5972,41 @@ async function loadAllState() {
           setTimeout(() => analyzeNewInboxPdfs(), 1000);
         }
       }
+    } catch(e){}
+  }
+  // Load contacts (Adressbuch)
+  const contactsRaw = await Storage.get(CONTACTS_STORAGE_KEY);
+  if (contactsRaw) {
+    try {
+      const parsed = JSON.parse(contactsRaw);
+      if (Array.isArray(parsed)) state.contacts = parsed;
+    } catch(e){}
+  }
+  // Load Brief-Historie
+  const briefHistRaw = await Storage.get(BRIEF_HISTORY_KEY);
+  if (briefHistRaw) {
+    try {
+      const parsed = JSON.parse(briefHistRaw);
+      if (Array.isArray(parsed)) state.briefHistory = parsed;
+    } catch(e){}
+  }
+  // Load eigene Brief-Vorlagen
+  const customTplRaw = await Storage.get(CUSTOM_TEMPLATES_KEY);
+  if (customTplRaw) {
+    try {
+      const parsed = JSON.parse(customTplRaw);
+      if (parsed && typeof parsed === "object") {
+        state.customTemplates = parsed;
+        restoreCustomTemplatesIntoTemplates();
+      }
+    } catch(e){}
+  }
+  // Load Termin-Vorbereitungs-Checklisten
+  const prepRaw = await Storage.get(TERMIN_PREP_KEY);
+  if (prepRaw) {
+    try {
+      const parsed = JSON.parse(prepRaw);
+      if (parsed && typeof parsed === "object") state.terminPrep = parsed;
     } catch(e){}
   }
   // Load backup reminder state
@@ -7291,6 +7425,8 @@ function render() {
   else if (state.view === "inbox") app.innerHTML = renderInboxView();
   else if (state.view === "import") app.innerHTML = renderImportView();
   else if (state.view === "settings") app.innerHTML = renderSettingsView();
+  else if (state.view === "contacts") app.innerHTML = renderContactsView();
+  else if (state.view === "briefHistory") app.innerHTML = renderBriefHistoryView();
 
   // Render modal overlay if open.
   // IMPORTANT: remove ALL existing overlays (not just one) - if duplicates ever
@@ -7310,6 +7446,7 @@ function render() {
   else if (avgCalcTarget) modalHtml = renderAvgCalculatorModal();
   else if (state.inboxModal) modalHtml = renderInboxModal();
   else if (state.extractedTextModal) modalHtml = renderExtractedTextModal();
+  if (state.globalSearchOpen) modalHtml = (modalHtml || "") + renderGlobalSearchModal();
   if (modalHtml) {
     const wrap = document.createElement("div");
     wrap.id = "modalOverlay";
@@ -7371,6 +7508,525 @@ function attachAutoFormatListeners() {
 // Sammelt die wichtigsten "ich habe X erledigt"-Zahlen aus allen Docs.
 // Bewusst sachlich und ehrlich gehalten — der Mehrwert ist, dass der Nutzer
 // schwarz auf weiß sieht: ja, ich tue was, und es summiert sich.
+// ── Adressbuch (Kontakte: BH, Anwalt, Therapeut, Jobcenter, Gerichtskasse) ──
+// Storage-Key: bh_contacts_v1; Format: Array von { id, rolle, name, firma, email,
+// telefon, anschrift, notiz }
+const CONTACTS_STORAGE_KEY = "bh_contacts_v1";
+const CONTACT_ROLES = [
+  { key: "bh", icon: "👤", label: "Bewährungshelfer:in" },
+  { key: "anwalt", icon: "⚖️", label: "Rechtsanwalt/in" },
+  { key: "therapeut", icon: "🧠", label: "Therapeut:in" },
+  { key: "jobcenter", icon: "🏛", label: "Jobcenter" },
+  { key: "gerichtskasse", icon: "💸", label: "Gerichtskasse" },
+  { key: "staatsanwaltschaft", icon: "⚖️", label: "Staatsanwaltschaft" },
+  { key: "gericht", icon: "🏛", label: "Gericht" },
+  { key: "polizei", icon: "👮", label: "Polizei" },
+  { key: "sozialberatung", icon: "🤝", label: "Soziale Beratung" },
+  { key: "arbeitgeber", icon: "💼", label: "Arbeitgeber" },
+  { key: "sonstige", icon: "📇", label: "Sonstige" },
+];
+
+function saveContacts() {
+  Storage.set(CONTACTS_STORAGE_KEY, JSON.stringify(state.contacts || []));
+  if (typeof markDataChanged === "function") markDataChanged();
+}
+
+function addContact(rolle) {
+  if (!state.contacts) state.contacts = [];
+  const id = "c_" + Date.now() + "_" + Math.random().toString(36).slice(2,6);
+  state.contacts.unshift({ id, rolle: rolle || "sonstige", name: "", firma: "", email: "", telefon: "", anschrift: "", notiz: "" });
+  saveContacts();
+  render();
+}
+function updateContactField(id, field, value) {
+  const c = (state.contacts || []).find(x => x.id === id);
+  if (!c) return;
+  c[field] = value;
+  // Debounced save
+  clearTimeout(updateContactField._t);
+  updateContactField._t = setTimeout(() => saveContacts(), 400);
+}
+function deleteContact(id) {
+  if (!confirm("Diesen Kontakt löschen?")) return;
+  state.contacts = (state.contacts || []).filter(c => c.id !== id);
+  saveContacts();
+  render();
+}
+
+function renderContactsView() {
+  const contacts = state.contacts || [];
+  let body = "";
+  if (contacts.length === 0) {
+    body = `<div style="background:var(--card); border:1px solid var(--border); border-radius:14px; padding:30px; text-align:center;">
+      <div style="font-size:42px; margin-bottom:10px;">📇</div>
+      <h3>Noch keine Kontakte</h3>
+      <p style="color:var(--text-soft); margin-bottom:18px;">Lege deine wichtigen Ansprechpartner an — sie werden dann in Briefen automatisch verwendet.</p>
+    </div>`;
+  } else {
+    // Gruppiere nach Rolle
+    const byRole = {};
+    contacts.forEach(c => { (byRole[c.rolle] = byRole[c.rolle] || []).push(c); });
+    let cardsHtml = "";
+    CONTACT_ROLES.forEach(r => {
+      const list = byRole[r.key];
+      if (!list || list.length === 0) return;
+      cardsHtml += `<div style="margin-bottom:16px;">
+        <h3 style="font-size:13px; text-transform:uppercase; letter-spacing:.5px; color:var(--text-soft); margin-bottom:8px;">${esc(r.icon)} ${esc(r.label)} (${list.length})</h3>`;
+      list.forEach(c => {
+        cardsHtml += `
+          <div style="background:var(--card); border:1px solid var(--border); border-radius:10px; padding:12px 14px; margin-bottom:8px;">
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
+              <input type="text" value="${esc(c.name || "")}" oninput="updateContactField('${c.id}','name',this.value)" placeholder="Name (Vor- und Nachname)" style="padding:7px 10px; border:1px solid var(--border); border-radius:6px; font-size:13px; background:var(--input-bg); color:var(--text);" />
+              <input type="text" value="${esc(c.firma || "")}" oninput="updateContactField('${c.id}','firma',this.value)" placeholder="Firma / Einrichtung" style="padding:7px 10px; border:1px solid var(--border); border-radius:6px; font-size:13px; background:var(--input-bg); color:var(--text);" />
+              <input type="email" value="${esc(c.email || "")}" oninput="updateContactField('${c.id}','email',this.value)" placeholder="E-Mail" style="padding:7px 10px; border:1px solid var(--border); border-radius:6px; font-size:13px; background:var(--input-bg); color:var(--text);" />
+              <input type="tel" value="${esc(c.telefon || "")}" oninput="updateContactField('${c.id}','telefon',this.value)" placeholder="Telefon" style="padding:7px 10px; border:1px solid var(--border); border-radius:6px; font-size:13px; background:var(--input-bg); color:var(--text);" />
+            </div>
+            <textarea oninput="updateContactField('${c.id}','anschrift',this.value)" placeholder="Anschrift (Straße, PLZ Ort)" rows="2" style="width:100%; padding:7px 10px; border:1px solid var(--border); border-radius:6px; font-size:13px; background:var(--input-bg); color:var(--text); margin-top:6px; resize:vertical;">${esc(c.anschrift || "")}</textarea>
+            <textarea oninput="updateContactField('${c.id}','notiz',this.value)" placeholder="Notizen (z.B. Sprechzeiten, Aktenzeichen, Bemerkungen)" rows="2" style="width:100%; padding:7px 10px; border:1px solid var(--border); border-radius:6px; font-size:12px; background:var(--input-bg); color:var(--text); margin-top:6px; resize:vertical;">${esc(c.notiz || "")}</textarea>
+            <div style="display:flex; gap:6px; margin-top:8px; justify-content:flex-end;">
+              <button class="btn btn-secondary" style="font-size:12px; padding:5px 10px;" onclick="deleteContact('${c.id}')">🗑 Löschen</button>
+            </div>
+          </div>`;
+      });
+      cardsHtml += `</div>`;
+    });
+    body = cardsHtml;
+  }
+
+  const addBtns = CONTACT_ROLES.slice(0, 6).map(r =>
+    `<button class="btn btn-secondary" style="font-size:12px;" onclick="addContact('${r.key}')">+ ${esc(r.icon)} ${esc(r.label)}</button>`
+  ).join("");
+
+  return `
+    <div class="header">
+      <div>
+        <h1>📇 Adressbuch</h1>
+        <div class="sub">Wichtige Ansprechpartner — werden in Briefen automatisch verwendet</div>
+      </div>
+      <button class="btn btn-secondary" onclick="goHome()">← Zur Übersicht</button>
+    </div>
+    <div style="background:var(--card); border:1px solid var(--border); border-radius:12px; padding:14px; margin-bottom:14px;">
+      <div style="font-size:12px; color:var(--text-soft); margin-bottom:8px;">+ Neuer Kontakt:</div>
+      <div style="display:flex; gap:6px; flex-wrap:wrap;">${addBtns}
+        <button class="btn btn-secondary" style="font-size:12px;" onclick="addContact('sonstige')">+ 📇 Sonstige</button>
+      </div>
+    </div>
+    ${body}`;
+}
+
+// ── Web-Notifications (PWA Push für Termine) ─────────────────────────────
+// Bittet einmalig um Permission, prüft regelmäßig die nächsten Termine und
+// zeigt eine Browser-Notification 1 Stunde vorher. Persistent State im
+// localStorage: bh_notif_enabled (true/false), bh_notif_shown (Map<termId,
+// timestamp>) — damit derselbe Termin nicht wiederholt benachrichtigt wird.
+const NOTIF_ENABLED_KEY = "bh_notif_enabled";
+const NOTIF_SHOWN_KEY = "bh_notif_shown";
+const NOTIF_CHECK_INTERVAL_MS = 5 * 60 * 1000; // alle 5 Minuten prüfen
+const NOTIF_LEAD_MS = 60 * 60 * 1000; // 1h vor Termin benachrichtigen
+let _notifCheckTimer = null;
+
+function notifSupported() {
+  return typeof window !== "undefined" && "Notification" in window;
+}
+function notifIsEnabled() {
+  if (!notifSupported()) return false;
+  if (Notification.permission !== "granted") return false;
+  try { return localStorage.getItem(NOTIF_ENABLED_KEY) === "true"; } catch(e) { return false; }
+}
+async function enableNotifications() {
+  if (!notifSupported()) { alert("Dein Browser unterstützt keine Benachrichtigungen."); return; }
+  let perm = Notification.permission;
+  if (perm === "default") {
+    perm = await Notification.requestPermission();
+  }
+  if (perm !== "granted") {
+    alert("Berechtigung nicht erteilt. Du kannst sie später in den Browser-Einstellungen anpassen.");
+    return;
+  }
+  try { localStorage.setItem(NOTIF_ENABLED_KEY, "true"); } catch(e){}
+  scheduleNotifChecks();
+  showSaveToast("✓ Termin-Erinnerungen aktiviert");
+  // Sofortige Test-Notification
+  try { new Notification("Bewährungshilfe-Assistent", { body: "Erinnerungen für deine Termine sind jetzt aktiv.", icon: "/favicon.ico" }); } catch(e){}
+  render();
+}
+function disableNotifications() {
+  try { localStorage.setItem(NOTIF_ENABLED_KEY, "false"); } catch(e){}
+  if (_notifCheckTimer) { clearInterval(_notifCheckTimer); _notifCheckTimer = null; }
+  showSaveToast("Termin-Erinnerungen deaktiviert");
+  render();
+}
+function _loadNotifShown() {
+  try {
+    const raw = localStorage.getItem(NOTIF_SHOWN_KEY);
+    if (!raw) return {};
+    return JSON.parse(raw) || {};
+  } catch(e) { return {}; }
+}
+function _saveNotifShown(map) {
+  try { localStorage.setItem(NOTIF_SHOWN_KEY, JSON.stringify(map)); } catch(e){}
+}
+function checkUpcomingTermineForNotif() {
+  if (!notifIsEnabled()) return;
+  const now = Date.now();
+  const shown = _loadNotifShown();
+  // Garbage-Collection: alte Einträge entfernen (>30 Tage alt)
+  const cutoff = now - 30 * 24 * 60 * 60 * 1000;
+  Object.keys(shown).forEach(k => { if (shown[k] < cutoff) delete shown[k]; });
+  // Quellen durchsuchen
+  const candidates = [];
+  // BH-Termine
+  (state.docs?.bhtermine?.rows?.termine || []).forEach((row, idx) => {
+    if (!row.datum) return;
+    const d = parseDateGuess(row.datum);
+    if (!d) return;
+    const [h, mi] = parseTimeStr(row.uhrzeit || "10:00");
+    d.setHours(h ?? 10, mi ?? 0, 0, 0);
+    candidates.push({ id: "bh-" + idx, time: d.getTime(), title: "BH-Termin", body: row.ort ? "Ort: " + row.ort : "" });
+  });
+  // Therapie-Termine
+  (state.docs?.thera?.rows?.termine || []).forEach((row, idx) => {
+    if (!row.datum) return;
+    const d = parseDateGuess(row.datum);
+    if (!d) return;
+    const [h, mi] = parseTimeStr(row.uhrzeit || "10:00");
+    d.setHours(h ?? 10, mi ?? 0, 0, 0);
+    candidates.push({ id: "thera-" + idx, time: d.getTime(), title: "Therapie-Termin", body: row.art || "" });
+  });
+  // Sozialstunden
+  (state.docs?.sozial?.rows?.eintraege || []).forEach((row, idx) => {
+    if (!row.datum) return;
+    const d = parseDateGuess(row.datum);
+    if (!d) return;
+    const [h, mi] = parseTimeStr(row.von || "08:00");
+    d.setHours(h ?? 8, mi ?? 0, 0, 0);
+    candidates.push({ id: "sozial-" + idx, time: d.getTime(), title: "Sozialstunden-Einsatz", body: row.taetigkeit || "" });
+  });
+  // Filter: Termine, die in den nächsten LEAD-Zeitraum fallen und noch nicht gezeigt
+  candidates.forEach(c => {
+    const diff = c.time - now;
+    if (diff > 0 && diff <= NOTIF_LEAD_MS && !shown[c.id]) {
+      try {
+        const dt = new Date(c.time);
+        const minutes = Math.round(diff / 60000);
+        const when = minutes < 60 ? "in " + minutes + " Min" : "in " + Math.round(minutes/60) + "h";
+        new Notification("⏰ " + c.title + " " + when, {
+          body: c.body || (pad(dt.getHours()) + ":" + pad(dt.getMinutes()) + " — vergiss die Unterlagen nicht!"),
+          icon: "/favicon.ico",
+          tag: c.id,
+        });
+        shown[c.id] = now;
+        _saveNotifShown(shown);
+      } catch(e){}
+    }
+  });
+}
+function scheduleNotifChecks() {
+  if (_notifCheckTimer) clearInterval(_notifCheckTimer);
+  if (!notifIsEnabled()) return;
+  // Sofort einen Check + danach periodisch
+  setTimeout(() => checkUpcomingTermineForNotif(), 1000);
+  _notifCheckTimer = setInterval(() => checkUpcomingTermineForNotif(), NOTIF_CHECK_INTERVAL_MS);
+}
+
+// ── Brief-Historie ─────────────────────────────────────────────────────────
+const BRIEF_HISTORY_KEY = "bh_brief_history_v1";
+function saveBriefHistory() {
+  Storage.set(BRIEF_HISTORY_KEY, JSON.stringify(state.briefHistory || []));
+}
+function recordBriefSent(tplKey, mode) {
+  if (!state.briefHistory) state.briefHistory = [];
+  const tpl = ANSCHREIBEN_TEMPLATES[tplKey];
+  state.briefHistory.unshift({
+    id: "b_" + Date.now(),
+    tplKey,
+    title: tpl?.title || tplKey,
+    mode: mode || "drucken",
+    erstelltAm: new Date().toISOString(),
+    status: "erstellt",
+    statusNotiz: "",
+  });
+  if (state.briefHistory.length > 200) state.briefHistory = state.briefHistory.slice(0, 200);
+  saveBriefHistory();
+}
+function updateBriefHistoryStatus(id, status, notiz) {
+  const b = (state.briefHistory || []).find(x => x.id === id);
+  if (!b) return;
+  if (status) b.status = status;
+  if (notiz !== undefined) b.statusNotiz = notiz;
+  b.statusChangedAt = new Date().toISOString();
+  saveBriefHistory();
+  if (status) render();
+}
+function deleteBriefHistory(id) {
+  state.briefHistory = (state.briefHistory || []).filter(b => b.id !== id);
+  saveBriefHistory();
+  render();
+}
+const BRIEF_STATUS_LABELS = {
+  erstellt: { icon: "📝", label: "erstellt" },
+  verschickt: { icon: "📤", label: "verschickt" },
+  antwort_eingegangen: { icon: "📨", label: "Antwort da" },
+  erledigt: { icon: "✅", label: "erledigt" },
+};
+
+function renderBriefHistoryView() {
+  const history = state.briefHistory || [];
+  let body = "";
+  if (history.length === 0) {
+    body = `<div style="background:var(--card); border:1px solid var(--border); border-radius:14px; padding:30px; text-align:center;">
+      <div style="font-size:42px; margin-bottom:10px;">📨</div>
+      <h3>Noch keine Brief-Historie</h3>
+      <p style="color:var(--text-soft);">Sobald du einen Brief druckst oder verschickst, wird er hier zum Nachverfolgen aufgelistet.</p>
+    </div>`;
+  } else {
+    body = history.map(b => {
+      const dt = new Date(b.erstelltAm).toLocaleDateString("de-DE");
+      const statusOpts = Object.entries(BRIEF_STATUS_LABELS).map(([key, def]) =>
+        `<option value="${key}" ${b.status === key ? "selected" : ""}>${def.icon} ${def.label}</option>`).join("");
+      return `
+        <div style="background:var(--card); border:1px solid var(--border); border-radius:10px; padding:12px 14px; margin-bottom:8px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+            <div style="flex:1; min-width:200px;">
+              <div style="font-weight:600; font-size:14px;">${esc(b.title)}</div>
+              <div style="font-size:11px; color:var(--text-soft); margin-top:2px;">${esc(dt)} · per ${esc(b.mode)}</div>
+            </div>
+            <select onchange="updateBriefHistoryStatus('${b.id}', this.value)" style="padding:5px 8px; border:1px solid var(--border); border-radius:5px; font-size:12px; background:var(--input-bg); color:var(--text);">${statusOpts}</select>
+            <button class="btn btn-secondary" style="font-size:12px; padding:5px 10px;" onclick="selectAnschreiben('${b.tplKey}'); state.view='anschreiben'; render();">↻ Neu erstellen</button>
+            <button class="btn btn-secondary" style="font-size:12px; padding:5px 8px;" onclick="deleteBriefHistory('${b.id}')">🗑</button>
+          </div>
+          <input type="text" value="${esc(b.statusNotiz || '')}" oninput="updateBriefHistoryStatus('${b.id}', null, this.value)" placeholder="Notiz zum Status (z.B. Empfänger, Antwort-Datum)" style="width:100%; margin-top:8px; padding:6px 10px; border:1px solid var(--border); border-radius:5px; font-size:12px; background:var(--input-bg); color:var(--text);" />
+        </div>`;
+    }).join("");
+  }
+  const counts = {};
+  history.forEach(b => { counts[b.status] = (counts[b.status] || 0) + 1; });
+  const statBoxes = Object.entries(BRIEF_STATUS_LABELS).map(([key, def]) =>
+    `<div style="text-align:center; padding:8px 12px; background:var(--card); border:1px solid var(--border); border-radius:8px;">
+      <div style="font-size:22px; font-weight:700;">${counts[key] || 0}</div>
+      <div style="font-size:11px; color:var(--text-soft);">${def.icon} ${def.label}</div>
+    </div>`).join("");
+  return `
+    <div class="header">
+      <div>
+        <h1>📨 Brief-Historie</h1>
+        <div class="sub">Welche Briefe hast du wann erstellt und sind die Antworten schon da?</div>
+      </div>
+      <button class="btn btn-secondary" onclick="goHome()">← Zur Übersicht</button>
+    </div>
+    ${history.length > 0 ? `<div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap:8px; margin-bottom:14px;">${statBoxes}</div>` : ""}
+    ${body}`;
+}
+
+// ── Eigene Brief-Vorlagen ──────────────────────────────────────────────────
+const CUSTOM_TEMPLATES_KEY = "bh_custom_templates_v1";
+function saveCustomTemplates() {
+  Storage.set(CUSTOM_TEMPLATES_KEY, JSON.stringify(state.customTemplates || {}));
+}
+function addCustomTemplate() {
+  const title = prompt("Titel der neuen Brief-Vorlage:");
+  if (!title || !title.trim()) return;
+  if (!state.customTemplates) state.customTemplates = {};
+  const key = "custom_" + Date.now();
+  state.customTemplates[key] = {
+    title: title.trim(),
+    desc: "Eigene Vorlage",
+    cat: "bh",
+    text: "Sehr geehrte Damen und Herren,\n\n[hier deinen Brieftext eingeben]\n\nMit freundlichen Grüßen\n" + (state.shared?.name || ""),
+  };
+  saveCustomTemplates();
+  ANSCHREIBEN_TEMPLATES[key] = {
+    title: state.customTemplates[key].title,
+    desc: state.customTemplates[key].desc,
+    cat: state.customTemplates[key].cat,
+    empfaenger: [],
+    body: () => state.customTemplates[key].text,
+    isCustom: true,
+  };
+  selectAnschreiben(key);
+}
+function updateCustomTemplateText(key, text) {
+  if (!state.customTemplates || !state.customTemplates[key]) return;
+  state.customTemplates[key].text = text;
+  clearTimeout(updateCustomTemplateText._t);
+  updateCustomTemplateText._t = setTimeout(() => saveCustomTemplates(), 400);
+}
+function deleteCustomTemplate(key) {
+  if (!confirm("Eigene Vorlage „" + (state.customTemplates?.[key]?.title || key) + "“ löschen?")) return;
+  if (state.customTemplates) delete state.customTemplates[key];
+  delete ANSCHREIBEN_TEMPLATES[key];
+  saveCustomTemplates();
+  if (activeAnschreiben === key) activeAnschreiben = null;
+  render();
+}
+// Wird beim App-Start aufgerufen, registriert alle gespeicherten Custom-Vorlagen
+// in ANSCHREIBEN_TEMPLATES.
+function restoreCustomTemplatesIntoTemplates() {
+  if (!state.customTemplates) return;
+  Object.entries(state.customTemplates).forEach(([key, def]) => {
+    ANSCHREIBEN_TEMPLATES[key] = {
+      title: def.title,
+      desc: def.desc || "Eigene Vorlage",
+      cat: def.cat || "bh",
+      empfaenger: [],
+      body: () => state.customTemplates[key].text,
+      isCustom: true,
+    };
+  });
+}
+
+// ── Termin-Vorbereitungs-Checklisten ─────────────────────────────────────────
+const TERMIN_PREP_KEY = "bh_termin_prep_v1";
+function saveTerminPrep() {
+  Storage.set(TERMIN_PREP_KEY, JSON.stringify(state.terminPrep || {}));
+}
+const DEFAULT_PREP_ITEMS = [
+  "Aktuelle Lohnabrechnung",
+  "EAR (Einnahmen-Ausgaben-Rechnung) aktualisiert",
+  "Sozialstunden-Nachweis",
+  "Belege über letzte Geldstrafen-Raten",
+  "Therapie-Bestätigung",
+  "Personalausweis",
+  "Notizen zu offenen Fragen",
+];
+function getPrepKey(termId) { return "bh-" + termId; }
+function getPrepItems(termId) {
+  const key = getPrepKey(termId);
+  if (!state.terminPrep) state.terminPrep = {};
+  if (!state.terminPrep[key]) {
+    state.terminPrep[key] = DEFAULT_PREP_ITEMS.map(t => ({ text: t, done: false }));
+  }
+  return state.terminPrep[key];
+}
+function togglePrepItem(termId, idx) {
+  const items = getPrepItems(termId);
+  if (items[idx]) {
+    items[idx].done = !items[idx].done;
+    saveTerminPrep();
+    render();
+  }
+}
+function addPrepItem(termId, text) {
+  if (!text || !text.trim()) return;
+  const items = getPrepItems(termId);
+  items.push({ text: text.trim(), done: false });
+  saveTerminPrep();
+  render();
+}
+function deletePrepItem(termId, idx) {
+  const items = getPrepItems(termId);
+  items.splice(idx, 1);
+  saveTerminPrep();
+  render();
+}
+function renderTerminPrepWidget(termId, compact) {
+  const items = getPrepItems(termId);
+  const done = items.filter(i => i.done).length;
+  const total = items.length;
+  if (compact) {
+    return `<span style="font-size:11px; color:var(--text-soft);" title="Was mitnehmen zum Termin?">📋 ${done}/${total} mitbringen</span>`;
+  }
+  const itemsHtml = items.map((it, idx) => `
+    <div style="display:flex; gap:8px; align-items:center; padding:5px 0; ${it.done ? 'opacity:0.55;' : ''}">
+      <input type="checkbox" ${it.done ? "checked" : ""} onchange="togglePrepItem('${esc(termId)}', ${idx})" />
+      <span style="flex:1; font-size:13px; ${it.done ? 'text-decoration:line-through;' : ''}">${esc(it.text)}</span>
+      <button onclick="deletePrepItem('${esc(termId)}', ${idx})" style="background:transparent; border:none; color:var(--text-soft); cursor:pointer; font-size:14px; padding:0 4px;" title="Entfernen">✕</button>
+    </div>`).join("");
+  const progress = total > 0 ? Math.round(done / total * 100) : 0;
+  return `
+    <details style="background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:8px 12px; margin-top:8px;">
+      <summary style="cursor:pointer; font-size:12px; list-style:none; display:flex; align-items:center; gap:8px;">
+        <span>📋 <strong>Was mitnehmen?</strong></span>
+        <span style="font-size:11px; color:var(--text-soft);">${done}/${total} erledigt</span>
+        <span style="flex:1;"></span>
+        <span style="width:80px; height:5px; background:var(--border); border-radius:3px; overflow:hidden;"><span style="display:block; height:100%; background:var(--accent); width:${progress}%;"></span></span>
+      </summary>
+      <div style="margin-top:8px;">${itemsHtml}</div>
+      <div style="margin-top:8px;">
+        <input type="text" placeholder="+ Eigenen Punkt hinzufügen (Enter)" onkeydown="if(event.key==='Enter'){ addPrepItem('${esc(termId)}', this.value); this.value=''; }" style="width:100%; padding:5px 8px; border:1px solid var(--border); border-radius:5px; font-size:12px; background:var(--input-bg); color:var(--text);" />
+      </div>
+    </details>`;
+}
+
+// ── Notiz-Labels / Tags ────────────────────────────────────────────────────
+const NOTE_LABEL_OPTIONS = [
+  { key: "wichtig", icon: "🔥", color: "#dc2626" },
+  { key: "termin", icon: "📅", color: "#2563eb" },
+  { key: "warten", icon: "⏳", color: "#d97706" },
+  { key: "erledigt", icon: "✅", color: "#16a34a" },
+  { key: "idee", icon: "💡", color: "#7c3aed" },
+];
+function toggleNoteLabel(noteId, labelKey) {
+  const n = (state.notes || []).find(x => x.id === noteId);
+  if (!n) return;
+  if (!n.labels) n.labels = [];
+  const i = n.labels.indexOf(labelKey);
+  if (i >= 0) n.labels.splice(i, 1);
+  else n.labels.push(labelKey);
+  Storage.set(NOTES_STORAGE_KEY, JSON.stringify(state.notes));
+  render();
+}
+
+// Verfahrenskosten-Rechner: berechnet basierend auf Geldstrafe + bisherigen
+// Zahlungen + Ratenhöhe, wie lange es noch dauert und wann's voraussichtlich
+// abbezahlt ist. Wird auf der Home-Page und im Kosten-Doc angezeigt.
+function computeKostenForecast() {
+  const ans = state.docs.kosten?.answers || {};
+  const zahlungen = state.docs.kosten?.rows?.zahlungen || [];
+  const geldstrafe = parseMoney(ans["geldstrafe.betrag_gesamt"] || "");
+  const gerichtskosten = parseMoney(ans["gerichtskosten.betrag_gesamt"] || "");
+  const gesamt = geldstrafe + gerichtskosten;
+  if (gesamt <= 0) return null;
+  const gezahlt = zahlungen.reduce((s, r) => s + parseMoney(r.betrag || ""), 0);
+  const rest = Math.max(0, gesamt - gezahlt);
+  // Ratenhöhe — bevorzugt explizit, sonst Schnitt der letzten 3 Zahlungen
+  let rateMonat = parseMoney(ans["geldstrafe.rate_hoehe"] || "") || parseMoney(ans["gerichtskosten.rate_hoehe"] || "");
+  if (!rateMonat || rateMonat <= 0) {
+    const recent = zahlungen.slice(-3).map(r => parseMoney(r.betrag || "")).filter(n => n > 0);
+    if (recent.length > 0) rateMonat = recent.reduce((s, n) => s + n, 0) / recent.length;
+  }
+  const result = {
+    gesamt, gezahlt, rest, rateMonat: rateMonat || 0,
+    prozent: gesamt > 0 ? Math.round(gezahlt / gesamt * 100) : 0,
+  };
+  if (rateMonat > 0 && rest > 0) {
+    result.monateRest = Math.ceil(rest / rateMonat);
+    const endDate = new Date();
+    endDate.setMonth(endDate.getMonth() + result.monateRest);
+    result.endDatum = pad(endDate.getDate()) + "." + pad(endDate.getMonth()+1) + "." + endDate.getFullYear();
+  }
+  return result;
+}
+
+function renderKostenForecastCard() {
+  const f = computeKostenForecast();
+  if (!f || f.gesamt <= 0) return "";
+  // Knapp: wenn abbezahlt, freundlicher Status; sonst Rest + Prognose
+  if (f.rest <= 0) {
+    return `<div style="background:rgba(91,165,114,0.15); border:1px solid var(--accent); border-radius:10px; padding:12px 14px; margin-top:12px;">
+      <div style="font-size:13px;">✅ <strong>Verfahrenskosten vollständig abbezahlt!</strong> ${moneyOnly(f.gesamt)} € von ${moneyOnly(f.gesamt)} €.</div>
+    </div>`;
+  }
+  const forecast = (f.monateRest && f.endDatum)
+    ? `Bei <strong>${moneyOnly(f.rateMonat)} €</strong>/Monat noch <strong>${f.monateRest} ${f.monateRest === 1 ? "Monat" : "Monate"}</strong>, voraussichtliches Ende: <strong>${esc(f.endDatum)}</strong>.`
+    : `Trag Ratenhöhe oder mache Zahlungen ein, damit ich eine Prognose machen kann.`;
+  return `
+    <div style="background:var(--card); border:1px solid var(--border); border-radius:10px; padding:12px 14px; margin-top:12px;">
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
+        <span style="font-size:18px;">💸</span>
+        <strong style="font-size:13px;">Verfahrenskosten-Stand</strong>
+        <span style="margin-left:auto; font-size:12px; color:var(--text-soft);">${f.prozent}% bezahlt</span>
+      </div>
+      <div style="width:100%; height:8px; background:var(--bg); border-radius:4px; overflow:hidden; margin-bottom:8px;">
+        <div style="height:100%; background:var(--accent); width:${f.prozent}%; transition: width .3s;"></div>
+      </div>
+      <div style="font-size:12px; color:var(--text-soft);">
+        Bezahlt: <strong>${moneyOnly(f.gezahlt)} €</strong> von ${moneyOnly(f.gesamt)} € · Rest: <strong>${moneyOnly(f.rest)} €</strong>
+      </div>
+      <div style="font-size:12px; color:var(--text-soft); margin-top:6px;">${forecast}</div>
+    </div>`;
+}
+
 function computeAchievements() {
   const out = {
     bhWahrgenommen: 0, bhAbgesagt: 0, bhTotal: 0,
@@ -7551,6 +8207,29 @@ function renderHome() {
           return dl ? `<div class="deadline-info ${dl.kind}">${esc(dl.message)}</div>` : "";
         })()}
         <div class="card-actions" style="display:flex; gap:6px; flex-wrap:wrap; margin-top:12px;">${actionButtons}</div>
+        ${(() => {
+          // Brief-Schnellzugriff: passende Brief-Vorlagen direkt aus der Doc-Karte
+          if (docArchived || isAuto) return "";
+          const map = {
+            bhtermine: [["krankmeldung", "🤒 Krankmeldung"], ["lockerung", "📜 Lockerungs-Antrag"]],
+            ear: [["stundung", "💸 Stundung"], ["erklaerung_wirtschaft", "📋 Erklärung Hessen"]],
+            kosten: [["kosten_ratenzahlung", "💸 Ratenzahlung"], ["kosten_stundung", "🕐 Stundung"], ["erklaerung_wirtschaft", "📋 Erklärung Hessen"]],
+            sozial: [["sozial_anforderung", "✓ Bestätigung anfordern"]],
+            thera: [["therapie_anforderung", "✓ Bestätigung anfordern"]],
+            asservate: [["herausgabe", "📦 Herausgabe"], ["herausgabe_erinnerung", "↻ Erinnerung"]],
+            schadens: [["stundung", "💸 Stundung Geldauflage"]],
+          };
+          const briefe = map[doc.id];
+          if (!briefe || briefe.length === 0) return "";
+          const briefBtns = briefe.map(([key, label]) =>
+            `<button class="btn btn-secondary" style="font-size:11px; padding:3px 8px; flex:0 1 auto;" onclick="event.stopPropagation(); state.view='anschreiben'; selectAnschreiben('${key}');" title="Direkt zum Brief springen">${esc(label)}</button>`
+          ).join("");
+          return `
+            <div style="margin-top:8px; padding-top:8px; border-top:1px dashed var(--border);">
+              <div style="font-size:10px; color:var(--text-soft); margin-bottom:5px; text-transform:uppercase; letter-spacing:.5px;">✉ Passende Briefe</div>
+              <div style="display:flex; gap:5px; flex-wrap:wrap;">${briefBtns}</div>
+            </div>`;
+        })()}
       </div>
     `;
   });
@@ -7734,12 +8413,29 @@ function renderHome() {
     const dt = new Date(n.createdAt);
     const dateStr = `${pad(dt.getDate())}.${pad(dt.getMonth()+1)}.`;
     const catLabel = { bh: "Bei BH", after: "Nach BH", misc: "Sonst" }[n.category] || "Notiz";
+    // Label-Chips für aktive Labels
+    const activeLabels = (n.labels || []);
+    const labelChips = activeLabels.map(lk => {
+      const def = NOTE_LABEL_OPTIONS.find(o => o.key === lk);
+      if (!def) return "";
+      return `<span style="background:${def.color}22; color:${def.color}; border:1px solid ${def.color}55; padding:1px 6px; border-radius:6px; font-size:10px; margin-right:3px;" title="${esc(def.key)}">${def.icon}</span>`;
+    }).join("");
+    // Label-Auswahl-Popover (immer im DOM, per details kollabierbar)
+    const labelMenu = NOTE_LABEL_OPTIONS.map(o => {
+      const active = activeLabels.includes(o.key);
+      return `<button onclick="toggleNoteLabel('${n.id}', '${o.key}')" title="${esc(o.key)}" style="background:${active ? o.color + '33' : 'transparent'}; border:1px solid ${active ? o.color : 'var(--border)'}; padding:2px 6px; border-radius:5px; cursor:pointer; font-size:13px;">${o.icon}</button>`;
+    }).join("");
     notesList += `
       <div class="note-item cat-${n.category}${n.done ? ' done' : ''}">
         <span class="cat-badge">${catLabel}</span>
+        ${labelChips ? `<span style="margin-right:4px;">${labelChips}</span>` : ""}
         <span class="text">${esc(n.text)}</span>
         <span class="date">${dateStr}</span>
         <span class="actions">
+          <details style="display:inline-block; position:relative;">
+            <summary style="list-style:none; cursor:pointer; padding:2px 6px; background:transparent; border:1px solid var(--border); border-radius:4px; font-size:11px;" title="Labels">🏷</summary>
+            <div style="position:absolute; right:0; top:100%; margin-top:4px; background:var(--card); border:1px solid var(--border); border-radius:6px; padding:5px; display:flex; gap:3px; z-index:10; box-shadow:0 4px 12px rgba(0,0,0,0.15);">${labelMenu}</div>
+          </details>
           <button onclick="toggleNoteDone('${n.id}')" title="${n.done ? 'Als offen markieren' : 'Als erledigt markieren'}">${n.done ? "↶" : "✓"}</button>
           <button onclick="deleteNote('${n.id}')" title="Löschen">🗑</button>
         </span>
@@ -7782,12 +8478,19 @@ function renderHome() {
           <button class="btn btn-secondary" onclick="state.view='anschreiben'; render();" title="Briefe und Anträge erstellen">✉️ Briefe</button>
         </div>
 
+        <div class="action-group" title="Adressbuch & Brief-Historie">
+          <button class="btn btn-secondary" onclick="state.view='contacts'; render();" title="Adressbuch: BH, Anwalt, Therapeut, ..." style="font-size:13px;">📇 Adressbuch${state.contacts && state.contacts.length > 0 ? ` <span style="opacity:0.6; font-size:11px;">(${state.contacts.length})</span>` : ""}</button>
+          <button class="btn btn-secondary" onclick="state.view='briefHistory'; render();" title="Brief-Historie - was wurde wann verschickt" style="font-size:13px;">📨 Historie${state.briefHistory && state.briefHistory.length > 0 ? ` <span style="opacity:0.6; font-size:11px;">(${state.briefHistory.length})</span>` : ""}</button>
+        </div>
+
         <div class="action-group" title="Daten sichern und wiederherstellen">
           <button class="btn btn-secondary" onclick="exportAllData()" title="Alle Daten als Backup speichern">💾 Sichern</button>
           <button class="btn btn-secondary" onclick="triggerImport()" title="Daten aus Backup-Datei wiederherstellen">📥 Laden</button>
+          <button class="btn btn-secondary" onclick="exportAllTermineToCalendar()" title="Alle zukünftigen Termine als .ics-Datei zum Import in Google/Apple-Kalender" style="font-size:13px;">📅 Kalender</button>
         </div>
 
         <div class="action-group action-group-icons" title="App-Einstellungen">
+          <button class="btn btn-secondary btn-icon" onclick="openGlobalSearch()" title="Suche (Strg+/)">🔍</button>
           <button class="btn btn-secondary btn-icon" onclick="state.view='settings'; render();" title="App-Einstellungen anpassen">⚙️</button>
           <button class="btn btn-secondary btn-icon" onclick="state.view='help'; render();" title="Anleitung anzeigen">❓</button>
           ${pinStatusIcon}
@@ -7802,6 +8505,7 @@ function renderHome() {
       ${state.settings.showTodayOverview !== false ? renderTodayOverview() : ""}
       ${state.settings.showBewaehrungProgress !== false ? bewProgress : ""}
       ${state.settings.showAchievements !== false ? renderAchievementsBox() : ""}
+      ${renderKostenForecastCard()}
       ${inboxCount() > 0 ? `
         <div style="background:rgba(245, 158, 11, 0.12); border:1px solid rgba(245, 158, 11, 0.4); border-radius:10px; padding:12px 14px; margin-top:14px; display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
           <span style="font-size:13px;">📥 <strong>${inboxCount()} ${inboxCount() === 1 ? "Beleg wartet" : "Belege warten"}</strong> in der Inbox auf Einsortierung.</span>
@@ -7887,6 +8591,25 @@ function renderSettingsView() {
         <h2>⏰ Backup-Erinnerung</h2>
         <p class="settings-section-desc">Wie oft die App dich an ein Backup erinnert. Erinnerung erscheint nur, wenn seit dem letzten Backup wirklich etwas geändert wurde.</p>
         ${intervalRadios}
+      </div>
+
+      <div class="settings-section">
+        <h2>🔔 Termin-Erinnerungen (Push)</h2>
+        <p class="settings-section-desc">Lass dich vom Browser 1 Stunde vor BH-, Therapie- oder Sozialstunden-Terminen erinnern. Funktioniert nur, wenn die App geöffnet oder im Hintergrund ist und du die Berechtigung erteilt hast.</p>
+        ${(() => {
+          if (!notifSupported()) return `<div style="font-size:13px; color:var(--text-soft); padding:8px 10px; background:var(--bg); border-radius:6px;">⚠ Dein Browser unterstützt keine Benachrichtigungen.</div>`;
+          const enabled = notifIsEnabled();
+          const perm = Notification.permission;
+          return `
+            <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+              ${enabled
+                ? `<button class="btn btn-secondary" onclick="disableNotifications()">🔕 Deaktivieren</button>
+                   <span style="font-size:12px; color:var(--accent);">✓ Aktiv</span>`
+                : `<button class="btn btn-primary" onclick="enableNotifications()">🔔 Aktivieren</button>
+                   ${perm === "denied" ? `<span style="font-size:12px; color:var(--warn);">⚠ Du hast die Erlaubnis im Browser blockiert — bitte in den Browser-Einstellungen aktivieren.</span>` : ""}`
+              }
+            </div>`;
+        })()}
       </div>
 
       <div class="settings-section">
@@ -9167,6 +9890,7 @@ function copyAnschreibenToClipboard() {
     document.execCommand("copy");
     showSaveToast("In Zwischenablage kopiert");
   }
+  if (activeAnschreiben) recordBriefSent(activeAnschreiben, "kopiert");
 }
 function downloadAnschreibenTxt() {
   const ta = document.getElementById("anschreiben-textarea");
@@ -9179,6 +9903,7 @@ function downloadAnschreibenTxt() {
   a.href = url; a.download = `Anschreiben_${tpl.title.replace(/[^a-zA-Z0-9äöüÄÖÜß_-]/g, "_")}${safeName ? "_" + safeName : ""}_${todayISO()}.txt`;
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(url);
+  if (activeAnschreiben) recordBriefSent(activeAnschreiben, "download");
 }
 // ── Brief-Anhänge: aus den vorhandenen Belegen aller Docs PLUS komplette
 // generierte Dokumente. State ist transient (nur die aktuelle Session); jeder
@@ -9302,6 +10027,12 @@ async function printAnschreiben() {
   const text = ta.value;
   const tpl = ANSCHREIBEN_TEMPLATES[activeAnschreiben];
 
+  // Validierungs-Hinweis: leere Platzhalter (____) im Brieftext erkennen
+  const placeholderCount = (text.match(/_{3,}/g) || []).length;
+  if (placeholderCount > 0) {
+    if (!confirm(`⚠ Der Brief enthält noch ${placeholderCount} ${placeholderCount === 1 ? "Platzhalter (____)" : "Platzhalter (____)"} — typischerweise Stellen, die du noch ausfüllen musst.\n\nTrotzdem drucken?`)) return;
+  }
+
   // Anhänge bauen, falls welche ausgewählt
   const selectedIds = getSelectedAttachmentIds();
   let attachmentsHtml = "";
@@ -9345,6 +10076,7 @@ async function printAnschreiben() {
   );
   win.document.close();
   setTimeout(() => win.print(), 400);
+  if (activeAnschreiben) recordBriefSent(activeAnschreiben, "drucken");
 }
 
 // Form-mode printing: rendert das Formular-HTML (mit Checkboxen, Linien etc.)
@@ -9419,6 +10151,7 @@ async function printFormular() {
   );
   win.document.close();
   win.focus();
+  if (activeAnschreiben) recordBriefSent(activeAnschreiben, "drucken");
 }
 
 // Baut das Daten-Dict für das Hessen-Formular und andere Anschreiben aus
@@ -9769,7 +10502,10 @@ function renderAnschreibenView() {
     ${hintBox}
     <div class="anschreiben-grid">
       <div>
-        <div style="font-size:12px; text-transform:uppercase; letter-spacing:.5px; color:var(--text-soft); margin-bottom:8px; padding-left:4px;">Vorlagen</div>
+        <div style="font-size:12px; text-transform:uppercase; letter-spacing:.5px; color:var(--text-soft); margin-bottom:8px; padding-left:4px; display:flex; justify-content:space-between; align-items:center;">
+          <span>Vorlagen</span>
+          <button onclick="addCustomTemplate()" style="background:transparent; border:1px dashed var(--border); color:var(--text-soft); padding:3px 9px; border-radius:6px; cursor:pointer; font-size:11px; text-transform:none; letter-spacing:0;" title="Eigene Brief-Vorlage anlegen">+ eigene Vorlage</button>
+        </div>
         ${listHtml}
       </div>
       ${editorHtml}
@@ -9785,6 +10521,7 @@ function emailAnschreiben() {
   const subject = `${tpl.title}${state.shared.name ? " - " + state.shared.name : ""}${state.shared.aktenzeichen ? " (Az. " + state.shared.aktenzeichen + ")" : ""}`;
   const url = `mailto:${encodeURIComponent(state.shared.bh_email || "")}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(ta.value)}`;
   window.location.href = url;
+  if (activeAnschreiben) recordBriefSent(activeAnschreiben, "email");
 }
 
 function renderOnboardingModal() {
@@ -10090,12 +10827,24 @@ function renderRowsSection(sec) {
       ? `<button class="row-calendar-btn" onclick="exportRowToCalendar('${docId}', '${sec.id}', ${idx})" title="Diesen Eintrag als .ics in den Kalender exportieren">📲 Kalender</button>`
       : "";
 
+    // Termin-Vorbereitungs-Checkliste nur für künftige BH-Termine
+    let terminPrepHtml = "";
+    if (state.activeDocId === "bhtermine" && sec.id === "termine" && row.datum) {
+      const rowDate = parseDateGuess(row.datum);
+      const today = new Date(); today.setHours(0,0,0,0);
+      if (rowDate && rowDate >= today) {
+        const termId = "bh-" + idx;
+        terminPrepHtml = renderTerminPrepWidget(termId, false);
+      }
+    }
+
     html += `
       <div class="row-card${visible ? '' : ' search-hidden'}">
         <div class="row-num">#${idx + 1}${pastMarker}</div>
         <div class="row-grid">${cols}</div>
         ${attachmentsHtml}
         ${signatureHtml}
+        ${terminPrepHtml}
         <div class="row-actions">
           ${calendarBtn}
           <button class="row-delete" onclick="deleteRow('${sec.id}', ${idx})">🗑 Eintrag entfernen</button>
@@ -10530,12 +11279,225 @@ function attachListeners() {
 }
 
 // Global Escape key handler: closes any open modal
+// ── Globale Suche (Strg+/) ────────────────────────────────────────────────
+// Durchsucht: Notizen, Inbox-Belege, Doc-Beleg-Attachment-Namen, Doc-Inhalte
+// (alle answers) und Brief-Templates. Ergebnisliste mit Link zur Quelle.
+function openGlobalSearch() {
+  state.globalSearchOpen = true;
+  state.globalSearchQuery = "";
+  render();
+  // Focus auf das Input-Feld setzen nach dem Render
+  setTimeout(() => {
+    const el = document.getElementById("global-search-input");
+    if (el) el.focus();
+  }, 40);
+}
+function closeGlobalSearch() {
+  state.globalSearchOpen = false;
+  state.globalSearchQuery = "";
+  render();
+}
+function setGlobalSearchQuery(q) {
+  state.globalSearchQuery = q;
+  render();
+  setTimeout(() => {
+    const el = document.getElementById("global-search-input");
+    if (el && document.activeElement !== el) el.focus();
+  }, 0);
+}
+function runGlobalSearch(q) {
+  const norm = (s) => (s == null ? "" : String(s).toLowerCase());
+  const needle = norm(q).trim();
+  if (!needle) return [];
+  const results = [];
+
+  // Notizen
+  (state.notes || []).forEach(n => {
+    const txt = norm(n.text);
+    if (txt.includes(needle)) {
+      results.push({
+        kind: "note",
+        label: (n.text || "").slice(0, 80),
+        sub: "📝 Notiz · " + (n.createdAt ? new Date(n.createdAt).toLocaleDateString("de-DE") : ""),
+        action: () => { state.view = "home"; render(); /* notes panel is on home */ },
+      });
+    }
+  });
+
+  // Inbox-Belege
+  (state.inbox || []).forEach(item => {
+    if (norm(item.name).includes(needle) || norm(item.ocrText).includes(needle)) {
+      results.push({
+        kind: "inbox",
+        label: item.name || "Beleg",
+        sub: "📥 Beleg-Inbox · " + (item.type === "image" ? "Bild" : "PDF"),
+        action: () => { state.view = "inbox"; render(); },
+      });
+    }
+  });
+
+  // Doc-Anhänge (Name + ggf OCR-Text)
+  Object.entries(state.docs || {}).forEach(([docId, ds]) => {
+    if (!ds || !ds.attachments) return;
+    const docDef = DOCS[docId];
+    if (!docDef) return;
+    Object.entries(ds.attachments).forEach(([secId, byRow]) => {
+      if (!byRow) return;
+      Object.entries(byRow).forEach(([rowIdx, atts]) => {
+        if (!Array.isArray(atts)) return;
+        atts.forEach(att => {
+          if (norm(att.name).includes(needle) || norm(att.extractedText).includes(needle)) {
+            results.push({
+              kind: "attachment",
+              label: att.name || "Beleg",
+              sub: (docDef.icon || "📎") + " " + docDef.title + " · " + secId,
+              action: () => { state.activeDocId = docId; state.view = "wizard"; render(); },
+            });
+          }
+        });
+      });
+    });
+  });
+
+  // Doc-Answers (Felder)
+  Object.entries(state.docs || {}).forEach(([docId, ds]) => {
+    if (!ds || !ds.answers) return;
+    const docDef = DOCS[docId];
+    if (!docDef) return;
+    Object.entries(ds.answers).forEach(([key, val]) => {
+      const v = norm(val);
+      if (v && v.includes(needle)) {
+        results.push({
+          kind: "field",
+          label: String(val).slice(0, 80),
+          sub: (docDef.icon || "📄") + " " + docDef.title + " · " + key,
+          action: () => { state.activeDocId = docId; state.view = "wizard"; render(); },
+        });
+      }
+    });
+    // Auch Rows durchsuchen
+    if (ds.rows) {
+      Object.entries(ds.rows).forEach(([secId, rows]) => {
+        if (!Array.isArray(rows)) return;
+        rows.forEach((r, idx) => {
+          const all = Object.values(r).map(v => norm(v)).join(" ");
+          if (all.includes(needle)) {
+            // Treffer mit dem ersten Feld als Label
+            const firstField = Object.entries(r).find(([k, v]) => norm(v).includes(needle));
+            const labelText = firstField ? String(firstField[1]).slice(0, 80) : "Zeile " + (idx + 1);
+            results.push({
+              kind: "row",
+              label: labelText,
+              sub: (docDef.icon || "📄") + " " + docDef.title + " · " + secId + " Zeile " + (idx + 1),
+              action: () => { state.activeDocId = docId; state.view = "wizard"; render(); },
+            });
+          }
+        });
+      });
+    }
+  });
+
+  // Brief-Templates
+  Object.entries(ANSCHREIBEN_TEMPLATES).forEach(([key, tpl]) => {
+    if (norm(tpl.title).includes(needle) || norm(tpl.desc).includes(needle)) {
+      const cat = ANSCHREIBEN_CATEGORIES[tpl.cat]?.label || "Brief";
+      results.push({
+        kind: "template",
+        label: tpl.title,
+        sub: "✉️ " + cat,
+        action: () => { state.view = "anschreiben"; selectAnschreiben(key); },
+      });
+    }
+  });
+
+  // Kontakte (Adressbuch)
+  (state.contacts || []).forEach(c => {
+    const blob = norm([c.name, c.firma, c.email, c.telefon, c.notiz, c.rolle].join(" "));
+    if (blob.includes(needle)) {
+      results.push({
+        kind: "contact",
+        label: c.name || c.firma || "Kontakt",
+        sub: "📇 Adressbuch · " + (c.rolle || ""),
+        action: () => { state.view = "contacts"; render(); },
+      });
+    }
+  });
+
+  return results.slice(0, 60);
+}
+// Globale Such-Action: navigiert per Index zum gewaehlten Treffer
+const _searchResultsCache = new Map();
+function selectSearchResult(idx) {
+  const results = _searchResultsCache.get(state.globalSearchQuery || "") || [];
+  const r = results[idx];
+  if (!r) return;
+  closeGlobalSearch();
+  setTimeout(() => r.action(), 50);
+}
+function renderGlobalSearchModal() {
+  if (!state.globalSearchOpen) return "";
+  const q = state.globalSearchQuery || "";
+  const results = runGlobalSearch(q);
+  _searchResultsCache.set(q, results);
+  let listHtml = "";
+  if (q && results.length === 0) {
+    listHtml = `<div style="padding:30px; text-align:center; color:var(--text-soft); font-size:13px;">Keine Treffer für „${esc(q)}". Versuch's mit weniger oder anderen Worten.</div>`;
+  } else if (results.length > 0) {
+    listHtml = results.map((r, i) => `
+      <button onclick="selectSearchResult(${i})" style="display:block; width:100%; text-align:left; padding:10px 14px; background:transparent; border:none; border-bottom:1px solid var(--border); cursor:pointer; color:var(--text);">
+        <div style="font-size:13px; font-weight:500;">${esc(r.label)}</div>
+        <div style="font-size:11px; color:var(--text-soft); margin-top:2px;">${esc(r.sub)}</div>
+      </button>`).join("");
+  } else {
+    listHtml = `<div style="padding:30px; text-align:center; color:var(--text-soft); font-size:13px;">Tippe los, um Notizen, Belege, Doc-Felder, Briefe und Kontakte zu durchsuchen.<br><br><strong>Tipp:</strong> Strg+/ öffnet diese Suche von überall.</div>`;
+  }
+  return `
+    <div class="modal-backdrop" onclick="if(event.target===this) closeGlobalSearch()" style="align-items:flex-start; padding-top:60px;">
+      <div class="modal" style="max-width:640px; padding:0; overflow:hidden;">
+        <div style="padding:14px 16px; border-bottom:1px solid var(--border); display:flex; gap:10px; align-items:center;">
+          <span style="font-size:18px;">🔍</span>
+          <input type="text" id="global-search-input" value="${esc(q)}" oninput="setGlobalSearchQuery(this.value)" placeholder="Suche in Notizen, Belegen, Doc-Inhalten, Briefen, Kontakten…" style="flex:1; padding:8px 10px; border:1px solid var(--border); border-radius:6px; font-size:14px; background:var(--input-bg); color:var(--text);" autocomplete="off" />
+          <button class="modal-close-btn" onclick="closeGlobalSearch()" title="Schließen (Esc)">✕</button>
+        </div>
+        <div style="max-height:60vh; overflow:auto;">${listHtml}</div>
+        ${results.length > 0 ? `<div style="padding:8px 14px; border-top:1px solid var(--border); font-size:11px; color:var(--text-soft); text-align:right;">${results.length} Treffer · Esc zum Schließen</div>` : ""}
+      </div>
+    </div>`;
+}
+
 document.addEventListener("keydown", e => {
-  if (e.key !== "Escape") return;
-  if (resetModalOpen) { closeResetModal(); return; }
-  if (quickAddOpen) { closeQuickAdd(); return; }
-  if (onboardingActive) { skipOnboarding(); return; }
-  if (lightboxOpen) { closeLightbox(); return; }
+  // Escape: schliesst offene Modals (Reihenfolge: innerste zuerst)
+  if (e.key === "Escape") {
+    if (state.extractedTextModal) { closeExtractedTextModal(); return; }
+    if (resetModalOpen) { closeResetModal(); return; }
+    if (quickAddOpen) { closeQuickAdd(); return; }
+    if (onboardingActive) { skipOnboarding(); return; }
+    if (lightboxOpen) { closeLightbox(); return; }
+    if (state.inboxModal) { closeInboxModal(); return; }
+    if (state.globalSearchOpen) { closeGlobalSearch(); return; }
+    return;
+  }
+  // Strg+/ oder Cmd+/: Globale Suche oeffnen
+  if ((e.ctrlKey || e.metaKey) && e.key === "/" && !state.globalSearchOpen) {
+    e.preventDefault();
+    openGlobalSearch();
+    return;
+  }
+  // Strg+P oder Cmd+P: Drucken (nur im Doc-Preview-Modus oder Anschreiben)
+  if ((e.ctrlKey || e.metaKey) && e.key === "p") {
+    if (state.view === "preview" || state.view === "anschreiben") {
+      // Browser-eigener Druckdialog ist sowieso besser als unser Print-Window
+      // also lassen wir den Standard-Print durchrennen
+      return;
+    }
+    return;
+  }
+  // Strg+S oder Cmd+S: Sichern (Backup-Datei)
+  if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+    e.preventDefault();
+    if (typeof exportAllData === "function") exportAllData();
+    return;
+  }
 });
 
 function openDoc(id) {
@@ -10556,7 +11518,7 @@ async function quickPdf(id) {
 // === EXPORT / IMPORT ===
 async function exportAllData() {
   const dump = {
-    version: 3,
+    version: 4,
     appVersion: APP_VERSION,
     exportedAt: new Date().toISOString(),
     shared: state.shared,
@@ -10565,6 +11527,11 @@ async function exportAllData() {
     docs: state.docs,
     notes: state.notes,
     inbox: state.inbox,
+    // v3.31 additions:
+    contacts: state.contacts || [],
+    briefHistory: state.briefHistory || [],
+    customTemplates: state.customTemplates || {},
+    terminPrep: state.terminPrep || {},
   };
   const blob = new Blob([JSON.stringify(dump, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
@@ -10589,7 +11556,7 @@ function triggerImport() {
       if (!data || typeof data !== "object" || !data.docs) throw new Error("Ungültiges Format - das ist keine Bewährungshilfe-Datensicherung");
       // Version compatibility check
       const fileVer = data.version || 1;
-      if (fileVer > 3) {
+      if (fileVer > 4) {
         if (!confirm(`Diese Sicherungsdatei wurde mit einer neueren Version der App erstellt (Version ${fileVer}, deine App: ${APP_VERSION}). Möglicherweise gehen dabei Daten verloren oder werden falsch eingelesen.\n\nTrotzdem fortfahren?`)) return;
       }
       if (!confirm("Achtung: Importieren überschreibt deine aktuellen Daten in diesem Browser. Fortfahren?")) return;
@@ -10603,6 +11570,14 @@ function triggerImport() {
       if (data.theme === "dark" || data.theme === "light") { state.theme = data.theme; applyTheme(); }
       if (Array.isArray(data.notes)) state.notes = data.notes;
       if (Array.isArray(data.inbox)) state.inbox = data.inbox;
+      // v3.31 fields
+      if (Array.isArray(data.contacts)) state.contacts = data.contacts;
+      if (Array.isArray(data.briefHistory)) state.briefHistory = data.briefHistory;
+      if (data.customTemplates && typeof data.customTemplates === "object") {
+        state.customTemplates = data.customTemplates;
+        restoreCustomTemplatesIntoTemplates();
+      }
+      if (data.terminPrep && typeof data.terminPrep === "object") state.terminPrep = data.terminPrep;
       // Save everything
       for (const id of Object.keys(state.docs)) {
         if (DOCS[id]) await Storage.set(DOCS[id].storageKey, JSON.stringify(state.docs[id]));
@@ -10611,6 +11586,10 @@ function triggerImport() {
       await Storage.set(THEME_STORAGE_KEY, state.theme);
       await Storage.set(NOTES_STORAGE_KEY, JSON.stringify(state.notes));
       await Storage.set(INBOX_STORAGE_KEY, JSON.stringify(state.inbox));
+      if (state.contacts) await Storage.set(CONTACTS_STORAGE_KEY, JSON.stringify(state.contacts));
+      if (state.briefHistory) await Storage.set(BRIEF_HISTORY_KEY, JSON.stringify(state.briefHistory));
+      if (state.customTemplates) await Storage.set(CUSTOM_TEMPLATES_KEY, JSON.stringify(state.customTemplates));
+      if (state.terminPrep) await Storage.set(TERMIN_PREP_KEY, JSON.stringify(state.terminPrep));
       const exportedDate = data.exportedAt ? new Date(data.exportedAt).toLocaleDateString("de-DE") : "";
       alert(`Daten erfolgreich importiert!${exportedDate ? "\n\nSicherungsdatum: " + exportedDate : ""}`);
       render();
@@ -13808,6 +14787,8 @@ function checkBrowserCompat() {
   if (!checkBrowserCompat()) return;
   await loadAllState();
   render();
+  // Termin-Erinnerungen anwerfen, falls vom Nutzer aktiviert
+  scheduleNotifChecks();
 })();
 </script>
 </body>
