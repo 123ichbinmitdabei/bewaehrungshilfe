@@ -5119,7 +5119,7 @@ let showArchived = false;
 function toggleShowArchived() { showArchived = !showArchived; render(); }
 
 // === VERSION INFO ===
-const APP_VERSION = "v3.29";
+const APP_VERSION = "v3.30";
 
 // === ONBOARDING ===
 let onboardingActive = false;
@@ -9180,27 +9180,203 @@ function downloadAnschreibenTxt() {
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
-function printAnschreiben() {
+// ── Brief-Anhänge: aus den vorhandenen Belegen aller Docs PLUS komplette
+// generierte Dokumente. State ist transient (nur die aktuelle Session); jeder
+// Brief hat eine eigene Auswahl, identifiziert über den Template-Key.
+function getAvailableAttachments() {
+  const list = [];
+  // 1. Belege aus allen Docs
+  Object.entries(state.docs || {}).forEach(([docId, ds]) => {
+    if (!ds || !ds.attachments) return;
+    const docDef = DOCS[docId];
+    if (!docDef) return;
+    Object.entries(ds.attachments).forEach(([secId, byRow]) => {
+      if (!byRow || typeof byRow !== "object") return;
+      Object.entries(byRow).forEach(([rowIdx, atts]) => {
+        if (!Array.isArray(atts)) return;
+        atts.forEach(att => {
+          if (!att || !att.id) return;
+          list.push({
+            id: docId + "/" + secId + "/" + rowIdx + "/" + att.id,
+            kind: "attachment",
+            docId, secId, rowIdx, attId: att.id,
+            type: att.type,
+            label: (att.name || "Beleg"),
+            sub: (docDef.icon || "📎") + " " + (docDef.title || docId) + " · " + secId,
+          });
+        });
+      });
+    });
+  });
+  // 2. Komplette Dokumente (als HTML eingebettet)
+  ["bhtermine", "ear", "schadens", "kosten", "sozial", "thera", "ziele", "zeit", "asservate"].forEach(docId => {
+    const doc = DOCS[docId];
+    if (!doc) return;
+    if (isDocHidden && isDocHidden(docId)) return;
+    list.push({
+      id: "doc/" + docId,
+      kind: "doc",
+      docId,
+      label: doc.title,
+      sub: (doc.icon || "📄") + " gesamtes Dokument als Anhang einbetten",
+    });
+  });
+  return list;
+}
+
+function getSelectedAttachmentIds() {
+  if (!state.anschreibenAttachments) return new Set();
+  const arr = state.anschreibenAttachments[activeAnschreiben] || [];
+  return new Set(arr);
+}
+
+function toggleAnschreibenAttachment(id) {
+  if (!state.anschreibenAttachments) state.anschreibenAttachments = {};
+  if (!state.anschreibenAttachments[activeAnschreiben]) state.anschreibenAttachments[activeAnschreiben] = [];
+  const arr = state.anschreibenAttachments[activeAnschreiben];
+  const i = arr.indexOf(id);
+  if (i >= 0) arr.splice(i, 1);
+  else arr.push(id);
+  render();
+}
+
+// Liefert das HTML, das ein Anhang im Druck-Fenster ergibt. Für Bilder direkt
+// die DataUrl, für PDFs gerendert als Page-Images (PDF.js), für komplette Docs
+// das jeweilige renderPrintXxx().
+async function renderAttachmentForPrint(att) {
+  if (att.kind === "attachment") {
+    const ds = state.docs[att.docId];
+    if (!ds || !ds.attachments || !ds.attachments[att.secId] || !ds.attachments[att.secId][att.rowIdx]) return "";
+    const a = ds.attachments[att.secId][att.rowIdx].find(x => x.id === att.attId);
+    if (!a) return "";
+    if (a.type === "image") {
+      return `<div style="page-break-before:always; margin-top:20pt;">
+        <div style="font-size:10pt; color:#555; margin-bottom:6pt; font-style:italic;">Anhang: ${esc(a.name || "")} · ${esc(att.sub)}</div>
+        <img src="${a.dataUrl}" style="max-width:100%; max-height:25cm; object-fit:contain; border:1px solid #ddd;" />
+      </div>`;
+    } else if (a.type === "pdf") {
+      try {
+        const pages = await renderPdfAttachmentToPageImages(a, { scale: 1.5, quality: 0.78 });
+        if (pages.length === 0) {
+          return `<div style="page-break-before:always; margin-top:20pt; font-style:italic;">Anhang ${esc(a.name)} konnte nicht eingebettet werden.</div>`;
+        }
+        const imgs = pages.map((p, idx) => `<img src="${p.dataUrl}" style="display:block; max-width:100%; ${idx > 0 ? 'page-break-before:always;' : ''} margin:8pt 0;" />`).join("");
+        return `<div style="page-break-before:always; margin-top:20pt;">
+          <div style="font-size:10pt; color:#555; margin-bottom:6pt; font-style:italic;">Anhang: ${esc(a.name || "")} · ${esc(att.sub)}</div>
+          ${imgs}
+        </div>`;
+      } catch(e) {
+        return `<div style="page-break-before:always; margin-top:20pt; font-style:italic;">Anhang ${esc(a.name)}: ${esc(e.message)}</div>`;
+      }
+    }
+  } else if (att.kind === "doc") {
+    // Komplettes Dokument als HTML einbetten — nutzt die existierenden Render-
+    // Funktionen für die Druckansicht, die auch beim normalen Drucken laufen.
+    const docId = att.docId;
+    const renderFnName = "renderPrint" + docId.charAt(0).toUpperCase() + docId.slice(1);
+    const renderFn = window[renderFnName];
+    if (typeof renderFn !== "function") {
+      return `<div style="page-break-before:always; margin-top:20pt; font-style:italic;">Dokument ${docId} konnte nicht eingebettet werden.</div>`;
+    }
+    try {
+      let html = renderFn();
+      // Anhang-Trenner + Beschriftung
+      const docDef = DOCS[docId];
+      return `<div style="page-break-before:always; margin-top:20pt;">
+        <div style="border-bottom:2px solid #333; padding-bottom:8pt; margin-bottom:14pt;">
+          <div style="font-size:11pt; color:#555;">Anhang</div>
+          <div style="font-size:14pt; font-weight:bold;">${esc((docDef?.icon || "") + " " + (docDef?.title || docId))}</div>
+        </div>
+        ${html}
+      </div>`;
+    } catch(e) {
+      return `<div style="page-break-before:always; margin-top:20pt; font-style:italic;">Fehler beim Einbetten von ${docId}: ${esc(e.message)}</div>`;
+    }
+  }
+  return "";
+}
+
+async function printAnschreiben() {
   const ta = document.getElementById("anschreiben-textarea");
   if (!ta) return;
   const text = ta.value;
   const tpl = ANSCHREIBEN_TEMPLATES[activeAnschreiben];
+
+  // Anhänge bauen, falls welche ausgewählt
+  const selectedIds = getSelectedAttachmentIds();
+  let attachmentsHtml = "";
+  if (selectedIds.size > 0) {
+    const available = getAvailableAttachments();
+    const selected = available.filter(a => selectedIds.has(a.id));
+    // Loading overlay damit User merkt, dass was passiert
+    const overlay = document.createElement("div");
+    overlay.style.cssText = "position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:99999; display:flex; align-items:center; justify-content:center; color:#fff; font-size:16px;";
+    overlay.innerHTML = '<div style="background:#1e3a5f; padding:24px 36px; border-radius:12px; text-align:center;"><div style="font-size:32px;">📎</div><div style="margin-top:10px;">Bereite Anhänge vor (' + selected.length + ')…</div></div>';
+    document.body.appendChild(overlay);
+    try {
+      // Inline: Anhang-Inhalte zusammenbauen, danach in Print-Window injizieren
+      const parts = [];
+      for (const att of selected) {
+        parts.push(await renderAttachmentForPrint(att));
+      }
+      attachmentsHtml = parts.join("");
+    } finally {
+      document.body.removeChild(overlay);
+    }
+  }
+
   const win = window.open("", "_blank");
-  win.document.write(`<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"><title>${esc(tpl.title)}</title><style>body{font-family: 'Times New Roman', serif; max-width: 17cm; margin: 2cm auto; line-height: 1.6; white-space: pre-wrap; font-size: 12pt;} @media print { body { margin: 1.5cm; } }</style></head><body>${esc(text)}</body></html>`);
+  if (!win) {
+    alert("Druckfenster vom Browser blockiert. Bitte Pop-ups für diese Seite erlauben.");
+    return;
+  }
+  win.document.write(
+    '<!DOCTYPE html><html lang="de"><head><meta charset="utf-8">' +
+    '<title>' + esc(tpl.title) + '</title>' +
+    '<style>' +
+      'body{font-family: \"Times New Roman\", serif; max-width: 17cm; margin: 2cm auto; line-height: 1.6; font-size: 12pt; color:#000;}' +
+      '.brief-text { white-space: pre-wrap; }' +
+      '.attachments-area img { max-width: 100%; }' +
+      '@media print { body { margin: 1.5cm; max-width: none; } }' +
+    '</style></head><body>' +
+    '<div class="brief-text">' + esc(text) + '</div>' +
+    (attachmentsHtml ? '<div class="attachments-area">' + attachmentsHtml + '</div>' : "") +
+    '</body></html>'
+  );
   win.document.close();
-  setTimeout(() => win.print(), 300);
+  setTimeout(() => win.print(), 400);
 }
 
 // Form-mode printing: rendert das Formular-HTML (mit Checkboxen, Linien etc.)
 // in ein eigenes Fenster und löst den Druck aus. Im Gegensatz zu printAnschreiben
 // wird hier HTML markup beibehalten (nicht als Plain-Text escaped).
-function printFormular() {
+async function printFormular() {
   const tpl = ANSCHREIBEN_TEMPLATES[activeAnschreiben];
   if (!tpl || !tpl.isFormular) return;
   // Daten-Dict frisch aus aktuellem State bauen — gleich wie in renderAnschreibenView
   const d = buildAnschreibenDataDict();
   // Druck-Version: editable=false, also Spans statt Inputs
   const printHtml = renderErklaerungFormHtml(d, false);
+
+  // Anhänge sammeln (wie in printAnschreiben)
+  const selectedIds = getSelectedAttachmentIds();
+  let attachmentsHtml = "";
+  if (selectedIds.size > 0) {
+    const available = getAvailableAttachments();
+    const selected = available.filter(a => selectedIds.has(a.id));
+    const overlay = document.createElement("div");
+    overlay.style.cssText = "position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:99999; display:flex; align-items:center; justify-content:center; color:#fff; font-size:16px;";
+    overlay.innerHTML = '<div style="background:#1e3a5f; padding:24px 36px; border-radius:12px; text-align:center;"><div style="font-size:32px;">📎</div><div style="margin-top:10px;">Bereite Anhänge vor (' + selected.length + ')…</div></div>';
+    document.body.appendChild(overlay);
+    try {
+      const parts = [];
+      for (const att of selected) parts.push(await renderAttachmentForPrint(att));
+      attachmentsHtml = parts.join("");
+    } finally {
+      document.body.removeChild(overlay);
+    }
+  }
+
   const title = tpl ? tpl.title : "Formular";
   const win = window.open("", "_blank");
   if (!win) {
@@ -9238,6 +9414,7 @@ function printFormular() {
       '<button onclick="window.close()">Schließen</button>' +
     '</div>' +
     printHtml +
+    attachmentsHtml +
     '</body></html>'
   );
   win.document.close();
@@ -9478,28 +9655,101 @@ function renderAnschreibenView() {
     if (tpl.isFormular && typeof tpl.renderHtml === "function") {
       // Formular-Modus: vorschau-rendern statt editierbarem Textarea
       const formHtml = tpl.renderHtml(d);
+      // Anhänge-Picker auch hier (z.B. EAR an die Erklärung anhängen)
+      const available = getAvailableAttachments();
+      const selectedIds = getSelectedAttachmentIds();
+      let attHtml = "";
+      if (available.length > 0) {
+        const attachments = available.filter(a => a.kind === "attachment");
+        const docs = available.filter(a => a.kind === "doc");
+        const renderItem = a => {
+          const isSel = selectedIds.has(a.id);
+          const ic = a.type === "image" ? "🖼" : (a.type === "pdf" ? "📄" : "📎");
+          return `<label style="display:flex; gap:8px; align-items:flex-start; padding:7px 10px; background:${isSel ? 'var(--primary-soft)' : 'var(--bg)'}; border:1px solid ${isSel ? 'var(--primary-light)' : 'var(--border)'}; border-radius:7px; margin-bottom:4px; cursor:pointer; font-size:12px;">
+            <input type="checkbox" ${isSel ? "checked" : ""} onchange="toggleAnschreibenAttachment('${esc(a.id)}')" style="margin-top:2px;" />
+            <span style="flex:1;">
+              <strong>${a.kind === "doc" ? "📑" : ic} ${esc(a.label)}</strong>
+              <div style="font-size:11px; color:var(--text-soft); margin-top:1px;">${esc(a.sub)}</div>
+            </span>
+          </label>`;
+        };
+        attHtml = `
+          <details ${selectedIds.size > 0 ? "open" : ""} style="margin-top:10px; background:var(--card); border:1px solid var(--border); border-radius:10px; padding:8px 12px;">
+            <summary style="cursor:pointer; font-size:13px; font-weight:600; color:var(--text); list-style:none; display:flex; align-items:center; gap:8px;">
+              <span style="font-size:16px;">📎</span>
+              <span style="flex:1;">Anhänge${selectedIds.size > 0 ? ` <span style="background:var(--primary); color:#fff; padding:1px 8px; border-radius:999px; font-size:11px; margin-left:4px;">${selectedIds.size}</span>` : ""}</span>
+              <span style="font-size:11px; color:var(--text-soft); font-weight:400;">${available.length} verfügbar</span>
+            </summary>
+            <div style="margin-top:10px;">
+              ${attachments.length > 0 ? `<div style="font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:var(--text-soft); margin:6px 0 4px;">Belege aus Dokumenten (${attachments.length})</div>${attachments.map(renderItem).join("")}` : ""}
+              ${docs.length > 0 ? `<div style="font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:var(--text-soft); margin:10px 0 4px;">Komplettes Dokument als Anhang einbetten</div>${docs.map(renderItem).join("")}` : ""}
+              <div style="font-size:11px; color:var(--text-soft); margin-top:8px; padding:6px 8px; background:var(--bg); border-radius:6px;">💡 Häufig: bei der Erklärung wirtschaftliche Verhältnisse die <strong>EAR</strong> sowie die <strong>aktuelle Lohnabrechnung</strong> anhängen.</div>
+            </div>
+          </details>`;
+      }
       editorHtml = `
         <div style="background:var(--card); border:1px solid var(--border); border-radius:14px; padding:18px;">
           <h3 style="color:var(--primary); margin-bottom:6px;">${esc(tpl.title)}</h3>
           <div style="font-size:12px; color:var(--text-soft); margin-bottom:12px;">Formular vorab ausgefüllt aus Stammdaten, EAR und Verfahrenskosten-Doc. Felder, die fehlen, bitte vor dem Druck in den jeweiligen Dokumenten ergänzen, dann hier nochmal aufrufen. Nach dem Druck nur noch unterschreiben.</div>
           <div id="formular-preview" style="background:#fff; color:#000; border:1px solid var(--border); border-radius:8px; padding:24px; max-height:70vh; overflow:auto;">${formHtml}</div>
+          ${attHtml}
           <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:12px;">
-            <button class="btn btn-primary" onclick="printFormular()">🖨 Drucken / als PDF</button>
+            <button class="btn btn-primary" onclick="printFormular()">🖨 Drucken / als PDF${selectedIds.size > 0 ? ` (mit ${selectedIds.size} Anhang${selectedIds.size === 1 ? "" : "en"})` : ""}</button>
             <button class="btn btn-secondary" onclick="state.view='home'; state.activeDocId='kosten'; render();">✏️ Felder ergänzen (Verfahrenskosten)</button>
           </div>
           <div style="font-size:11px; color:var(--text-soft); margin-top:10px;">💡 Die Textfelder im Formular kannst du direkt bearbeiten — Änderungen werden automatisch in den passenden Dokumenten gespeichert (z.B. Arbeitgeber in den Verfahrenskosten). Familienstand und Sozialleistungs-Checkboxen kommen automatisch aus EAR und Verfahrenskosten.</div>
         </div>`;
     } else {
       const text = tpl.body(d);
+      // Anhänge-Picker: Belege aus allen Docs + komplette Doc-Druckversionen
+      const available = getAvailableAttachments();
+      const selectedIds = getSelectedAttachmentIds();
+      let attHtml = "";
+      if (available.length > 0) {
+        // Gruppieren: Belege vs. Komplette Dokumente
+        const attachments = available.filter(a => a.kind === "attachment");
+        const docs = available.filter(a => a.kind === "doc");
+        const renderItem = a => {
+          const isSel = selectedIds.has(a.id);
+          const ic = a.type === "image" ? "🖼" : (a.type === "pdf" ? "📄" : "📎");
+          return `<label style="display:flex; gap:8px; align-items:flex-start; padding:7px 10px; background:${isSel ? 'var(--primary-soft)' : 'var(--bg)'}; border:1px solid ${isSel ? 'var(--primary-light)' : 'var(--border)'}; border-radius:7px; margin-bottom:4px; cursor:pointer; font-size:12px;">
+            <input type="checkbox" ${isSel ? "checked" : ""} onchange="toggleAnschreibenAttachment('${esc(a.id)}')" style="margin-top:2px;" />
+            <span style="flex:1;">
+              <strong>${a.kind === "doc" ? "📑" : ic} ${esc(a.label)}</strong>
+              <div style="font-size:11px; color:var(--text-soft); margin-top:1px;">${esc(a.sub)}</div>
+            </span>
+          </label>`;
+        };
+        attHtml = `
+          <details ${selectedIds.size > 0 ? "open" : ""} style="margin-top:10px; background:var(--card); border:1px solid var(--border); border-radius:10px; padding:8px 12px;">
+            <summary style="cursor:pointer; font-size:13px; font-weight:600; color:var(--text); list-style:none; display:flex; align-items:center; gap:8px;">
+              <span style="font-size:16px;">📎</span>
+              <span style="flex:1;">Anhänge${selectedIds.size > 0 ? ` <span style="background:var(--primary); color:#fff; padding:1px 8px; border-radius:999px; font-size:11px; margin-left:4px;">${selectedIds.size}</span>` : ""}</span>
+              <span style="font-size:11px; color:var(--text-soft); font-weight:400;">${available.length} verfügbar</span>
+            </summary>
+            <div style="margin-top:10px;">
+              ${attachments.length > 0 ? `
+                <div style="font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:var(--text-soft); margin:6px 0 4px;">Belege aus Dokumenten (${attachments.length})</div>
+                ${attachments.map(renderItem).join("")}
+              ` : ""}
+              ${docs.length > 0 ? `
+                <div style="font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:var(--text-soft); margin:10px 0 4px;">Komplettes Dokument als Anhang einbetten</div>
+                ${docs.map(renderItem).join("")}
+              ` : ""}
+              <div style="font-size:11px; color:var(--text-soft); margin-top:8px; padding:6px 8px; background:var(--bg); border-radius:6px;">💡 Ausgewählte Anhänge werden beim Drucken mit angehängt — Bilder und PDFs als Seiten, komplette Dokumente als formatierte Anlage.</div>
+            </div>
+          </details>`;
+      }
       editorHtml = `
         <div style="background:var(--card); border:1px solid var(--border); border-radius:14px; padding:18px;">
           <h3 style="color:var(--primary); margin-bottom:6px;">${esc(tpl.title)}</h3>
           <div style="font-size:12px; color:var(--text-soft); margin-bottom:12px;">Vorausgefüllt mit deinen Stammdaten. Du kannst alles direkt im Feld bearbeiten. Stellen mit ____ musst du noch ausfüllen.</div>
           <textarea id="anschreiben-textarea" style="width:100%; min-height:500px; padding:14px; border:1px solid var(--border); border-radius:8px; font-family: 'Times New Roman', serif; font-size:14px; line-height:1.6; resize:vertical; background:var(--input-bg); color:var(--text);" spellcheck="true" lang="de">${esc(text)}</textarea>
+          ${attHtml}
           <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:12px;">
             <button class="btn btn-secondary" onclick="copyAnschreibenToClipboard()">📋 In Zwischenablage</button>
             <button class="btn btn-secondary" onclick="downloadAnschreibenTxt()">💾 Als Text-Datei</button>
-            <button class="btn btn-primary" onclick="printAnschreiben()">🖨 Drucken / als PDF</button>
+            <button class="btn btn-primary" onclick="printAnschreiben()">🖨 Drucken / als PDF${selectedIds.size > 0 ? ` (mit ${selectedIds.size} Anhang${selectedIds.size === 1 ? "" : "en"})` : ""}</button>
             ${state.shared.bh_email ? `<button class="btn btn-secondary" onclick="emailAnschreiben()">📧 Per Mail</button>` : ""}
           </div>
         </div>`;
