@@ -5315,7 +5315,7 @@ let showArchived = false;
 function toggleShowArchived() { showArchived = !showArchived; render(); }
 
 // === VERSION INFO ===
-const APP_VERSION = "v3.33";
+const APP_VERSION = "v3.34";
 
 // === ONBOARDING ===
 let onboardingActive = false;
@@ -7549,6 +7549,7 @@ function render() {
   else if (state.inboxModal) modalHtml = renderInboxModal();
   else if (state.extractedTextModal) modalHtml = renderExtractedTextModal();
   if (state.globalSearchOpen) modalHtml = (modalHtml || "") + renderGlobalSearchModal();
+  if (state.addCustomTplOpen) modalHtml = (modalHtml || "") + renderAddCustomTplModal();
   if (modalHtml) {
     const wrap = document.createElement("div");
     wrap.id = "modalOverlay";
@@ -7666,25 +7667,103 @@ async function deleteContact(id) {
 }
 
 // ── Adressbuch <-> Stammdaten Synchronisation ──────────────────────────────
-// Wenn der erste Kontakt mit Rolle=bh erfasst wird, übernehmen wir seine
-// Felder in state.shared. Wenn jemand die shared-Daten ändert, spiegelt das
-// zurück in den Kontakt. Reduziert Doppel-Erfassung.
+// Bidirektional zwischen den jeweils ersten Kontakten pro Rolle und den
+// entsprechenden Stammdaten-Feldern. Beispiel:
+//   bh-Kontakt  <-> state.shared.bewaehrungshelfer / bh_email / bh_telefon / ...
+//   anwalt      <-> state.shared.anwalt / anwalt_email / ...
+//   therapeut   <-> state.shared.therapeut / therapeut_email / ...
+//   gerichtskasse <-> state.shared.gerichtskasse / gerichtskasse_email / ...
+// Wenn neue Stammdaten-Felder dazu kommen, hier ergänzen.
+
+// Map<rolle, sharedFieldMap>. Jeder Eintrag mapt Kontakt-Feldname -> shared-Key.
+// "name" wird im Mapping gesondert behandelt: meist Direktname wie
+// "bewaehrungshelfer", "anwalt", "therapeut".
+const CONTACT_SHARED_MAP = {
+  bh: {
+    name: "bewaehrungshelfer",
+    firma: "bh_firma",
+    email: "bh_email",
+    telefon: "bh_telefon",
+    anschrift: "bh_anschrift",
+  },
+  anwalt: {
+    name: "anwalt",
+    firma: "anwalt_firma",
+    email: "anwalt_email",
+    telefon: "anwalt_telefon",
+    anschrift: "anwalt_anschrift",
+  },
+  therapeut: {
+    name: "therapeut",
+    firma: "therapeut_firma",
+    email: "therapeut_email",
+    telefon: "therapeut_telefon",
+    anschrift: "therapeut_anschrift",
+  },
+  gerichtskasse: {
+    name: "gerichtskasse_name",
+    firma: "gerichtskasse",
+    email: "gerichtskasse_email",
+    telefon: "gerichtskasse_telefon",
+    anschrift: "gerichtskasse_anschrift",
+  },
+  staatsanwaltschaft: {
+    name: "staatsanwaltschaft_name",
+    firma: "staatsanwaltschaft",
+    email: "staatsanwaltschaft_email",
+    telefon: "staatsanwaltschaft_telefon",
+    anschrift: "staatsanwaltschaft_anschrift",
+  },
+  gericht: {
+    name: "gericht_name",
+    firma: "gericht",
+    email: "gericht_email",
+    telefon: "gericht_telefon",
+    anschrift: "gericht_anschrift",
+  },
+  jobcenter: {
+    name: "jobcenter_name",
+    firma: "jobcenter",
+    email: "jobcenter_email",
+    telefon: "jobcenter_telefon",
+    anschrift: "jobcenter_anschrift",
+  },
+  sozialberatung: {
+    name: "sozialberatung_name",
+    firma: "sozialberatung",
+    email: "sozialberatung_email",
+    telefon: "sozialberatung_telefon",
+    anschrift: "sozialberatung_anschrift",
+  },
+  arbeitgeber: {
+    name: "arbeitgeber_ansprechpartner",
+    firma: "arbeitgeber",
+    email: "arbeitgeber_email",
+    telefon: "arbeitgeber_telefon",
+    anschrift: "arbeitgeber_anschrift",
+  },
+  polizei: {
+    name: "polizei_name",
+    firma: "polizei",
+    email: "polizei_email",
+    telefon: "polizei_telefon",
+    anschrift: "polizei_anschrift",
+  },
+};
+
+// Kontakt -> shared. Nur Felder des ersten Kontakts mit dieser Rolle werden
+// als "primärer" Kontakt gespiegelt. Spätere Kontakte mit selber Rolle
+// bleiben unverknüpft.
 function syncContactToShared(contact) {
-  if (!contact || contact.rolle !== "bh") return;
-  // Nur ersten BH-Kontakt als "primären" nehmen
-  const allBh = (state.contacts || []).filter(c => c.rolle === "bh");
-  if (allBh.length === 0 || allBh[0].id !== contact.id) return;
+  if (!contact || !contact.rolle) return;
+  const fieldMap = CONTACT_SHARED_MAP[contact.rolle];
+  if (!fieldMap) return; // Rolle hat kein Mapping (z.B. "sonstige")
+  const allOfRole = (state.contacts || []).filter(c => c.rolle === contact.rolle);
+  if (allOfRole.length === 0 || allOfRole[0].id !== contact.id) return;
   state.shared = state.shared || {};
-  // Nur überschreiben, wenn Kontakt-Feld nicht leer (sonst löscht man unbeabsichtigt)
-  const map = {
-    bewaehrungshelfer: contact.name,
-    bh_firma: contact.firma,
-    bh_email: contact.email,
-    bh_telefon: contact.telefon,
-    bh_anschrift: contact.anschrift,
-  };
   let changed = false;
-  Object.entries(map).forEach(([sharedKey, val]) => {
+  Object.entries(fieldMap).forEach(([contactField, sharedKey]) => {
+    const val = contact[contactField];
     if (val && state.shared[sharedKey] !== val) {
       state.shared[sharedKey] = val;
       changed = true;
@@ -7694,36 +7773,44 @@ function syncContactToShared(contact) {
     Storage.set(SHARED_STORAGE_KEY, JSON.stringify(state.shared));
   }
 }
+
+// shared -> Kontakt. Für jede Rolle im Mapping: Wenn die zugehörigen
+// shared-Felder Werte haben aber kein Kontakt mit dieser Rolle existiert,
+// einen anlegen. Wenn einer existiert: Werte synchronisieren (User-Änderungen
+// in Stammdaten überschreiben den Kontakt — single source of truth).
 function syncSharedToContacts() {
-  // Wird beim Bearbeiten von Stammdaten (Onboarding etc.) aufgerufen.
-  // Sucht den BH-Kontakt und aktualisiert ihn aus state.shared.
-  if (!state.contacts) return;
+  if (!state.contacts) state.contacts = [];
   const s = state.shared || {};
-  let bhContact = state.contacts.find(c => c.rolle === "bh");
-  // Wenn noch keiner existiert UND Stammdaten BH-Daten enthalten: anlegen
-  if (!bhContact && s.bewaehrungshelfer) {
-    bhContact = {
-      id: "c_" + Date.now() + "_bh01",
-      rolle: "bh",
-      name: s.bewaehrungshelfer || "",
-      firma: s.bh_firma || "",
-      email: s.bh_email || "",
-      telefon: s.bh_telefon || "",
-      anschrift: s.bh_anschrift || "",
-      notiz: "Automatisch aus Stammdaten erstellt",
-    };
-    state.contacts.unshift(bhContact);
-    saveContacts();
-    return;
-  }
-  if (!bhContact) return;
-  let changed = false;
-  if (s.bewaehrungshelfer && bhContact.name !== s.bewaehrungshelfer) { bhContact.name = s.bewaehrungshelfer; changed = true; }
-  if (s.bh_firma && bhContact.firma !== s.bh_firma) { bhContact.firma = s.bh_firma; changed = true; }
-  if (s.bh_email && bhContact.email !== s.bh_email) { bhContact.email = s.bh_email; changed = true; }
-  if (s.bh_telefon && bhContact.telefon !== s.bh_telefon) { bhContact.telefon = s.bh_telefon; changed = true; }
-  if (s.bh_anschrift && bhContact.anschrift !== s.bh_anschrift) { bhContact.anschrift = s.bh_anschrift; changed = true; }
-  if (changed) saveContacts();
+  Object.entries(CONTACT_SHARED_MAP).forEach(([rolle, fieldMap]) => {
+    // Werte aus shared sammeln
+    const values = {};
+    let anySet = false;
+    Object.entries(fieldMap).forEach(([contactField, sharedKey]) => {
+      if (s[sharedKey]) { values[contactField] = s[sharedKey]; anySet = true; }
+    });
+    if (!anySet) return; // Keine Stammdaten für diese Rolle -> nichts tun
+    // Existierenden Kontakt finden (erster mit dieser Rolle)
+    let contact = state.contacts.find(c => c.rolle === rolle);
+    if (!contact) {
+      contact = {
+        id: "c_" + Date.now() + "_" + rolle.slice(0,3) + Math.random().toString(36).slice(2,4),
+        rolle,
+        name: values.name || "",
+        firma: values.firma || "",
+        email: values.email || "",
+        telefon: values.telefon || "",
+        anschrift: values.anschrift || "",
+        notiz: "Automatisch aus Stammdaten erstellt",
+      };
+      state.contacts.unshift(contact);
+    } else {
+      // shared ist die "Quelle" — alle gesetzten Werte werden übernommen
+      Object.entries(values).forEach(([contactField, val]) => {
+        if (val) contact[contactField] = val;
+      });
+    }
+  });
+  saveContacts();
 }
 
 function renderContactsView() {
@@ -7746,9 +7833,10 @@ function renderContactsView() {
       cardsHtml += `<div style="margin-bottom:16px;">
         <h3 style="font-size:13px; text-transform:uppercase; letter-spacing:.5px; color:var(--text-soft); margin-bottom:8px;">${esc(r.icon)} ${esc(r.label)} (${list.length})</h3>`;
       list.forEach(c => {
-        const isBhPrimary = c.rolle === "bh" && list[0]?.id === c.id;
-        const syncBadge = isBhPrimary
-          ? `<div style="font-size:11px; color:var(--primary); background:var(--primary-soft); padding:4px 10px; border-radius:6px; margin-bottom:8px; display:flex; align-items:center; gap:6px;">🔗 <strong>Mit Stammdaten verknüpft</strong> — Änderungen werden in alle Briefe übernommen.</div>`
+        // Ist das der "primäre" Kontakt dieser Rolle und hat die Rolle ein Mapping?
+        const isPrimary = list[0]?.id === c.id && !!CONTACT_SHARED_MAP[c.rolle];
+        const syncBadge = isPrimary
+          ? `<div style="font-size:11px; color:var(--primary); background:var(--primary-soft); padding:4px 10px; border-radius:6px; margin-bottom:8px; display:flex; align-items:center; gap:6px;">🔗 <strong>Mit Stammdaten verknüpft</strong> — Änderungen werden in Briefe und Anträge übernommen.</div>`
           : "";
         cardsHtml += `
           <div style="background:var(--card); border:1px solid var(--border); border-radius:10px; padding:12px 14px; margin-bottom:8px;">
@@ -8002,14 +8090,38 @@ function saveCustomTemplates() {
   Storage.set(CUSTOM_TEMPLATES_KEY, JSON.stringify(state.customTemplates || {}));
 }
 function addCustomTemplate() {
-  const title = prompt("Titel der neuen Brief-Vorlage:");
-  if (!title || !title.trim()) return;
+  // prompt() ist auf vielen Browsern (insb. mobil oder mit Pop-up-Blockern)
+  // unzuverlässig — daher eigenes Modal. State: addCustomTplOpen + Pending-Titel.
+  state.addCustomTplOpen = true;
+  state.addCustomTplTitle = "";
+  state.addCustomTplCat = "bh";
+  render();
+  setTimeout(() => {
+    const el = document.getElementById("add-custom-tpl-input");
+    if (el) el.focus();
+  }, 40);
+}
+function closeAddCustomTpl() {
+  state.addCustomTplOpen = false;
+  render();
+}
+function setAddCustomTplTitle(v) { state.addCustomTplTitle = v; }
+function setAddCustomTplCat(v) { state.addCustomTplCat = v; }
+function confirmAddCustomTpl() {
+  const title = (state.addCustomTplTitle || "").trim();
+  if (!title) {
+    // Im Modal feldhervorheben: kein silent-Fail
+    const el = document.getElementById("add-custom-tpl-input");
+    if (el && el.style) el.style.borderColor = "var(--danger)";
+    return;
+  }
   if (!state.customTemplates) state.customTemplates = {};
   const key = "custom_" + Date.now();
+  const cat = state.addCustomTplCat || "bh";
   state.customTemplates[key] = {
-    title: title.trim(),
+    title: title,
     desc: "Eigene Vorlage",
-    cat: "bh",
+    cat: cat,
     text: "Sehr geehrte Damen und Herren,\n\n[hier deinen Brieftext eingeben]\n\nMit freundlichen Grüßen\n" + (state.shared?.name || ""),
   };
   saveCustomTemplates();
@@ -8021,7 +8133,37 @@ function addCustomTemplate() {
     body: () => state.customTemplates[key].text,
     isCustom: true,
   };
+  state.addCustomTplOpen = false;
+  state.addCustomTplTitle = "";
   selectAnschreiben(key);
+}
+function renderAddCustomTplModal() {
+  if (!state.addCustomTplOpen) return "";
+  const title = state.addCustomTplTitle || "";
+  const cat = state.addCustomTplCat || "bh";
+  const catOpts = Object.entries(ANSCHREIBEN_CATEGORIES).map(([k, def]) =>
+    `<option value="${k}" ${cat === k ? "selected" : ""}>${esc(def.icon)} ${esc(def.label)}</option>`).join("");
+  return `
+    <div class="modal-backdrop" onclick="if(event.target===this) closeAddCustomTpl()">
+      <div class="modal" style="max-width:480px;">
+        <div style="padding:18px 20px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:10px;">
+          <span style="font-size:22px;">✏️</span>
+          <strong style="font-size:16px;">Neue Brief-Vorlage</strong>
+          <button class="modal-close-btn" onclick="closeAddCustomTpl()" style="margin-left:auto;" title="Abbrechen">✕</button>
+        </div>
+        <div style="padding:18px 20px;">
+          <label style="display:block; font-size:13px; margin-bottom:6px; color:var(--text-soft);">Titel der Vorlage</label>
+          <input type="text" id="add-custom-tpl-input" value="${esc(title)}" oninput="setAddCustomTplTitle(this.value)" onkeydown="if(event.key==='Enter') confirmAddCustomTpl(); else if(event.key==='Escape') closeAddCustomTpl();" placeholder="z.B. Krankenkassen-Anfrage" style="width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:6px; font-size:14px; background:var(--input-bg); color:var(--text);" autocomplete="off" />
+          <label style="display:block; font-size:13px; margin:14px 0 6px; color:var(--text-soft);">Kategorie</label>
+          <select onchange="setAddCustomTplCat(this.value)" style="width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:6px; font-size:14px; background:var(--input-bg); color:var(--text);">${catOpts}</select>
+          <div style="font-size:11px; color:var(--text-soft); margin-top:10px;">💡 Du kannst den Brieftext danach im Editor frei bearbeiten — er wird automatisch gespeichert.</div>
+        </div>
+        <div style="padding:14px 20px; border-top:1px solid var(--border); display:flex; gap:8px; justify-content:flex-end;">
+          <button class="btn btn-secondary" onclick="closeAddCustomTpl()">Abbrechen</button>
+          <button class="btn btn-primary" onclick="confirmAddCustomTpl()">Anlegen</button>
+        </div>
+      </div>
+    </div>`;
 }
 function updateCustomTemplateText(key, text) {
   if (!state.customTemplates || !state.customTemplates[key]) return;
@@ -10650,15 +10792,27 @@ async function printAnschreiben() {
       'body{font-family: \"Times New Roman\", serif; max-width: 17cm; margin: 2cm auto; line-height: 1.6; font-size: 12pt; color:#000;}' +
       '.brief-text { white-space: pre-wrap; }' +
       '.attachments-area img { max-width: 100%; }' +
-      '@media print { body { margin: 1.5cm; max-width: none; } }' +
+      '.print-toolbar { position: sticky; top: 0; background: #1a5f3c; color: white; padding: 10px 20px; margin: -2cm -50vw 14pt; padding-left: 50vw; padding-right: 50vw; display: flex; gap: 10px; align-items: center; box-shadow: 0 2px 8px rgba(0,0,0,0.15); font-family: sans-serif; }' +
+      '.print-toolbar button { padding: 8px 16px; font-size: 14px; border-radius: 6px; border: none; cursor: pointer; font-weight: 600; }' +
+      '.print-toolbar .btn-print { background: white; color: #1a5f3c; }' +
+      '.print-toolbar .btn-close { background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.4); }' +
+      '.print-toolbar .hint { font-size: 12px; opacity: 0.9; margin-left: auto; font-family: sans-serif; }' +
+      '@media print { body { margin: 1.5cm; max-width: none; } .print-toolbar { display: none !important; } }' +
     '</style></head><body>' +
+    '<div class="print-toolbar">' +
+      '<button class="btn-print" onclick="window.print()">🖨 Drucken / als PDF speichern</button>' +
+      '<button class="btn-close" onclick="window.close()">Schließen</button>' +
+      '<span class="hint">Tipp: Im Druckdialog „Als PDF speichern" wählen</span>' +
+    '</div>' +
     '<div class="brief-text">' + esc(text) + '</div>' +
     getBriefSignatureHtml() +
     (attachmentsHtml ? '<div class="attachments-area">' + attachmentsHtml + '</div>' : "") +
     '</body></html>'
   );
   win.document.close();
-  setTimeout(() => win.print(), 400);
+  win.focus();
+  // Kein Auto-Print mehr — Browser blockieren das oft und der User sieht dann
+  // nur die Vorschau ohne Print-Dialog. Toolbar bietet klaren Drucken-Knopf.
   if (activeAnschreiben) recordBriefSent(activeAnschreiben, "drucken");
 }
 
@@ -10715,13 +10869,12 @@ async function printFormular() {
     .print-controls span { font-size: 13px; }
     body.has-controls { padding-top: 60px; }
   `;
-  const script = "window.addEventListener('load', function(){ setTimeout(function(){ try { window.print(); } catch(e){} }, 350); });";
+  const script = "// auto-print entfernt — User klickt explizit Drucken-Knopf";
   win.document.open();
   win.document.write(
     '<!DOCTYPE html><html lang="de"><head><meta charset="utf-8">' +
     '<title>' + esc(title) + '</title>' +
     '<style>' + css + '</style>' +
-    '<scr' + 'ipt>' + script + '</scr' + 'ipt>' +
     '</head><body class="has-controls">' +
     '<div class="print-controls">' +
       '<span>📋 Formular-Druckvorschau</span>' +
@@ -11822,11 +11975,10 @@ function openPrintWindow(pv, id) {
     body.has-controls { padding-top: 70px; }
     @media print { .print-controls { display: none !important; } body.has-controls { padding-top: 1.2cm; } }
   `;
-  // Self-printing script: waits for full load (images included), then prints.
-  const printScript =
-    "window.addEventListener('load', function(){" +
-    "  setTimeout(function(){ try { window.print(); } catch(e){} }, 350);" +
-    "});";
+  // Auto-Print entfernt - der Browser blockiert das oft mit Pop-up-Blocker,
+  // und der User sieht dann nur die Vorschau ohne Drucken-Dialog. Stattdessen
+  // klare Toolbar mit Drucken-Knopf.
+  const printScript = "// print on user click via toolbar";
   const controlsBar =
     '<div class="print-controls">' +
     '<span>📄 Druckvorschau</span>' +
@@ -11845,7 +11997,6 @@ function openPrintWindow(pv, id) {
     '<!DOCTYPE html><html lang="de"><head><meta charset="utf-8">' +
     '<title>' + esc(docTitle) + '</title>' +
     '<style>' + printCss + '</style>' +
-    '<scr' + 'ipt>' + printScript + '</scr' + 'ipt>' +
     '</head><body class="has-controls">' +
     controlsBar +
     pv.innerHTML +
@@ -12122,6 +12273,7 @@ document.addEventListener("keydown", e => {
     if (lightboxOpen) { closeLightbox(); return; }
     if (state.inboxModal) { closeInboxModal(); return; }
     if (state.globalSearchOpen) { closeGlobalSearch(); return; }
+    if (state.addCustomTplOpen) { closeAddCustomTpl(); return; }
     return;
   }
   // Strg+/ oder Cmd+/: Globale Suche oeffnen
