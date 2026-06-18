@@ -8811,11 +8811,11 @@ Anlagen:
   // renderHtml(d)-Funktion liefert das fertige Druck-HTML.
   erklaerung_wirtschaft: {
     title: "Erkl\u00E4rung \u00FCber die wirtschaftlichen Verh\u00E4ltnisse (Hessen)",
-    desc: "Offizielles Hessen-Formular zur Vorlage bei der Gerichtskasse. Wird vor-ausgef\u00FCllt aus Stammdaten, EAR und Kosten-Doc. Nach Ausdruck nur noch unterschreiben.",
+    desc: "Offizielles Hessen-Formular zur Vorlage bei der Gerichtskasse. Wird vor-ausgef\u00FCllt aus Stammdaten, EAR und Kosten-Doc. Felder sind direkt editierbar; nach Ausdruck nur noch unterschreiben.",
     empfaenger: ["landesjustizkasse"],
     isFormular: true,
-    body: (d) => renderErklaerungFormHtml(d),
-    renderHtml: (d) => renderErklaerungFormHtml(d),
+    body: (d) => renderErklaerungFormHtml(d, false),
+    renderHtml: (d) => renderErklaerungFormHtml(d, true),
   }
 };
 
@@ -8823,11 +8823,16 @@ Anlagen:
 // Verh\u00E4ltnisse" form (Hessen). Designed to mimic the official paper form
 // layout so users only need to sign after printing. Receives the merged data
 // dictionary `d` built in renderAnschreibenView().
-function renderErklaerungFormHtml(d) {
+function renderErklaerungFormHtml(d, editable) {
+  editable = !!editable;
   // Safe-String-Helper: schützt gegen Number-Werte aus dem Storage (z.B. alte
   // Onboarding-Daten, in denen Lohn-Betraege als Number statt String landeten)
-  // — JavaScript-Quirk: (123 || "") ergibt 123, nicht "".
-  const S = v => (v == null ? "" : String(v));
+  // und gegen versehentliche Objects (würden sonst "[object Object]" rendern).
+  const S = v => {
+    if (v == null) return "";
+    if (typeof v === "object" || typeof v === "boolean") return "";
+    return String(v);
+  };
 
   // Helper: a checkbox glyph filled (\u2612) or empty (\u2610) with a label.
   // Wrapped in nowrap span so it doesn't break mid-line.
@@ -8836,10 +8841,37 @@ function renderErklaerungFormHtml(d) {
     return `<span style="white-space:nowrap; margin-right:14px;"><span style="font-size:14pt;">${glyph}</span> ${esc(label)}</span>`;
   }
   // Helper: write a value above an underline; falls back to underline only.
+  // Defensiv: nicht-String-Werte (Objects, Bools, null/undefined) werden zu
+  // leerem String. Verhindert "[object Object]"-Artefakte bei korruptem Storage.
   function line(val, width) {
     width = width || "260px";
-    const v = val || "";
+    const v = (val == null || typeof val === "object" || typeof val === "boolean") ? "" : String(val);
+    if (editable) {
+      // Editierbarer Modus: echtes Input-Feld, das wie ein Unterstrich aussieht
+      return `<input type="text" value="${esc(v)}" data-erkl-field="" oninput="saveErklaerungField(this.dataset.erklField, this.value)" style="display:inline-block; min-width:${width}; max-width:${width}; border:none; border-bottom:1px solid #000; padding:0 4pt; vertical-align:bottom; font-weight:600; font-family:inherit; font-size:inherit; background:transparent; color:inherit; outline:none;" />`;
+    }
     return `<span style="display:inline-block; min-width:${width}; border-bottom:1px solid #000; padding:0 4pt; vertical-align:bottom; font-weight:600;">${esc(v) || "&nbsp;"}</span>`;
+  }
+  // Editierbares Input mit Feld-Mapping. Setzt das data-erkl-field-Attribut,
+  // damit der oninput-Handler weiß, wohin gespeichert wird. Wir geben nur den
+  // HTML-String zurück und setzen das Attribut nachträglich, weil line() oben
+  // generisch ist und nichts über das Mapping weiß.
+  function inp(fieldKey, val, width) {
+    width = width || "260px";
+    const v = (val == null || typeof val === "object" || typeof val === "boolean") ? "" : String(val);
+    if (editable) {
+      return `<input type="text" value="${esc(v)}" oninput="saveErklaerungField('${fieldKey}', this.value)" style="display:inline-block; min-width:${width}; max-width:${width}; border:none; border-bottom:1px solid #000; padding:0 4pt; vertical-align:bottom; font-weight:600; font-family:inherit; font-size:inherit; background:transparent; color:inherit; outline:none;" />`;
+    }
+    return `<span style="display:inline-block; min-width:${width}; border-bottom:1px solid #000; padding:0 4pt; vertical-align:bottom; font-weight:600;">${esc(v) || "&nbsp;"}</span>`;
+  }
+  // Editierbares Textarea (Mehrzeilig)
+  function ta(fieldKey, val, rows) {
+    rows = rows || 3;
+    const v = (val == null || typeof val === "object" || typeof val === "boolean") ? "" : String(val);
+    if (editable) {
+      return `<textarea rows="${rows}" oninput="saveErklaerungField('${fieldKey}', this.value)" style="width:100%; border:1px solid #ccc; padding:4pt; font-family:inherit; font-size:inherit; background:transparent; color:inherit; outline:none; resize:vertical;">${esc(v)}</textarea>`;
+    }
+    return `<div style="border-bottom:1px solid #000; min-height:${rows * 14}pt; padding:2pt 4pt; white-space:pre-wrap;">${esc(v) || "&nbsp;"}</div>`;
   }
 
   // Resolve sender / recipient
@@ -8941,12 +8973,12 @@ function renderErklaerungFormHtml(d) {
       </div>
 
       <div style="margin-bottom:14pt;">
-        <div><strong>Kassenzeichen:</strong> ${line(d.k_az_kasse || "", "300px")}</div>
+        <div><strong>Kassenzeichen:</strong> ${inp("k_az_kasse", S(d.k_az_kasse), "300px")}</div>
       </div>
 
       <div style="margin-bottom:6pt;"><strong><u>Kostensache</u></strong></div>
       <div style="margin-bottom:4pt;">${esc(kostensacheLine)}</div>
-      <div style="margin-bottom:16pt;">geb. am: ${esc(d.geb || "____")}</div>
+      <div style="margin-bottom:16pt;">geb. am: ${esc(S(d.geb) || "____")}</div>
 
       <h2 style="text-align:center; font-size:13pt; text-decoration:underline; margin:20pt 0 14pt;">Erkl\u00E4rung \u00FCber die wirtschaftlichen Verh\u00E4ltnisse</h2>
 
@@ -8961,22 +8993,22 @@ function renderErklaerungFormHtml(d) {
 
       <div style="margin-bottom:10pt;">
         <strong>Bezieht Ihr Ehegatte eigenes Einkommen?</strong>
-        ${cb(eheHat, "Ja.")} H\u00F6he: ${line(eheEin, "140px")} ${cb(!eheHat && (fstVerh || fstGetr || fstGesch), "Nein.")}
+        ${cb(eheHat, "Ja.")} H\u00F6he: ${inp("k_ehe_einkommen", eheEin, "140px")} ${cb(!eheHat && (fstVerh || fstGetr || fstGesch), "Nein.")}
       </div>
 
       <div style="margin-bottom:10pt;">
-        <strong>Anzahl der unterhaltsberechtigten Kinder:</strong> ${line(kinderRaw, "60px")}
-        (Alter: ${line("", "180px")})
+        <strong>Anzahl der unterhaltsberechtigten Kinder:</strong> ${inp("kinder", kinderRaw, "60px")}
+        (Alter: ${inp("kinder_alter", S(d.kinder_alter), "180px")})
       </div>
 
       <div style="margin-bottom:10pt;">
         ${cb(hatLohn, "")}
         <strong>Mein derzeitiges Arbeitseinkommen betr\u00E4gt monatlich</strong>
-        ${line(lohn, "120px")} \u20AC
+        ${inp("ear_lohn", lohn, "120px")} \u20AC
         <span style="font-size:9pt; color:#555;">(Netto)</span>
       </div>
       <div style="margin-bottom:6pt;">
-        Arbeitgeber: ${line(arbeitgeber, "360px")}
+        Arbeitgeber: ${inp("k_arbeitgeber", arbeitgeber, "360px")}
       </div>
       <div style="margin-bottom:14pt; font-size:9pt; font-style:italic;">(aktuelle Lohnabrechnung ist beizuf\u00FCgen!)</div>
 
@@ -8990,10 +9022,10 @@ function renderErklaerungFormHtml(d) {
         ${cb(cbSonst, "sonstige Leistungen")}
       </div>
       <div style="margin-bottom:6pt;">
-        in H\u00F6he von ${line(leistungBetrag, "120px")} \u20AC
+        in H\u00F6he von ${inp("leistung_betrag_override", leistungBetrag, "120px")} \u20AC
       </div>
       <div style="margin-bottom:6pt;">
-        Beh\u00F6rde: ${line("", "360px")}
+        Beh\u00F6rde: ${inp("leistung_behoerde", S(d.leistung_behoerde), "360px")}
       </div>
       <div style="margin-bottom:14pt; font-size:9pt; font-style:italic;">(aktueller Bescheid bzw. Nachweis ist beizuf\u00FCgen!)</div>
 
@@ -9001,17 +9033,21 @@ function renderErklaerungFormHtml(d) {
         <strong>Ich habe folgende monatliche Verpflichtungen/Ausgaben:</strong>
         <span style="font-size:9pt; font-style:italic;">(z.B. Strom, Miete, Kreditzahlungen etc.)</span>
       </div>
-      <div style="border:1px solid #000; min-height:80pt; padding:8pt; margin-bottom:14pt; white-space:pre-wrap;">${esc(ausgabenText) || "&nbsp;"}</div>
+      ${editable
+        ? ta("k_ausgaben_freitext", S(d.k_ausgaben_freitext) || ausgabenText, 5)
+        : `<div style="border:1px solid #000; min-height:80pt; padding:8pt; margin-bottom:14pt; white-space:pre-wrap;">${esc(ausgabenText) || "&nbsp;"}</div>`}
 
       <div style="margin-bottom:6pt;"><strong>Sonstige zweckdienliche Angaben:</strong></div>
-      <div style="border:1px solid #000; min-height:80pt; padding:8pt; margin-bottom:14pt; white-space:pre-wrap;">${esc(sonstiges) || "&nbsp;"}</div>
+      ${editable
+        ? ta("k_sonstiges", sonstiges, 5)
+        : `<div style="border:1px solid #000; min-height:80pt; padding:8pt; margin-bottom:14pt; white-space:pre-wrap;">${esc(sonstiges) || "&nbsp;"}</div>`}
 
       <div style="margin-bottom:6pt;">
         <strong>Ich habe bereits die eidesstattliche Versicherung geleistet:</strong>
         ${cb(evJa, "JA")} ${cb(evNein, "NEIN")}
       </div>
-      <div style="margin-bottom:6pt;">Wenn ja, bei welchem Gericht: ${line(d.k_ev_gericht || "", "320px")}</div>
-      <div style="margin-bottom:30pt;">Aktenzeichen: ${line(d.k_ev_aktenzeichen || "", "320px")}</div>
+      <div style="margin-bottom:6pt;">Wenn ja, bei welchem Gericht: ${inp("k_ev_gericht", S(d.k_ev_gericht), "320px")}</div>
+      <div style="margin-bottom:30pt;">Aktenzeichen: ${inp("k_ev_aktenzeichen", S(d.k_ev_aktenzeichen), "320px")}</div>
 
       <div style="margin-top:36pt; display:flex; justify-content:space-between; align-items:flex-end; gap:20pt;">
         <div style="border-top:1px solid #000; padding-top:4pt; flex:1; max-width:8cm;">
@@ -9066,9 +9102,12 @@ function printAnschreiben() {
 // in ein eigenes Fenster und löst den Druck aus. Im Gegensatz zu printAnschreiben
 // wird hier HTML markup beibehalten (nicht als Plain-Text escaped).
 function printFormular() {
-  const preview = document.getElementById("formular-preview");
-  if (!preview) return;
   const tpl = ANSCHREIBEN_TEMPLATES[activeAnschreiben];
+  if (!tpl || !tpl.isFormular) return;
+  // Daten-Dict frisch aus aktuellem State bauen — gleich wie in renderAnschreibenView
+  const d = buildAnschreibenDataDict();
+  // Druck-Version: editable=false, also Spans statt Inputs
+  const printHtml = renderErklaerungFormHtml(d, false);
   const title = tpl ? tpl.title : "Formular";
   const win = window.open("", "_blank");
   if (!win) {
@@ -9105,11 +9144,106 @@ function printFormular() {
       '<button onclick="window.print()">🖨 Drucken / als PDF</button>' +
       '<button onclick="window.close()">Schließen</button>' +
     '</div>' +
-    preview.innerHTML +
+    printHtml +
     '</body></html>'
   );
   win.document.close();
   win.focus();
+}
+
+// Baut das Daten-Dict für das Hessen-Formular und andere Anschreiben aus
+// state.shared, state.docs.kosten.answers und state.docs.ear.answers. Identisch
+// zu der Logik in renderAnschreibenView, ausgelagert damit printFormular und
+// die Save-Logik dasselbe nutzen.
+function buildAnschreibenDataDict() {
+  const kAns = state.docs.kosten?.answers || {};
+  const earAns = state.docs.ear?.answers || {};
+  return {
+    name: state.shared.name || "",
+    geb: state.shared.geburtsdatum || "",
+    anschrift: state.shared.anschrift || "",
+    tel: state.shared.telefon || "",
+    email: state.shared.email || "",
+    k_az_kasse: kAns["verfahren.az_landesjustizkasse"] || "",
+    k_behoerde_kasse: kAns["verfahren.behoerde_kasse"] || "",
+    k_behoerde_kasse_anschrift: kAns["verfahren.behoerde_kasse_anschrift"] || "",
+    k_arbeitgeber: kAns["erklaerung_wirtschaft.arbeitgeber"] || "",
+    k_ehe_einkommen: kAns["erklaerung_wirtschaft.ehe_einkommen"] || "",
+    k_ev_geleistet: kAns["erklaerung_wirtschaft.ev_geleistet"] || "",
+    k_ev_gericht: kAns["erklaerung_wirtschaft.ev_gericht"] || "",
+    k_ev_aktenzeichen: kAns["erklaerung_wirtschaft.ev_aktenzeichen"] || "",
+    k_ausgaben_freitext: kAns["erklaerung_wirtschaft.ausgaben_freitext"] || "",
+    k_sonstiges: kAns["erklaerung_wirtschaft.sonstiges"] || "",
+    leistung_behoerde: kAns["erklaerung_wirtschaft.leistung_behoerde"] || "",
+    leistung_betrag_override: kAns["erklaerung_wirtschaft.leistung_betrag_override"] || "",
+    kinder_alter: kAns["erklaerung_wirtschaft.kinder_alter"] || "",
+    familienstand: earAns["personal.familienstand"] || "",
+    kinder: earAns["personal.kinder"] || "",
+    ear_lohn: earAns["arbeit.lohn"] || "",
+    ear_alg1: earAns["sozial.alg1"] || "",
+    ear_buergergeld: earAns["sozial.buergergeld"] || "",
+    ear_buergergeld_kdu: earAns["sozial.buergergeld_kdu"] || "",
+    ear_sozialhilfe: earAns["sozial.sozialhilfe"] || "",
+    ear_eingliederung: earAns["sozial.eingliederung"] || "",
+    ear_pflegegeld: earAns["sozial.pflegegeld"] || "",
+    ear_aus_total: "",
+  };
+}
+
+// Wird vom oninput-Handler der Formular-Inputs aufgerufen. Mapped den
+// Form-Feldnamen auf den richtigen Storage-Slot (state.shared / state.docs.*)
+// und speichert dort. Re-render ist NICHT nötig — die anderen Felder hängen
+// nicht direkt voneinander ab; falls doch, machen wir's beim nächsten Open.
+// Debounced über setTimeout damit nicht bei jedem Tastendruck synchron zur
+// localStorage geschrieben wird (kann auf Mobile spürbar ruckeln).
+const _erklSaveTimers = {};
+function saveErklaerungField(fieldKey, value) {
+  if (!fieldKey) return;
+  // Direkt im State speichern (synchron — kein UI-Flicker)
+  const mapping = {
+    // Stammdaten (state.shared)
+    name:        { type: "shared", key: "name" },
+    geb:         { type: "shared", key: "geburtsdatum" },
+    anschrift:   { type: "shared", key: "anschrift" },
+    tel:         { type: "shared", key: "telefon" },
+    // Kosten / Erklaerung wirtschaftliche Verhaeltnisse
+    k_az_kasse:           { type: "doc", docId: "kosten", key: "verfahren.az_landesjustizkasse" },
+    k_arbeitgeber:        { type: "doc", docId: "kosten", key: "erklaerung_wirtschaft.arbeitgeber" },
+    k_ehe_einkommen:      { type: "doc", docId: "kosten", key: "erklaerung_wirtschaft.ehe_einkommen" },
+    k_ev_gericht:         { type: "doc", docId: "kosten", key: "erklaerung_wirtschaft.ev_gericht" },
+    k_ev_aktenzeichen:    { type: "doc", docId: "kosten", key: "erklaerung_wirtschaft.ev_aktenzeichen" },
+    k_ausgaben_freitext:  { type: "doc", docId: "kosten", key: "erklaerung_wirtschaft.ausgaben_freitext" },
+    k_sonstiges:          { type: "doc", docId: "kosten", key: "erklaerung_wirtschaft.sonstiges" },
+    leistung_behoerde:    { type: "doc", docId: "kosten", key: "erklaerung_wirtschaft.leistung_behoerde" },
+    leistung_betrag_override: { type: "doc", docId: "kosten", key: "erklaerung_wirtschaft.leistung_betrag_override" },
+    kinder_alter:         { type: "doc", docId: "kosten", key: "erklaerung_wirtschaft.kinder_alter" },
+    // EAR
+    ear_lohn:    { type: "doc", docId: "ear", key: "arbeit.lohn" },
+    kinder:      { type: "doc", docId: "ear", key: "personal.kinder" },
+  };
+  const m = mapping[fieldKey];
+  if (!m) {
+    console.warn("saveErklaerungField: unbekanntes Feld " + fieldKey);
+    return;
+  }
+  if (m.type === "shared") {
+    state.shared[m.key] = value;
+    // Debounced Storage-Save
+    clearTimeout(_erklSaveTimers.shared);
+    _erklSaveTimers.shared = setTimeout(() => {
+      Storage.set(SHARED_STORAGE_KEY, JSON.stringify(state.shared));
+    }, 300);
+  } else if (m.type === "doc") {
+    const ds = state.docs[m.docId];
+    if (!ds) return;
+    if (!ds.answers) ds.answers = {};
+    ds.answers[m.key] = value;
+    clearTimeout(_erklSaveTimers[m.docId]);
+    _erklSaveTimers[m.docId] = setTimeout(() => {
+      const sk = DOCS[m.docId] && DOCS[m.docId].storageKey;
+      if (sk) Storage.set(sk, JSON.stringify(ds));
+    }, 300);
+  }
 }
 
 function renderAnschreibenView() {
