@@ -143,6 +143,18 @@
   .home-hero h1 { font-size: 28px; color: var(--primary); margin-bottom: 8px; }
   .home-hero p { color: var(--text-soft); max-width: 600px; margin: 0 auto; }
 
+  /* Settings collapsible sections */
+  .settings-section details > summary {
+    display: block; padding: 0;
+  }
+  .settings-section details > summary::-webkit-details-marker { display: none; }
+  .settings-section details[open] > summary span:last-child {
+    display: none;
+  }
+  .settings-section details > summary span:last-child {
+    font-size: 12px; opacity: 0.8;
+  }
+
   /* HOME HEADER ACTIONS - gruppiert mit Trennern */
   .home-header-actions {
     display: flex; justify-content: flex-end; align-items: center;
@@ -7861,9 +7873,14 @@ function renderSettingsView() {
       <p style="color:var(--text-soft); margin:0 0 24px; font-size:14px;">Hier kannst du anpassen, welche Funktionen und Dokumente du brauchst. Änderungen werden sofort gespeichert.</p>
 
       <div class="settings-section">
-        <h2>📁 Sichtbare Dokumente</h2>
-        <p class="settings-section-desc">Verstecke Dokumente, die du nicht brauchst (z.B. wenn du keine Sozialstunden-Auflage hast). Sie verschwinden vom Startbildschirm, deine Daten bleiben erhalten.</p>
-        ${docCheckboxes}
+        <details>
+          <summary style="cursor:pointer; list-style:none;">
+            <h2 style="display:inline; margin:0;">📁 Sichtbare Dokumente</h2>
+            <span style="float:right; color:var(--text-soft); font-size:14px;">▼ aufklappen</span>
+          </summary>
+          <p class="settings-section-desc" style="margin-top:10px;">Verstecke Dokumente, die du nicht brauchst (z.B. wenn du keine Sozialstunden-Auflage hast). Sie verschwinden vom Startbildschirm, deine Daten bleiben erhalten.</p>
+          ${docCheckboxes}
+        </details>
       </div>
 
       <div class="settings-section">
@@ -7873,16 +7890,21 @@ function renderSettingsView() {
       </div>
 
       <div class="settings-section">
-        <h2>🏠 Startseite</h2>
-        <p class="settings-section-desc">Welche Bereiche werden auf der Startseite angezeigt?</p>
-        ${showToggle("showNextAppointments", "📅 Nächste Termine", "Karte mit nächstem Termin pro Bereich + Kalender-Knopf")}
-        ${showToggle("showTodayOverview", "🔔 Heute-Übersicht", "Zusammenfassung von heutigen/morgigen Terminen mit Action-Buttons")}
-        ${showToggle("showQuickAdd", "⚡ Schnell-Eintrag", "Knöpfe für schnelles Anlegen von Terminen, Zahlungen, Stunden")}
-        ${showToggle("showBewaehrungProgress", "📊 Bewährungs-Fortschritt", "Fortschrittsbalken (wieviel der Bewährungszeit ist um)")}
-        ${showToggle("showAchievements", "✅ Was du geschafft hast", "Übersicht der absolvierten BH-Termine, Sozialstunden, gezahlten Raten und Therapie-Termine")}
-        ${showToggle("showStats", "📈 Monats-Statistiken", "Zahlen vom aktuellen Monat (Zahlungen, Stunden, Termine)")}
-        ${showToggle("showInstallBanner", "📲 Installations-Hinweis", "Banner mit Anleitung wie die App installiert wird (PWA)")}
-        ${showToggle("showBackupReminder", "💾 Backup-Erinnerungs-Banner", "Banner oben auf der Startseite (nicht das Intervall)")}
+        <details>
+          <summary style="cursor:pointer; list-style:none;">
+            <h2 style="display:inline; margin:0;">🏠 Startseite anpassen</h2>
+            <span style="float:right; color:var(--text-soft); font-size:14px;">▼ aufklappen</span>
+          </summary>
+          <p class="settings-section-desc" style="margin-top:10px;">Welche Bereiche werden auf der Startseite angezeigt?</p>
+          ${showToggle("showNextAppointments", "📅 Nächste Termine", "Karte mit nächstem Termin pro Bereich + Kalender-Knopf")}
+          ${showToggle("showTodayOverview", "🔔 Heute-Übersicht", "Zusammenfassung von heutigen/morgigen Terminen mit Action-Buttons")}
+          ${showToggle("showQuickAdd", "⚡ Schnell-Eintrag", "Knöpfe für schnelles Anlegen von Terminen, Zahlungen, Stunden")}
+          ${showToggle("showBewaehrungProgress", "📊 Bewährungs-Fortschritt", "Fortschrittsbalken (wieviel der Bewährungszeit ist um)")}
+          ${showToggle("showAchievements", "✅ Was du geschafft hast", "Übersicht der absolvierten BH-Termine, Sozialstunden, gezahlten Raten und Therapie-Termine")}
+          ${showToggle("showStats", "📈 Monats-Statistiken", "Zahlen vom aktuellen Monat (Zahlungen, Stunden, Termine)")}
+          ${showToggle("showInstallBanner", "📲 Installations-Hinweis", "Banner mit Anleitung wie die App installiert wird (PWA)")}
+          ${showToggle("showBackupReminder", "💾 Backup-Erinnerungs-Banner", "Banner oben auf der Startseite (nicht das Intervall)")}
+        </details>
       </div>
 
       <div class="settings-section">
@@ -8283,40 +8305,54 @@ function generateQrCode() {
 }
 
 // === ANSCHREIBEN-GENERATOR ===
+// Kategorien für die Briefe-Übersicht. Reihenfolge bestimmt die Anzeige im UI.
+const ANSCHREIBEN_CATEGORIES = {
+  bh: { icon: "👤", label: "Bewährungshilfe", desc: "Direkter Kontakt mit deiner Bewährungshelferin" },
+  bestaetigung: { icon: "📋", label: "Bestätigungen anfordern", desc: "Nachweise einholen für deine Akte" },
+  kosten: { icon: "💸", label: "Verfahrenskosten & Geldauflage", desc: "Anträge zu Geldstrafen, Gerichtskosten, Geldauflagen" },
+  asservate: { icon: "📦", label: "Asservate & Beweismittel", desc: "Herausgabe nach Verfahrensende" },
+};
+
 const ANSCHREIBEN_TEMPLATES = {
   stundung: {
     title: "Stundungsantrag (Geldauflage)",
     desc: "Antrag auf Stundung oder Ratenzahlung der Geldauflage / Schadenswiedergutmachung",
+    cat: "kosten",
     empfaenger: ["bh"],
     body: (d) => `${d.name ? d.name + "\n" : ""}${d.anschrift ? d.anschrift + "\n" : ""}${d.tel ? "Tel: " + d.tel + "\n" : ""}\n\n${d.bh ? d.bh : "An die Bewährungshilfe"}\n\nOrt, ${todayDE()}\n\nBetreff: Antrag auf Stundung / Ratenzahlung\nAktenzeichen: ${d.az || "________"}\n\nSehr geehrte Damen und Herren,\n\nim Rahmen meiner Bewährungsauflage wurde mir eine Geldauflage in Höhe von ${d.gesamt || "____"} € auferlegt. Aufgrund meiner aktuellen finanziellen Situation ist mir die fristgerechte Zahlung nicht möglich.\n\nIch bitte Sie daher um Stundung beziehungsweise um die Möglichkeit einer Ratenzahlung. Konkret schlage ich monatliche Raten in Höhe von ____ € vor, beginnend ab dem ____.\n\nMeine aktuelle Einnahmen-Ausgaben-Rechnung füge ich diesem Schreiben bei.\n\nIch versichere, dass ich die vereinbarte Rate pünktlich zahlen werde, und bitte um Ihr Verständnis.\n\nMit freundlichen Grüßen\n\n\n_____________________\n${d.name || "(Unterschrift)"}`,
   },
   krankmeldung: {
     title: "Krankmeldung an die Bewährungshilfe",
     desc: "Mitteilung über krankheitsbedingte Verhinderung",
+    cat: "bh",
     empfaenger: ["bh"],
     body: (d) => `${d.name ? d.name + "\n" : ""}${d.anschrift ? d.anschrift + "\n" : ""}${d.tel ? "Tel: " + d.tel + "\n" : ""}\n\n${d.bh ? d.bh : "An die Bewährungshilfe"}\n\nOrt, ${todayDE()}\n\nBetreff: Krankmeldung\nAktenzeichen: ${d.az || "________"}\n\nSehr geehrte Damen und Herren,\n\nhiermit teile ich mit, dass ich aufgrund einer Erkrankung meinen vereinbarten Termin am ____ nicht wahrnehmen kann.\n\nEine ärztliche Arbeitsunfähigkeitsbescheinigung füge ich bei / reiche ich nach.\n\nIch melde mich umgehend wieder, sobald ich wieder fit bin, um einen Ersatztermin zu vereinbaren.\n\nMit freundlichen Grüßen\n\n\n_____________________\n${d.name || "(Unterschrift)"}`,
   },
   therapie_anforderung: {
     title: "Therapiebestätigung anfordern",
     desc: "Anschreiben an Therapeut/in mit Bitte um Bestätigung",
+    cat: "bestaetigung",
     empfaenger: ["therapeut"],
     body: (d) => `${d.name ? d.name + "\n" : ""}${d.anschrift ? d.anschrift + "\n" : ""}${d.geb ? "Geboren am: " + d.geb + "\n" : ""}\n\nAn meine/n Therapeut/in\n\nOrt, ${todayDE()}\n\nBetreff: Bitte um Bestätigung der Therapieteilnahme\n\nSehr geehrte Damen und Herren,\n\nim Rahmen meiner Bewährungsauflage benötige ich für die Bewährungshilfe (Aktenzeichen: ${d.az || "____"}) eine Bestätigung über meine Therapieteilnahme.\n\nIch bitte Sie höflich, das beigefügte Formular „Therapie-Bestätigung" auszufüllen oder eine eigene Bestätigung über folgende Punkte auszustellen:\n\n• Beginn der Therapie\n• Frequenz der Sitzungen\n• Bisher wahrgenommene Termine\n• Voraussichtliches Ende\n• Allgemeine Einschätzung zum Verlauf\n\nMein/e Bewährungshelfer/in ist ${d.bh || "____"}.\n\nFür Ihre Mühe bedanke ich mich herzlich im Voraus.\n\nMit freundlichen Grüßen\n\n\n_____________________\n${d.name || "(Unterschrift)"}`,
   },
   sozial_anforderung: {
     title: "Sozialstunden-Bestätigung anfordern",
     desc: "Anschreiben an Einrichtung",
+    cat: "bestaetigung",
     empfaenger: ["einrichtung"],
     body: (d) => `${d.name ? d.name + "\n" : ""}${d.anschrift ? d.anschrift + "\n" : ""}${d.geb ? "Geboren am: " + d.geb + "\n" : ""}\n\nAn die Einrichtung\n\nOrt, ${todayDE()}\n\nBetreff: Bitte um Bestätigung der geleisteten Sozialstunden\n\nSehr geehrte Damen und Herren,\n\nim Rahmen meiner Bewährungsauflage (Aktenzeichen: ${d.az || "____"}) habe ich bei Ihnen Sozialstunden geleistet.\n\nIch bitte Sie, das beigefügte Stunden-Nachweisblatt zu prüfen, durch Unterschrift und ggf. Stempel zu bestätigen und mir zurückzugeben.\n\nDieser Nachweis wird von meiner Bewährungshilfe (${d.bh || "____"}) zur Erfüllung der Auflage benötigt.\n\nVielen Dank für Ihre Mühe und Unterstützung!\n\nMit freundlichen Grüßen\n\n\n_____________________\n${d.name || "(Unterschrift)"}`,
   },
   lockerung: {
     title: "Antrag auf Lockerung der Auflagen",
     desc: "Antrag bei guter Führung",
+    cat: "bh",
     empfaenger: ["gericht"],
     body: (d) => `${d.name ? d.name + "\n" : ""}${d.anschrift ? d.anschrift + "\n" : ""}${d.geb ? "Geboren am: " + d.geb + "\n" : ""}\n\nAn das zuständige Gericht\n(über die Bewährungshilfe ${d.bh || "____"})\n\nOrt, ${todayDE()}\n\nBetreff: Antrag auf Lockerung der Bewährungsauflagen\nAktenzeichen: ${d.az || "________"}\n\nSehr geehrte Damen und Herren,\n\nhiermit beantrage ich die Lockerung folgender mir auferlegter Bewährungsauflagen:\n\n• ____\n• ____\n\nBegründung:\n\nSeit Beginn meiner Bewährungszeit am ${d.bewBeginn || "____"} habe ich:\n\n• alle Termine bei der Bewährungshilfe wahrgenommen\n• die mir auferlegten Maßnahmen kontinuierlich erfüllt\n• ____\n• ____\n\nIch bitte daher um wohlwollende Prüfung meines Antrags.\n\nMit freundlichen Grüßen\n\n\n_____________________\n${d.name || "(Unterschrift)"}`,
   },
   herausgabe: {
     title: "Antrag auf Herausgabe (§ 111n StPO)",
     desc: "Antrag auf Rückgabe beschlagnahmter / sichergestellter Gegenstände an die Staatsanwaltschaft",
+    cat: "asservate",
     empfaenger: ["staatsanwaltschaft"],
     body: (d) => {
       // Build list of items from asservate doc, falling back to placeholder
@@ -8411,6 +8447,7 @@ Anlagen:
   herausgabe_erinnerung: {
     title: "Erinnerung / Sachstandsanfrage Herausgabe",
     desc: "Nachfrage, wenn auf einen Herausgabe-Antrag länger keine Antwort kommt",
+    cat: "asservate",
     empfaenger: ["staatsanwaltschaft"],
     body: (d) => {
       const empfaenger = d.behoerde
@@ -8456,6 +8493,7 @@ Anlagen:
   kosten_ratenzahlung: {
     title: "Antrag auf Ratenzahlung (Verfahrenskosten / Geldstrafe)",
     desc: "Antrag auf Ratenzahlung an Staatsanwaltschaft oder Landesjustizkasse - mit Begründung und Vorschlag zur Ratenhöhe",
+    cat: "kosten",
     empfaenger: ["staatsanwaltschaft", "landesjustizkasse"],
     body: (d) => {
       // Empfänger bevorzugt StA (für Geldstrafe), sonst Landesjustizkasse
@@ -8552,6 +8590,7 @@ Anlagen:
   kosten_stundung: {
     title: "Antrag auf Stundung (Verfahrenskosten / Geldstrafe)",
     desc: "Antrag auf Stundung der Zahlung - sinnvoll, wenn alsbald ein Geldzufluss erwartet wird (z.B. neue Arbeit, Steuerrückzahlung)",
+    cat: "kosten",
     empfaenger: ["staatsanwaltschaft", "landesjustizkasse"],
     body: (d) => {
       const empfaenger = d.k_behoerde_sta
@@ -8630,6 +8669,7 @@ Anlagen:
   gk_ratenzahlung_kasse: {
     title: "Ratenzahlung Gerichtskosten (an Gerichtskasse, kurz)",
     desc: "Schlanker Ratenzahlungsantrag direkt an die Gerichts- / Landesjustizkasse. §11 JBeitrG i.V.m. §222 AO.",
+    cat: "kosten",
     empfaenger: ["landesjustizkasse"],
     body: (d) => {
       const empfaenger = d.k_behoerde_kasse
@@ -8690,6 +8730,7 @@ ${d.name || "(Unterschrift)"}`;
   gk_mehrstufig: {
     title: "Gerichtskosten - mehrstufiger Antrag (StA + Kasse)",
     desc: "Vierstufiges Schreiben: Aufschlüsselung anfordern, vorsorgliche Erinnerung §66 GKG, Ratenzahlung, Vorbehalt §227 AO. Adressat StA mit Kopie an die Gerichtskasse.",
+    cat: "kosten",
     empfaenger: ["staatsanwaltschaft", "landesjustizkasse"],
     body: (d) => {
       const empfaengerSta = d.k_behoerde_sta
@@ -8785,6 +8826,7 @@ ${d.name || "(Unterschrift)"}`;
   gk_erlass: {
     title: "Erlass-/Stundungsantrag Gerichtskosten (§227 AO)",
     desc: "Antrag auf Erlass oder Stundung der Verfahrenskosten aus persönlichen Billigkeitsgründen. Nach § 11 JBeitrG i.V.m. § 227 AO.",
+    cat: "kosten",
     empfaenger: ["landesjustizkasse"],
     body: (d) => {
       const empfaenger = d.k_behoerde_kasse
@@ -8857,6 +8899,7 @@ Anlagen:
   erklaerung_wirtschaft: {
     title: "Erkl\u00E4rung \u00FCber die wirtschaftlichen Verh\u00E4ltnisse (Hessen)",
     desc: "Offizielles Hessen-Formular zur Vorlage bei der Gerichtskasse. Wird vor-ausgef\u00FCllt aus Stammdaten, EAR und Kosten-Doc. Felder sind direkt editierbar; nach Ausdruck nur noch unterschreiben.",
+    cat: "kosten",
     empfaenger: ["landesjustizkasse"],
     isFormular: true,
     body: (d) => renderErklaerungFormHtml(d, false),
@@ -9109,6 +9152,11 @@ function renderErklaerungFormHtml(d, editable) {
 }
 let activeAnschreiben = null;
 function selectAnschreiben(key) { activeAnschreiben = key; render(); }
+function toggleAnschreibenCat(catKey) {
+  if (!state.anschreibenCatOpen) state.anschreibenCatOpen = {};
+  state.anschreibenCatOpen[catKey] = !state.anschreibenCatOpen[catKey];
+  render();
+}
 function copyAnschreibenToClipboard() {
   const ta = document.getElementById("anschreiben-textarea");
   if (!ta) return;
@@ -9384,13 +9432,43 @@ function renderAnschreibenView() {
       </div>`;
   }
 
-  let listHtml = "";
+  // Templates nach Kategorien gruppieren — ergibt aufgeräumte UI mit Untergruppen
+  // statt 13 flachen Items in einer Liste. Aufgeklappt ist die Kategorie der
+  // aktuell ausgewählten Vorlage, plus standardmaßig „bh" (häufigste).
+  const tplsByCat = {};
   Object.entries(ANSCHREIBEN_TEMPLATES).forEach(([key, tpl]) => {
-    const isActive = activeAnschreiben === key;
+    const c = tpl.cat || "kosten";
+    if (!tplsByCat[c]) tplsByCat[c] = [];
+    tplsByCat[c].push({ key, tpl });
+  });
+
+  let listHtml = "";
+  Object.entries(ANSCHREIBEN_CATEGORIES).forEach(([catKey, catDef]) => {
+    const items = tplsByCat[catKey] || [];
+    if (items.length === 0) return;
+    // Kategorie offen, wenn aktive Vorlage drin liegt, oder wenn's die erste ist (bh)
+    const activeCat = activeAnschreiben && ANSCHREIBEN_TEMPLATES[activeAnschreiben] && ANSCHREIBEN_TEMPLATES[activeAnschreiben].cat === catKey;
+    const isExpanded = !!state.anschreibenCatOpen?.[catKey] || activeCat || (!activeAnschreiben && catKey === "bh");
+    const itemsHtml = items.map(({ key, tpl }) => {
+      const isActive = activeAnschreiben === key;
+      return `
+        <div onclick="selectAnschreiben('${key}')" style="padding:10px 12px; border-radius:8px; cursor:pointer; border:1.5px solid ${isActive ? 'var(--primary)' : 'transparent'}; background:${isActive ? 'var(--primary-soft)' : 'var(--bg)'}; margin-bottom:4px; transition: all .12s;">
+          <div style="font-weight:${isActive ? '600' : '500'}; color:${isActive ? 'var(--primary)' : 'var(--text)'}; font-size:13px; margin-bottom:2px;">${esc(tpl.title)}</div>
+          <div style="font-size:11px; color:var(--text-soft); line-height:1.4;">${esc(tpl.desc)}</div>
+        </div>`;
+    }).join("");
+    const countLabel = items.length === 1 ? "1 Vorlage" : items.length + " Vorlagen";
     listHtml += `
-      <div onclick="selectAnschreiben('${key}')" style="padding:14px; border-radius:10px; cursor:pointer; border:2px solid ${isActive ? 'var(--primary)' : 'var(--border)'}; background:${isActive ? 'var(--primary-soft)' : 'var(--card)'}; margin-bottom:8px;">
-        <div style="font-weight:600; color:${isActive ? 'var(--primary)' : 'var(--text)'}; margin-bottom:3px;">${esc(tpl.title)}</div>
-        <div style="font-size:12px; color:var(--text-soft);">${esc(tpl.desc)}</div>
+      <div style="margin-bottom:10px; background:var(--card); border:1px solid var(--border); border-radius:10px; overflow:hidden;">
+        <button onclick="toggleAnschreibenCat('${catKey}')" style="width:100%; text-align:left; padding:12px 14px; background:transparent; border:none; cursor:pointer; display:flex; align-items:center; gap:8px; color:var(--text);">
+          <span style="font-size:18px;">${esc(catDef.icon)}</span>
+          <span style="flex:1;">
+            <strong style="font-size:13px; display:block;">${esc(catDef.label)}</strong>
+            <span style="font-size:11px; color:var(--text-soft); font-weight:400;">${countLabel}</span>
+          </span>
+          <span style="font-size:14px; color:var(--text-soft); transform:rotate(${isExpanded ? "90deg" : "0deg"}); transition:transform .15s;">▶</span>
+        </button>
+        ${isExpanded ? `<div style="padding:4px 8px 8px;">${itemsHtml}</div>` : ""}
       </div>`;
   });
 
@@ -9409,7 +9487,7 @@ function renderAnschreibenView() {
             <button class="btn btn-primary" onclick="printFormular()">🖨 Drucken / als PDF</button>
             <button class="btn btn-secondary" onclick="state.view='home'; state.activeDocId='kosten'; render();">✏️ Felder ergänzen (Verfahrenskosten)</button>
           </div>
-          <div style="font-size:11px; color:var(--text-soft); margin-top:10px;">Hinweis: Die Felder dieses Formulars sind nicht hier editierbar — sie kommen aus den anderen Dokumenten. Trag fehlende Werte dort ein, dann erscheinen sie hier automatisch.</div>
+          <div style="font-size:11px; color:var(--text-soft); margin-top:10px;">💡 Die Textfelder im Formular kannst du direkt bearbeiten — Änderungen werden automatisch in den passenden Dokumenten gespeichert (z.B. Arbeitgeber in den Verfahrenskosten). Familienstand und Sozialleistungs-Checkboxen kommen automatisch aus EAR und Verfahrenskosten.</div>
         </div>`;
     } else {
       const text = tpl.body(d);
