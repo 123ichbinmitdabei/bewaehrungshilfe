@@ -5851,10 +5851,18 @@ async function loadAllState() {
       }
     } catch(e){}
   }
-  // Check for PIN - if set, lock immediately
+  // Check for PIN - if set, lock immediately. Strict validation: a valid hash
+  // produced by hashPin() starts with "bh_" and is at least 6 chars long. Anything
+  // shorter or in a wrong format is treated as corrupt and silently cleared, so
+  // the user isn't locked out by a bogus storage value they never set.
   const pinHash = await Storage.get(PIN_STORAGE_KEY);
-  if (pinHash && pinHash.length > 0) {
+  if (pinHash && typeof pinHash === "string" && pinHash.startsWith("bh_") && pinHash.length >= 6) {
     state.pinLocked = true;
+  } else if (pinHash) {
+    // Corrupt or unexpected value — clean it up so the user isn't locked out
+    console.warn("PIN-Hash war im falschen Format und wird entfernt:", pinHash);
+    await Storage.del(PIN_STORAGE_KEY);
+    state.pinLocked = false;
   }
 }
 
@@ -8816,6 +8824,11 @@ Anlagen:
 // layout so users only need to sign after printing. Receives the merged data
 // dictionary `d` built in renderAnschreibenView().
 function renderErklaerungFormHtml(d) {
+  // Safe-String-Helper: schützt gegen Number-Werte aus dem Storage (z.B. alte
+  // Onboarding-Daten, in denen Lohn-Betraege als Number statt String landeten)
+  // — JavaScript-Quirk: (123 || "") ergibt 123, nicht "".
+  const S = v => (v == null ? "" : String(v));
+
   // Helper: a checkbox glyph filled (\u2612) or empty (\u2610) with a label.
   // Wrapped in nowrap span so it doesn't break mid-line.
   function cb(checked, label) {
@@ -8831,63 +8844,58 @@ function renderErklaerungFormHtml(d) {
 
   // Resolve sender / recipient
   const senderLines = [
-    d.name || "",
-    d.anschrift || "",
-    d.tel ? "Telefon: " + d.tel : "",
+    S(d.name),
+    S(d.anschrift),
+    d.tel ? "Telefon: " + S(d.tel) : "",
   ].filter(Boolean);
   const kasseDefault = "Gerichtskasse Gie\u00DFen\nGutfleischstra\u00DFe 1\n35390 Gie\u00DFen";
   const kasseLines = (d.k_behoerde_kasse
-    ? (d.k_behoerde_kasse + (d.k_behoerde_kasse_anschrift ? "\n" + d.k_behoerde_kasse_anschrift : ""))
+    ? (S(d.k_behoerde_kasse) + (d.k_behoerde_kasse_anschrift ? "\n" + S(d.k_behoerde_kasse_anschrift) : ""))
     : kasseDefault
   ).split(/\r?\n/).filter(Boolean);
 
   // Resolve "Kostensache" block: name, address, geb
   const kostensacheLine = [
-    d.name || "____",
-    d.anschrift ? d.anschrift.replace(/\n/g, ", ") : "____",
+    S(d.name) || "____",
+    d.anschrift ? S(d.anschrift).replace(/\n/g, ", ") : "____",
   ].join(", ");
 
   // Familienstand from EAR personal.familienstand
-  const fstRaw = (d.familienstand || "").toLowerCase();
+  const fstRaw = S(d.familienstand).toLowerCase();
   const fstLedig = /\bledig\b/.test(fstRaw);
   const fstVerh = /\bverh/.test(fstRaw);
   const fstGesch = /\bgesch/.test(fstRaw);
   const fstGetr = /getrennt/.test(fstRaw);
   const fstVerw = /\bverwitw/.test(fstRaw);
-  // If nothing parses but a value is present, we still mark nothing — better
-  // to leave it open so the user can tick by hand than to mis-tick.
 
   // Ehegatte income
-  const eheEin = (d.k_ehe_einkommen || "").trim();
+  const eheEin = S(d.k_ehe_einkommen).trim();
   const eheHat = !!eheEin && eheEin !== "0" && eheEin !== "0,00";
 
   // Kids
-  const kinderRaw = (d.kinder || "").toString().trim();
+  const kinderRaw = S(d.kinder).trim();
 
   // Working income
-  const lohn = (d.ear_lohn || "").trim();
+  const lohn = S(d.ear_lohn).trim();
   const hatLohn = !!lohn && lohn !== "0" && lohn !== "0,00";
-  const arbeitgeber = d.k_arbeitgeber || "";
+  const arbeitgeber = S(d.k_arbeitgeber);
 
-  // Sozialleistungen — heuristic: ALG1 \u2192 ALG, Bürgergeld \u2192 ALG II
-  // (Bürgergeld ist Nachfolger von ALG II), sozialhilfe \u2192 sonstige
-  const alg1 = parseMoney(d.ear_alg1 || "");
-  const buergergeld = parseMoney(d.ear_buergergeld || "") + parseMoney(d.ear_buergergeld_kdu || "");
-  const sozHilfe = parseMoney(d.ear_sozialhilfe || "");
-  const grundSi = parseMoney(d.ear_eingliederung || "") + parseMoney(d.ear_pflegegeld || "");
+  // Sozialleistungen — heuristic: ALG1 \u2192 ALG, B\u00FCrgergeld \u2192 ALG II
+  const alg1 = parseMoney(S(d.ear_alg1));
+  const buergergeld = parseMoney(S(d.ear_buergergeld)) + parseMoney(S(d.ear_buergergeld_kdu));
+  const sozHilfe = parseMoney(S(d.ear_sozialhilfe));
+  const grundSi = parseMoney(S(d.ear_eingliederung)) + parseMoney(S(d.ear_pflegegeld));
   const sumLeistung = alg1 + buergergeld + sozHilfe + grundSi;
   const hatLeistung = sumLeistung > 0;
   const cbAlg = alg1 > 0;
   const cbAlg2 = buergergeld > 0;
   const cbSonst = (sozHilfe + grundSi) > 0 && !cbAlg && !cbAlg2;
   const leistungBetrag = hatLeistung ? moneyOnly(sumLeistung) : "";
-  // Behörde where benefits come from: nicht direkt in der EAR \u2192 leer lassen
 
   // Monatliche Ausgaben — wenn Freitext, nutze den; sonst "siehe Anhang (EAR)"
-  // wenn EAR Eintr\u00E4ge hat
-  let ausgabenText = (d.k_ausgaben_freitext || "").trim();
+  let ausgabenText = S(d.k_ausgaben_freitext).trim();
   if (!ausgabenText) {
-    const earAusSum = parseMoney(d.ear_aus_total || "");
+    const earAusSum = parseMoney(S(d.ear_aus_total));
     if (earAusSum > 0) {
       ausgabenText = "siehe Anhang: Einnahmen-Ausgaben-Rechnung (Gesamtausgaben "
         + moneyOnly(earAusSum) + " \u20AC / Monat)";
@@ -8895,14 +8903,14 @@ function renderErklaerungFormHtml(d) {
   }
 
   // Eidesstattliche Versicherung
-  const evRaw = (d.k_ev_geleistet || "").toLowerCase().trim();
+  const evRaw = S(d.k_ev_geleistet).toLowerCase().trim();
   const evJa = /\bja\b/.test(evRaw);
   const evNein = /\bnein\b/.test(evRaw) || (!evJa && evRaw === "");
 
-  const sonstiges = (d.k_sonstiges || "").trim();
+  const sonstiges = S(d.k_sonstiges).trim();
 
   const ortDatum = (function() {
-    const ort = (d.anschrift || "").split(/\r?\n/).pop().replace(/^\d{4,5}\s*/, "") || "Marburg";
+    const ort = S(d.anschrift).split(/\r?\n/).pop().replace(/^\d{4,5}\s*/, "") || "Marburg";
     return ort + ", " + todayDE();
   })();
 
