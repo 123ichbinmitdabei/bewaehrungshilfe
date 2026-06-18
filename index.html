@@ -721,6 +721,33 @@
   .sig-row-mini-meta {
     font-size: 10px; color: #64748b;
   }
+  /* Inline-Print-Container: wird vor Drucken in den DOM injiziert.
+     Standardmäßig versteckt; @media print zeigt nur diesen + blendet alles
+     andere aus. Vermeidet Pop-up-Window-Blocker. */
+  #inline-print-container {
+    display: none;
+  }
+  @media print {
+    body > *:not(#inline-print-container) { display: none !important; }
+    #inline-print-container {
+      display: block !important;
+      font-family: "Times New Roman", serif;
+      font-size: 12pt;
+      line-height: 1.6;
+      color: #000;
+      background: #fff;
+      max-width: 17cm;
+      margin: 0 auto;
+    }
+    #inline-print-container .brief-text {
+      white-space: pre-wrap;
+    }
+    #inline-print-container .attachments-area img {
+      max-width: 100%;
+    }
+    @page { margin: 1.5cm; }
+  }
+
   /* In print: clean up */
   @media print {
     .sig-display {
@@ -5315,7 +5342,7 @@ let showArchived = false;
 function toggleShowArchived() { showArchived = !showArchived; render(); }
 
 // === VERSION INFO ===
-const APP_VERSION = "v3.34";
+const APP_VERSION = "v3.35";
 
 // === ONBOARDING ===
 let onboardingActive = false;
@@ -5349,6 +5376,8 @@ function finishOnboarding() {
   try { localStorage.setItem(ONBOARDING_DONE_KEY, "1"); } catch(e) {}
   // Adressbuch-BH-Eintrag aktualisieren oder anlegen (v3.33)
   try { syncSharedToContacts(); } catch(e){}
+  // Universal Data Sync (v3.35): alle gemappten Felder propagieren
+  try { reconcileAllSyncGroups(); } catch(e){}
   onboardingActive = false;
   showSaveToast("Stammdaten gespeichert");
   render();
@@ -6110,6 +6139,9 @@ async function loadAllState() {
   }
   // Stammdaten <-> Adressbuch synchronisieren (v3.33)
   try { syncSharedToContacts(); } catch(e){}
+  // Universal Data Sync (v3.35): einmaliger Reconcile aller Sync-Gruppen,
+  // damit fehlende Werte aus parallelen Quellen befüllt werden
+  try { reconcileAllSyncGroups(); } catch(e){}
   // Load backup reminder state
   const reminderRaw = await Storage.get(BACKUP_REMINDER_KEY);
   if (reminderRaw) {
@@ -7410,6 +7442,14 @@ function setAnswer(secId, fId, val) {
       });
     });
   }
+  // Universal Sync (v3.35): durch DATA_SYNC_GROUPS gehen und alle gemappten
+  // Felder und Adressbuch-Kontakte aktualisieren.
+  if (typeof val === "string" && state.activeDocId) {
+    try {
+      propagateFieldChange({ type: "doc", docId: state.activeDocId, key: `${secId}.${fId}` }, val);
+      syncSharedToContacts();
+    } catch(e) { console.error("universal sync failed:", e); }
+  }
   debouncedSave();
 }
 function getRows(secId) {
@@ -7550,6 +7590,7 @@ function render() {
   else if (state.extractedTextModal) modalHtml = renderExtractedTextModal();
   if (state.globalSearchOpen) modalHtml = (modalHtml || "") + renderGlobalSearchModal();
   if (state.addCustomTplOpen) modalHtml = (modalHtml || "") + renderAddCustomTplModal();
+  if (state.confirmModal) modalHtml = (modalHtml || "") + renderConfirmModal();
   if (modalHtml) {
     const wrap = document.createElement("div");
     wrap.id = "modalOverlay";
@@ -7652,21 +7693,255 @@ function updateContactField(id, field, value) {
   // Debounced save (400ms). Wichtig: Timer wird in deleteContact gecancelt.
   clearTimeout(updateContactField._t);
   updateContactField._t = setTimeout(() => saveContacts(), 400);
-  // Wenn dieser Kontakt auch Stammdaten-Quelle ist (rolle=bh): die shared-Daten
-  // automatisch synchron halten.
+  // Wenn dieser Kontakt auch Stammdaten-Quelle ist: shared aktualisieren UND
+  // alle gemappten Doc-Felder via universal sync (v3.35).
   syncContactToShared(c);
+  // Nach syncContactToShared steht der neue Wert in state.shared. Jetzt
+  // propagieren wir ihn auch in alle gemappten Doc-Felder.
+  const fieldMap = CONTACT_SHARED_MAP[c.rolle];
+  if (fieldMap && fieldMap[field]) {
+    const sharedKey = fieldMap[field];
+    try { propagateFieldChange({ type: "shared", key: sharedKey }, value); } catch(e){}
+  }
 }
-async function deleteContact(id) {
-  if (!confirm("Diesen Kontakt löschen?")) return;
-  // Pending debounced-save abbrechen, sonst überschreibt der noch das gefilterte Array nicht, aber der Eintrag würde zwischendurch wieder geschrieben werden können
-  clearTimeout(updateContactField._t);
-  state.contacts = (state.contacts || []).filter(c => c.id !== id);
-  await saveContacts();
-  render();
-  showSaveToast("Kontakt gelöscht");
+function deleteContact(id) {
+  const c = (state.contacts || []).find(x => x.id === id);
+  if (!c) return;
+  confirmAction({
+    title: "Kontakt löschen?",
+    message: "Möchtest du „" + (c.name || c.firma || "diesen Kontakt") + "“ wirklich löschen?",
+    confirmLabel: "🗑 Löschen",
+    danger: true,
+    onConfirm: async () => {
+      // Pending debounced-save abbrechen
+      clearTimeout(updateContactField._t);
+      state.contacts = (state.contacts || []).filter(c => c.id !== id);
+      await saveContacts();
+      render();
+      showSaveToast("Kontakt gelöscht");
+    },
+  });
 }
 
-// ── Adressbuch <-> Stammdaten Synchronisation ──────────────────────────────
+// ── Universal Data Sync: Doc-Felder <-> Shared <-> Adressbuch ──────────────
+// Eine zentrale Quelle der Wahrheit. Wenn der User irgendwo (Doc, Stammdaten,
+// Adressbuch) ein Feld ändert, propagiert die Änderung automatisch in alle
+// gemappten Stellen. Reduziert Doppel-Erfassung drastisch.
+//
+// Format: Array von Mappings, jedes mappt eine Reihe paralleler Felder.
+// Wenn eines davon geändert wird, werden die anderen mit demselben Wert
+// überschrieben (nur wenn nicht leer; leere Felder werden befüllt aus
+// den nicht-leeren Counterparts).
+//
+// Feld-Adresse: 
+//   { type: "shared", key: "..." }  → state.shared[key]
+//   { type: "doc", docId: "...", key: "..." }  → state.docs[docId].answers[key]
+//
+const DATA_SYNC_GROUPS = [
+  // BH-Daten
+  {
+    name: "Bewährungshelfer:in",
+    fields: [
+      { type: "shared", key: "bewaehrungshelfer" },
+    ],
+  },
+  // Anwalt
+  {
+    name: "Anwalt-Name",
+    fields: [
+      { type: "shared", key: "anwalt" },
+    ],
+  },
+  // Therapeut
+  {
+    name: "Therapeut-Name",
+    fields: [
+      { type: "shared", key: "therapeut" },
+      { type: "doc", docId: "thera", key: "therapeut.name" },
+    ],
+  },
+  {
+    name: "Therapeut-Telefon",
+    fields: [
+      { type: "shared", key: "therapeut_telefon" },
+      { type: "doc", docId: "thera", key: "therapeut.telefon" },
+    ],
+  },
+  {
+    name: "Therapeut-Email",
+    fields: [
+      { type: "shared", key: "therapeut_email" },
+      { type: "doc", docId: "thera", key: "therapeut.email" },
+    ],
+  },
+  {
+    name: "Therapeut-Anschrift",
+    fields: [
+      { type: "shared", key: "therapeut_anschrift" },
+      { type: "doc", docId: "thera", key: "therapeut.anschrift" },
+    ],
+  },
+  // Arbeitgeber
+  {
+    name: "Arbeitgeber-Firma",
+    fields: [
+      { type: "shared", key: "arbeitgeber" },
+      { type: "doc", docId: "ear", key: "arbeit.arbeitgeber" },
+      { type: "doc", docId: "kosten", key: "erklaerung_wirtschaft.arbeitgeber" },
+    ],
+  },
+  {
+    name: "Arbeitgeber-Lohn-Netto",
+    fields: [
+      { type: "shared", key: "arbeit_lohn_netto" },
+      { type: "doc", docId: "ear", key: "arbeit.lohn" },
+    ],
+  },
+  // Gerichtskasse (Verfahrenskosten)
+  {
+    name: "Gerichtskasse-Behörde",
+    fields: [
+      { type: "shared", key: "gerichtskasse" },
+      { type: "doc", docId: "kosten", key: "verfahren.behoerde_kasse" },
+    ],
+  },
+  {
+    name: "Gerichtskasse-Anschrift",
+    fields: [
+      { type: "shared", key: "gerichtskasse_anschrift" },
+      { type: "doc", docId: "kosten", key: "verfahren.behoerde_kasse_anschrift" },
+    ],
+  },
+  {
+    name: "Kassenzeichen Landesjustizkasse",
+    fields: [
+      { type: "shared", key: "kassenzeichen" },
+      { type: "doc", docId: "kosten", key: "verfahren.az_landesjustizkasse" },
+    ],
+  },
+  // Staatsanwaltschaft
+  {
+    name: "Staatsanwaltschaft",
+    fields: [
+      { type: "shared", key: "staatsanwaltschaft" },
+      { type: "doc", docId: "kosten", key: "verfahren.behoerde_staatsanwaltschaft" },
+    ],
+  },
+  {
+    name: "Aktenzeichen Staatsanwaltschaft",
+    fields: [
+      { type: "shared", key: "aktenzeichen_sta" },
+      { type: "doc", docId: "kosten", key: "verfahren.az_sta" },
+    ],
+  },
+  // Gericht
+  {
+    name: "Gericht",
+    fields: [
+      { type: "shared", key: "gericht" },
+      { type: "doc", docId: "kosten", key: "verfahren.behoerde_gericht" },
+    ],
+  },
+  {
+    name: "Aktenzeichen Gericht",
+    fields: [
+      { type: "shared", key: "aktenzeichen_gericht" },
+      { type: "doc", docId: "kosten", key: "verfahren.az_gericht" },
+    ],
+  },
+  // Stammdaten klassisch
+  {
+    name: "Name",
+    fields: [
+      { type: "shared", key: "name" },
+      { type: "doc", docId: "kosten", key: "erklaerung_wirtschaft.name" },
+    ],
+  },
+  {
+    name: "Anschrift",
+    fields: [
+      { type: "shared", key: "anschrift" },
+      { type: "doc", docId: "kosten", key: "erklaerung_wirtschaft.anschrift" },
+    ],
+  },
+  {
+    name: "Geburtsdatum",
+    fields: [
+      { type: "shared", key: "geburtsdatum" },
+      { type: "doc", docId: "kosten", key: "erklaerung_wirtschaft.geburtsdatum" },
+    ],
+  },
+];
+
+function _readSyncField(f) {
+  if (f.type === "shared") return state.shared?.[f.key] || "";
+  if (f.type === "doc") return state.docs?.[f.docId]?.answers?.[f.key] || "";
+  return "";
+}
+function _writeSyncField(f, value) {
+  if (f.type === "shared") {
+    state.shared = state.shared || {};
+    state.shared[f.key] = value;
+    Storage.set(SHARED_STORAGE_KEY, JSON.stringify(state.shared));
+  } else if (f.type === "doc") {
+    state.docs = state.docs || {};
+    state.docs[f.docId] = state.docs[f.docId] || { answers:{}, rows:{}, attachments:{}, signatures:{} };
+    state.docs[f.docId].answers = state.docs[f.docId].answers || {};
+    state.docs[f.docId].answers[f.key] = value;
+    if (DOCS[f.docId]) Storage.set(DOCS[f.docId].storageKey, JSON.stringify(state.docs[f.docId]));
+  }
+}
+
+// Wird aufgerufen wenn EIN Feld in einer Gruppe geändert wird → propagiert
+// auf alle anderen Felder in dieser Gruppe. Gibt die Anzahl der propagierten
+// Änderungen zurück.
+function propagateFieldChange(changedField, value) {
+  let n = 0;
+  DATA_SYNC_GROUPS.forEach(group => {
+    // Ist das changed-Feld in dieser Gruppe?
+    const inGroup = group.fields.some(f => 
+      f.type === changedField.type &&
+      (f.type === "shared" ? f.key === changedField.key : (f.docId === changedField.docId && f.key === changedField.key))
+    );
+    if (!inGroup) return;
+    // Alle anderen Felder auf den neuen Wert setzen, falls sie sich unterscheiden
+    group.fields.forEach(f => {
+      if (f.type === changedField.type &&
+          (f.type === "shared" ? f.key === changedField.key : (f.docId === changedField.docId && f.key === changedField.key))) {
+        return; // Selbes Feld
+      }
+      const current = _readSyncField(f);
+      if (current !== value) {
+        _writeSyncField(f, value);
+        n++;
+      }
+    });
+  });
+  return n;
+}
+
+// Beim App-Start: gleicht alle Sync-Gruppen einmal ab. Wenn in einer Gruppe
+// ein nicht-leerer Wert existiert, werden alle leeren Felder damit gefüllt.
+// Wenn mehrere unterschiedliche Werte existieren, gewinnt der erste nicht-leere.
+function reconcileAllSyncGroups() {
+  let changes = 0;
+  DATA_SYNC_GROUPS.forEach(group => {
+    const valuesWithSource = group.fields.map(f => ({ f, val: _readSyncField(f) })).filter(x => x.val);
+    if (valuesWithSource.length === 0) return;
+    // Wert wählen: erster nicht-leerer
+    const winnerVal = valuesWithSource[0].val;
+    group.fields.forEach(f => {
+      const cur = _readSyncField(f);
+      if (cur !== winnerVal && (!cur || cur === "")) {
+        _writeSyncField(f, winnerVal);
+        changes++;
+      }
+    });
+  });
+  return changes;
+}
+
+
 // Bidirektional zwischen den jeweils ersten Kontakten pro Rolle und den
 // entsprechenden Stammdaten-Feldern. Beispiel:
 //   bh-Kontakt  <-> state.shared.bewaehrungshelfer / bh_email / bh_telefon / ...
@@ -8101,6 +8376,50 @@ function addCustomTemplate() {
     if (el) el.focus();
   }, 40);
 }
+// ── Generisches Bestätigungs-Modal ───────────────────────────────────────
+// Ersetzt confirm() — auf iOS-PWAs und Safari ist confirm() unzuverlässig.
+// State: confirmModal = { title, message, onConfirm, confirmLabel, danger }
+function confirmAction(opts) {
+  state.confirmModal = {
+    title: opts.title || "Bestätigen?",
+    message: opts.message || "",
+    confirmLabel: opts.confirmLabel || "OK",
+    danger: !!opts.danger,
+    onConfirm: opts.onConfirm,
+  };
+  render();
+}
+function closeConfirmModal() {
+  state.confirmModal = null;
+  render();
+}
+function runConfirmAction() {
+  const m = state.confirmModal;
+  state.confirmModal = null;
+  if (m && typeof m.onConfirm === "function") {
+    try { m.onConfirm(); } catch(e) { console.error("confirmAction onConfirm:", e); }
+  }
+  render();
+}
+function renderConfirmModal() {
+  const m = state.confirmModal;
+  if (!m) return "";
+  return `
+    <div class="modal-backdrop" onclick="if(event.target===this) closeConfirmModal()">
+      <div class="modal" style="max-width:440px;">
+        <div style="padding:18px 20px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:10px;">
+          <span style="font-size:22px;">${m.danger ? "⚠️" : "❓"}</span>
+          <strong style="font-size:16px;">${esc(m.title)}</strong>
+        </div>
+        <div style="padding:18px 20px; font-size:14px; line-height:1.5;">${esc(m.message)}</div>
+        <div style="padding:14px 20px; border-top:1px solid var(--border); display:flex; gap:8px; justify-content:flex-end;">
+          <button class="btn btn-secondary" onclick="closeConfirmModal()">Abbrechen</button>
+          <button class="btn ${m.danger ? "btn-danger" : "btn-primary"}" onclick="runConfirmAction()" style="${m.danger ? "background:var(--danger); color:#fff;" : ""}">${esc(m.confirmLabel)}</button>
+        </div>
+      </div>
+    </div>`;
+}
+
 function closeAddCustomTpl() {
   state.addCustomTplOpen = false;
   render();
@@ -8172,12 +8491,22 @@ function updateCustomTemplateText(key, text) {
   updateCustomTemplateText._t = setTimeout(() => saveCustomTemplates(), 400);
 }
 function deleteCustomTemplate(key) {
-  if (!confirm("Eigene Vorlage „" + (state.customTemplates?.[key]?.title || key) + "“ löschen?")) return;
-  if (state.customTemplates) delete state.customTemplates[key];
-  delete ANSCHREIBEN_TEMPLATES[key];
-  saveCustomTemplates();
-  if (activeAnschreiben === key) activeAnschreiben = null;
-  render();
+  const tpl = state.customTemplates?.[key];
+  const title = tpl?.title || key;
+  confirmAction({
+    title: "Eigene Vorlage löschen?",
+    message: "Möchtest du die Vorlage „" + title + "“ wirklich löschen?",
+    confirmLabel: "🗑 Löschen",
+    danger: true,
+    onConfirm: () => {
+      if (state.customTemplates) delete state.customTemplates[key];
+      delete ANSCHREIBEN_TEMPLATES[key];
+      saveCustomTemplates();
+      if (activeAnschreiben === key) activeAnschreiben = null;
+      showSaveToast("Vorlage gelöscht");
+      render();
+    },
+  });
 }
 // Wird beim App-Start aufgerufen, registriert alle gespeicherten Custom-Vorlagen
 // in ANSCHREIBEN_TEMPLATES.
@@ -10754,65 +11083,70 @@ async function printAnschreiben() {
   // Validierungs-Hinweis: leere Platzhalter (____) im Brieftext erkennen
   const placeholderCount = (text.match(/_{3,}/g) || []).length;
   if (placeholderCount > 0) {
-    if (!confirm(`⚠ Der Brief enthält noch ${placeholderCount} ${placeholderCount === 1 ? "Platzhalter (____)" : "Platzhalter (____)"} — typischerweise Stellen, die du noch ausfüllen musst.\n\nTrotzdem drucken?`)) return;
+    confirmAction({
+      title: "Platzhalter im Brief?",
+      message: "Der Brief enthält noch " + placeholderCount + " Platzhalter (____) — typischerweise Stellen, die du noch ausfüllen musst.\n\nTrotzdem drucken?",
+      confirmLabel: "🖨 Trotzdem drucken",
+      danger: false,
+      onConfirm: () => { _doPrintAnschreiben(text, tpl); },
+    });
+    return;
   }
+  await _doPrintAnschreiben(text, tpl);
+}
 
+// Inline-Print statt Pop-up — vermeidet Browser-Blocker und funktioniert auch
+// als PWA. Inhalt wird ins aktuelle Dokument injiziert; @media print blendet
+// alles andere aus. Nach dem Drucken wird der Inhalt wieder entfernt.
+async function _doPrintAnschreiben(text, tpl) {
   // Anhänge bauen, falls welche ausgewählt
   const selectedIds = getSelectedAttachmentIds();
   let attachmentsHtml = "";
   if (selectedIds.size > 0) {
     const available = getAvailableAttachments();
     const selected = available.filter(a => selectedIds.has(a.id));
-    // Loading overlay damit User merkt, dass was passiert
     const overlay = document.createElement("div");
     overlay.style.cssText = "position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:99999; display:flex; align-items:center; justify-content:center; color:#fff; font-size:16px;";
     overlay.innerHTML = '<div style="background:#1e3a5f; padding:24px 36px; border-radius:12px; text-align:center;"><div style="font-size:32px;">📎</div><div style="margin-top:10px;">Bereite Anhänge vor (' + selected.length + ')…</div></div>';
     document.body.appendChild(overlay);
     try {
-      // Inline: Anhang-Inhalte zusammenbauen, danach in Print-Window injizieren
       const parts = [];
-      for (const att of selected) {
-        parts.push(await renderAttachmentForPrint(att));
-      }
+      for (const att of selected) parts.push(await renderAttachmentForPrint(att));
       attachmentsHtml = parts.join("");
     } finally {
       document.body.removeChild(overlay);
     }
   }
 
-  const win = window.open("", "_blank");
-  if (!win) {
-    alert("Druckfenster vom Browser blockiert. Bitte Pop-ups für diese Seite erlauben.");
-    return;
-  }
-  win.document.write(
-    '<!DOCTYPE html><html lang="de"><head><meta charset="utf-8">' +
-    '<title>' + esc(tpl.title) + '</title>' +
-    '<style>' +
-      'body{font-family: \"Times New Roman\", serif; max-width: 17cm; margin: 2cm auto; line-height: 1.6; font-size: 12pt; color:#000;}' +
-      '.brief-text { white-space: pre-wrap; }' +
-      '.attachments-area img { max-width: 100%; }' +
-      '.print-toolbar { position: sticky; top: 0; background: #1a5f3c; color: white; padding: 10px 20px; margin: -2cm -50vw 14pt; padding-left: 50vw; padding-right: 50vw; display: flex; gap: 10px; align-items: center; box-shadow: 0 2px 8px rgba(0,0,0,0.15); font-family: sans-serif; }' +
-      '.print-toolbar button { padding: 8px 16px; font-size: 14px; border-radius: 6px; border: none; cursor: pointer; font-weight: 600; }' +
-      '.print-toolbar .btn-print { background: white; color: #1a5f3c; }' +
-      '.print-toolbar .btn-close { background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.4); }' +
-      '.print-toolbar .hint { font-size: 12px; opacity: 0.9; margin-left: auto; font-family: sans-serif; }' +
-      '@media print { body { margin: 1.5cm; max-width: none; } .print-toolbar { display: none !important; } }' +
-    '</style></head><body>' +
-    '<div class="print-toolbar">' +
-      '<button class="btn-print" onclick="window.print()">🖨 Drucken / als PDF speichern</button>' +
-      '<button class="btn-close" onclick="window.close()">Schließen</button>' +
-      '<span class="hint">Tipp: Im Druckdialog „Als PDF speichern" wählen</span>' +
-    '</div>' +
+  // Print-Container ins DOM injizieren
+  const oldContainer = document.getElementById("inline-print-container");
+  if (oldContainer) oldContainer.remove();
+  const container = document.createElement("div");
+  container.id = "inline-print-container";
+  container.innerHTML =
     '<div class="brief-text">' + esc(text) + '</div>' +
     getBriefSignatureHtml() +
-    (attachmentsHtml ? '<div class="attachments-area">' + attachmentsHtml + '</div>' : "") +
-    '</body></html>'
-  );
-  win.document.close();
-  win.focus();
-  // Kein Auto-Print mehr — Browser blockieren das oft und der User sieht dann
-  // nur die Vorschau ohne Print-Dialog. Toolbar bietet klaren Drucken-Knopf.
+    (attachmentsHtml ? '<div class="attachments-area">' + attachmentsHtml + '</div>' : "");
+  document.body.appendChild(container);
+
+  // Doc-Title temporär ändern damit PDF-Filename passt
+  const oldTitle = document.title;
+  document.title = tpl.title + " — " + (state.shared?.name || "");
+
+  // Drucken — Browser-eigener Dialog
+  try {
+    window.print();
+  } catch(e) {
+    alert("Drucken fehlgeschlagen: " + e.message);
+  }
+
+  // Nach Druckdialog (ob OK oder Abbruch): aufräumen
+  setTimeout(() => {
+    document.title = oldTitle;
+    const c = document.getElementById("inline-print-container");
+    if (c) c.remove();
+  }, 500);
+
   if (activeAnschreiben) recordBriefSent(activeAnschreiben, "drucken");
 }
 
@@ -10846,48 +11180,26 @@ async function printFormular() {
     }
   }
 
-  const title = tpl ? tpl.title : "Formular";
-  const win = window.open("", "_blank");
-  if (!win) {
-    alert("Das Druckfenster wurde vom Browser blockiert. Bitte Pop-ups für diese Seite erlauben.");
-    return;
-  }
-  const css = `
-    body{font-family: Arial, Helvetica, sans-serif; max-width: 19cm; margin: 1.4cm auto; line-height: 1.4; color:#000; font-size: 11pt;}
-    h2{text-align:center;}
-    @media print { body { margin: 1.2cm; max-width: none; } .print-controls { display:none !important; } }
-    .print-controls {
-      position: fixed; top: 0; left: 0; right: 0;
-      background: #2E5984; color: #fff; padding: 10px 16px;
-      display: flex; gap: 10px; align-items: center; justify-content: center;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.2); z-index: 9999;
-    }
-    .print-controls button {
-      background: #fff; color: #2E5984; border: none; padding: 8px 18px;
-      border-radius: 6px; font-weight: 700; font-size: 14px; cursor: pointer;
-    }
-    .print-controls span { font-size: 13px; }
-    body.has-controls { padding-top: 60px; }
-  `;
-  const script = "// auto-print entfernt — User klickt explizit Drucken-Knopf";
-  win.document.open();
-  win.document.write(
-    '<!DOCTYPE html><html lang="de"><head><meta charset="utf-8">' +
-    '<title>' + esc(title) + '</title>' +
-    '<style>' + css + '</style>' +
-    '</head><body class="has-controls">' +
-    '<div class="print-controls">' +
-      '<span>📋 Formular-Druckvorschau</span>' +
-      '<button onclick="window.print()">🖨 Drucken / als PDF</button>' +
-      '<button onclick="window.close()">Schließen</button>' +
-    '</div>' +
-    printHtml +
-    getBriefSignatureHtml() +
-    attachmentsHtml +
-    '</body></html>'
-  );
-  win.document.close();
-  win.focus();
+  // Inline-Print statt Pop-up (siehe _doPrintAnschreiben)
+  const oldContainer = document.getElementById("inline-print-container");
+  if (oldContainer) oldContainer.remove();
+  const container = document.createElement("div");
+  container.id = "inline-print-container";
+  container.classList.add("formular-print");
+  container.innerHTML = printHtml + getBriefSignatureHtml() + attachmentsHtml;
+  document.body.appendChild(container);
+
+  const oldTitle = document.title;
+  document.title = (tpl?.title || "Formular") + " — " + (state.shared?.name || "");
+
+  try { window.print(); } catch(e) { alert("Drucken fehlgeschlagen: " + e.message); }
+
+  setTimeout(() => {
+    document.title = oldTitle;
+    const c = document.getElementById("inline-print-container");
+    if (c) c.remove();
+  }, 500);
+
   if (activeAnschreiben) recordBriefSent(activeAnschreiben, "drucken");
 }
 
@@ -12266,6 +12578,7 @@ function renderGlobalSearchModal() {
 document.addEventListener("keydown", e => {
   // Escape: schliesst offene Modals (Reihenfolge: innerste zuerst)
   if (e.key === "Escape") {
+    if (state.confirmModal) { closeConfirmModal(); return; }
     if (state.extractedTextModal) { closeExtractedTextModal(); return; }
     if (resetModalOpen) { closeResetModal(); return; }
     if (quickAddOpen) { closeQuickAdd(); return; }
