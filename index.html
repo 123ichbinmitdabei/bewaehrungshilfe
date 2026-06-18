@@ -273,6 +273,103 @@
   .skip-btn:hover { background: var(--skip-bg); color: var(--text); }
   .skip-btn.active { background: var(--skip); color: white; border-color: var(--skip); }
   .nav { display: flex; justify-content: space-between; margin-top: 20px; gap: 12px; flex-wrap: wrap; }
+
+  /* ── Mobile-Optimierungen v3.32 ── */
+  @media (max-width: 720px) {
+    /* Wizard-Hauptkarte: weniger Padding, dafür mehr Inhalt-Platz */
+    .main { padding: 14px 12px; border-radius: 10px; }
+    /* Sidebar-Abschnitte: horizontal scrollbar statt vertikale Liste */
+    .sidebar { padding: 8px; }
+    .sidebar h3 { padding: 4px 8px 4px; font-size: 10px; }
+    .sidebar ul {
+      display: flex; gap: 6px; overflow-x: auto;
+      padding-bottom: 6px; -webkit-overflow-scrolling: touch;
+      scrollbar-width: thin;
+    }
+    .sidebar li {
+      flex: 0 0 auto; padding: 8px 12px; font-size: 12px;
+      white-space: nowrap; min-height: 36px;
+    }
+    /* Wizard-Sektion-Header kompakter */
+    .section-head { margin-bottom: 12px; padding-bottom: 10px; }
+    .section-head h2 { font-size: 17px; }
+    .section-head .meta { font-size: 12px; }
+    /* Felder: Label oben, Input volle Breite, mehr vertikaler Platz */
+    .field {
+      grid-template-columns: 1fr; gap: 4px; padding: 8px 0;
+    }
+    .field label { font-size: 13px; font-weight: 500; }
+    .field input, .field textarea, .field select {
+      width: 100%; padding: 11px 12px; font-size: 16px; /* 16px verhindert iOS-Zoom */
+      min-height: 44px; /* Apple HIG Touch-Target */
+    }
+    .field-input-wrap {
+      display: flex; gap: 6px; width: 100%;
+    }
+    .field-input-wrap input { flex: 1; }
+    .skip-btn {
+      min-width: 44px; min-height: 44px; padding: 8px 10px; font-size: 12px;
+    }
+    /* Wizard-Navigation als sticky Bottom-Bar */
+    .nav {
+      position: sticky; bottom: 0;
+      background: var(--card); border-top: 1px solid var(--border);
+      margin: 14px -12px -14px; padding: 10px 12px;
+      box-shadow: 0 -4px 12px rgba(0,0,0,0.1);
+      z-index: 50;
+    }
+    .nav .btn {
+      flex: 1; min-height: 48px; font-size: 14px; padding: 10px 16px;
+    }
+    /* Row-cards in Wizard: weniger Padding, größere Inputs */
+    .row-card { padding: 10px 10px 12px; }
+    .row-card .row-num { font-size: 10px; padding: 2px 7px; }
+    .row-grid .field-mini input,
+    .row-grid .field-mini textarea {
+      padding: 9px 11px; font-size: 16px; min-height: 42px;
+    }
+    /* Tab-Bar oben in Wizard: Speicher-Indikator + Buttons untereinander */
+    .header {
+      flex-direction: column; align-items: stretch; gap: 8px;
+    }
+    .header h1 { font-size: 19px; }
+    .header .sub { font-size: 12px; }
+    .header > div:last-child { display: flex; gap: 6px; flex-wrap: wrap; }
+    .header .reset-btn { font-size: 11px; padding: 5px 10px; }
+    /* Save-Indikator: kompakter */
+    .save-indicator { font-size: 11px; padding: 3px 8px; }
+    /* Checkbox-Item: größere Touch-Targets */
+    .checkbox-item { padding: 11px 12px; min-height: 44px; }
+    .checkbox-item span { font-size: 14px; }
+    /* Add-Row-Btn: Vollbreite, größer */
+    .add-row-btn {
+      width: 100%; min-height: 48px; font-size: 14px; padding: 12px;
+    }
+    /* Row-actions: Buttons als Block */
+    .row-actions {
+      display: flex; flex-direction: column; gap: 6px; margin-top: 10px;
+    }
+    .row-actions .btn, .row-actions button {
+      width: 100%; min-height: 40px; font-size: 13px;
+    }
+    /* Attachments-area: optimierte Touch-Targets */
+    .attachment-item .delete,
+    .attachment-item .att-action-btn {
+      min-width: 30px; min-height: 30px;
+    }
+    .attach-upload-btn {
+      min-height: 44px; font-size: 13px; padding: 10px 14px;
+    }
+  }
+
+  /* Sehr schmal: <=480px (Phone Portrait) */
+  @media (max-width: 480px) {
+    .container { padding: 0 8px; }
+    .home-hero { padding: 18px 14px; }
+    .home-hero h1 { font-size: 22px; }
+    .doc-card { padding: 14px; }
+    .doc-card h3 { font-size: 15px; }
+  }
   .info-box {
     background: var(--primary-soft); border-left: 3px solid var(--primary);
     border-radius: 6px; padding: 11px 14px; margin: 10px 0; font-size: 13px;
@@ -5218,7 +5315,7 @@ let showArchived = false;
 function toggleShowArchived() { showArchived = !showArchived; render(); }
 
 // === VERSION INFO ===
-const APP_VERSION = "v3.31";
+const APP_VERSION = "v3.33";
 
 // === ONBOARDING ===
 let onboardingActive = false;
@@ -5250,6 +5347,8 @@ function finishOnboarding() {
   // Save shared
   Storage.set(SHARED_STORAGE_KEY, JSON.stringify(state.shared));
   try { localStorage.setItem(ONBOARDING_DONE_KEY, "1"); } catch(e) {}
+  // Adressbuch-BH-Eintrag aktualisieren oder anlegen (v3.33)
+  try { syncSharedToContacts(); } catch(e){}
   onboardingActive = false;
   showSaveToast("Stammdaten gespeichert");
   render();
@@ -6009,6 +6108,8 @@ async function loadAllState() {
       if (parsed && typeof parsed === "object") state.terminPrep = parsed;
     } catch(e){}
   }
+  // Stammdaten <-> Adressbuch synchronisieren (v3.33)
+  try { syncSharedToContacts(); } catch(e){}
   // Load backup reminder state
   const reminderRaw = await Storage.get(BACKUP_REMINDER_KEY);
   if (reminderRaw) {
@@ -7427,6 +7528,7 @@ function render() {
   else if (state.view === "settings") app.innerHTML = renderSettingsView();
   else if (state.view === "contacts") app.innerHTML = renderContactsView();
   else if (state.view === "briefHistory") app.innerHTML = renderBriefHistoryView();
+  else if (state.view === "timeline") app.innerHTML = renderTimelineView();
 
   // Render modal overlay if open.
   // IMPORTANT: remove ALL existing overlays (not just one) - if duplicates ever
@@ -7526,9 +7628,13 @@ const CONTACT_ROLES = [
   { key: "sonstige", icon: "📇", label: "Sonstige" },
 ];
 
-function saveContacts() {
-  Storage.set(CONTACTS_STORAGE_KEY, JSON.stringify(state.contacts || []));
-  if (typeof markDataChanged === "function") markDataChanged();
+async function saveContacts() {
+  try {
+    await Storage.set(CONTACTS_STORAGE_KEY, JSON.stringify(state.contacts || []));
+    if (typeof markDataChanged === "function") markDataChanged();
+  } catch(e) {
+    console.error("saveContacts failed:", e);
+  }
 }
 
 function addContact(rolle) {
@@ -7542,15 +7648,82 @@ function updateContactField(id, field, value) {
   const c = (state.contacts || []).find(x => x.id === id);
   if (!c) return;
   c[field] = value;
-  // Debounced save
+  // Debounced save (400ms). Wichtig: Timer wird in deleteContact gecancelt.
   clearTimeout(updateContactField._t);
   updateContactField._t = setTimeout(() => saveContacts(), 400);
+  // Wenn dieser Kontakt auch Stammdaten-Quelle ist (rolle=bh): die shared-Daten
+  // automatisch synchron halten.
+  syncContactToShared(c);
 }
-function deleteContact(id) {
+async function deleteContact(id) {
   if (!confirm("Diesen Kontakt löschen?")) return;
+  // Pending debounced-save abbrechen, sonst überschreibt der noch das gefilterte Array nicht, aber der Eintrag würde zwischendurch wieder geschrieben werden können
+  clearTimeout(updateContactField._t);
   state.contacts = (state.contacts || []).filter(c => c.id !== id);
-  saveContacts();
+  await saveContacts();
   render();
+  showSaveToast("Kontakt gelöscht");
+}
+
+// ── Adressbuch <-> Stammdaten Synchronisation ──────────────────────────────
+// Wenn der erste Kontakt mit Rolle=bh erfasst wird, übernehmen wir seine
+// Felder in state.shared. Wenn jemand die shared-Daten ändert, spiegelt das
+// zurück in den Kontakt. Reduziert Doppel-Erfassung.
+function syncContactToShared(contact) {
+  if (!contact || contact.rolle !== "bh") return;
+  // Nur ersten BH-Kontakt als "primären" nehmen
+  const allBh = (state.contacts || []).filter(c => c.rolle === "bh");
+  if (allBh.length === 0 || allBh[0].id !== contact.id) return;
+  state.shared = state.shared || {};
+  // Nur überschreiben, wenn Kontakt-Feld nicht leer (sonst löscht man unbeabsichtigt)
+  const map = {
+    bewaehrungshelfer: contact.name,
+    bh_firma: contact.firma,
+    bh_email: contact.email,
+    bh_telefon: contact.telefon,
+    bh_anschrift: contact.anschrift,
+  };
+  let changed = false;
+  Object.entries(map).forEach(([sharedKey, val]) => {
+    if (val && state.shared[sharedKey] !== val) {
+      state.shared[sharedKey] = val;
+      changed = true;
+    }
+  });
+  if (changed) {
+    Storage.set(SHARED_STORAGE_KEY, JSON.stringify(state.shared));
+  }
+}
+function syncSharedToContacts() {
+  // Wird beim Bearbeiten von Stammdaten (Onboarding etc.) aufgerufen.
+  // Sucht den BH-Kontakt und aktualisiert ihn aus state.shared.
+  if (!state.contacts) return;
+  const s = state.shared || {};
+  let bhContact = state.contacts.find(c => c.rolle === "bh");
+  // Wenn noch keiner existiert UND Stammdaten BH-Daten enthalten: anlegen
+  if (!bhContact && s.bewaehrungshelfer) {
+    bhContact = {
+      id: "c_" + Date.now() + "_bh01",
+      rolle: "bh",
+      name: s.bewaehrungshelfer || "",
+      firma: s.bh_firma || "",
+      email: s.bh_email || "",
+      telefon: s.bh_telefon || "",
+      anschrift: s.bh_anschrift || "",
+      notiz: "Automatisch aus Stammdaten erstellt",
+    };
+    state.contacts.unshift(bhContact);
+    saveContacts();
+    return;
+  }
+  if (!bhContact) return;
+  let changed = false;
+  if (s.bewaehrungshelfer && bhContact.name !== s.bewaehrungshelfer) { bhContact.name = s.bewaehrungshelfer; changed = true; }
+  if (s.bh_firma && bhContact.firma !== s.bh_firma) { bhContact.firma = s.bh_firma; changed = true; }
+  if (s.bh_email && bhContact.email !== s.bh_email) { bhContact.email = s.bh_email; changed = true; }
+  if (s.bh_telefon && bhContact.telefon !== s.bh_telefon) { bhContact.telefon = s.bh_telefon; changed = true; }
+  if (s.bh_anschrift && bhContact.anschrift !== s.bh_anschrift) { bhContact.anschrift = s.bh_anschrift; changed = true; }
+  if (changed) saveContacts();
 }
 
 function renderContactsView() {
@@ -7573,8 +7746,13 @@ function renderContactsView() {
       cardsHtml += `<div style="margin-bottom:16px;">
         <h3 style="font-size:13px; text-transform:uppercase; letter-spacing:.5px; color:var(--text-soft); margin-bottom:8px;">${esc(r.icon)} ${esc(r.label)} (${list.length})</h3>`;
       list.forEach(c => {
+        const isBhPrimary = c.rolle === "bh" && list[0]?.id === c.id;
+        const syncBadge = isBhPrimary
+          ? `<div style="font-size:11px; color:var(--primary); background:var(--primary-soft); padding:4px 10px; border-radius:6px; margin-bottom:8px; display:flex; align-items:center; gap:6px;">🔗 <strong>Mit Stammdaten verknüpft</strong> — Änderungen werden in alle Briefe übernommen.</div>`
+          : "";
         cardsHtml += `
           <div style="background:var(--card); border:1px solid var(--border); border-radius:10px; padding:12px 14px; margin-bottom:8px;">
+            ${syncBadge}
             <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
               <input type="text" value="${esc(c.name || "")}" oninput="updateContactField('${c.id}','name',this.value)" placeholder="Name (Vor- und Nachname)" style="padding:7px 10px; border:1px solid var(--border); border-radius:6px; font-size:13px; background:var(--input-bg); color:var(--text);" />
               <input type="text" value="${esc(c.firma || "")}" oninput="updateContactField('${c.id}','firma',this.value)" placeholder="Firma / Einrichtung" style="padding:7px 10px; border:1px solid var(--border); border-radius:6px; font-size:13px; background:var(--input-bg); color:var(--text);" />
@@ -8083,6 +8261,402 @@ function computeAchievements() {
   }
   return out;
 }
+// ── Setup-Checkliste (persistent) ─────────────────────────────────────────
+// Zeigt was schon eingerichtet ist, was noch offen — anklickbare Schritte,
+// die direkt zur passenden Stelle führen. Wenn alles erledigt: einklappbarer
+// "Alles eingerichtet" Status.
+const SETUP_CHECKLIST_KEY = "bh_setup_checklist_dismissed";
+function computeSetupChecklist() {
+  const s = state.shared || {};
+  const items = [];
+  // Schritt 1: Name
+  items.push({
+    id: "name",
+    label: "Name in Stammdaten eingetragen",
+    done: !!s.name,
+    action: "startOnboarding()",
+    actionLabel: "📝 Onboarding starten",
+  });
+  // Schritt 2: BH-Daten
+  items.push({
+    id: "bh",
+    label: "Bewährungshelfer:in eingetragen",
+    done: !!s.bewaehrungshelfer,
+    action: "startOnboarding()",
+    actionLabel: "👤 BH ergänzen",
+  });
+  // Schritt 3: Aktenzeichen
+  items.push({
+    id: "az",
+    label: "Aktenzeichen erfasst",
+    done: !!s.aktenzeichen,
+    action: "startOnboarding()",
+    actionLabel: "⚖️ Aktenzeichen",
+  });
+  // Schritt 4: Bewährungs-Zeitraum
+  items.push({
+    id: "bewaehrung",
+    label: "Bewährungs-Zeitraum gesetzt (Beginn & Ende)",
+    done: !!(s.bewaehrung_start && s.bewaehrung_ende),
+    action: "startOnboarding()",
+    actionLabel: "📅 Zeitraum",
+  });
+  // Schritt 5: Erste Dokument-Karte begonnen
+  const docsStarted = Object.values(state.docs || {}).filter(d => d && (Object.keys(d.answers || {}).length > 0 || Object.keys(d.rows || {}).some(k => (d.rows[k] || []).length > 0))).length;
+  items.push({
+    id: "doc",
+    label: "Erstes Dokument begonnen",
+    done: docsStarted > 0,
+    action: "goHome()",
+    actionLabel: "📄 Dokument anfangen",
+  });
+  // Schritt 6: Backup einmal gemacht
+  items.push({
+    id: "backup",
+    label: "Erstes Backup gemacht",
+    done: !!state.lastBackupAt,
+    action: "exportAllData()",
+    actionLabel: "💾 Jetzt sichern",
+  });
+  // Schritt 7: PIN-Schutz aktiviert (optional, aber empfohlen)
+  let hasPin = false;
+  try { hasPin = !!localStorage.getItem(PIN_STORAGE_KEY); } catch(e){}
+  items.push({
+    id: "pin",
+    label: "PIN-Schutz aktiviert (optional, schützt deine Daten)",
+    done: hasPin,
+    optional: true,
+    action: "startPinSetup()",
+    actionLabel: "🔒 PIN einrichten",
+  });
+  // Schritt 8: Termin-Erinnerungen (optional)
+  items.push({
+    id: "notif",
+    label: "Termin-Erinnerungen aktiviert (optional)",
+    done: notifIsEnabled(),
+    optional: true,
+    action: "enableNotifications()",
+    actionLabel: "🔔 Aktivieren",
+  });
+  return items;
+}
+function isSetupChecklistDismissed() {
+  try { return localStorage.getItem(SETUP_CHECKLIST_KEY) === "1"; } catch(e) { return false; }
+}
+function dismissSetupChecklist() {
+  try { localStorage.setItem(SETUP_CHECKLIST_KEY, "1"); } catch(e){}
+  render();
+}
+function unDismissSetupChecklist() {
+  try { localStorage.removeItem(SETUP_CHECKLIST_KEY); } catch(e){}
+  render();
+}
+function renderSetupChecklist() {
+  const items = computeSetupChecklist();
+  const required = items.filter(i => !i.optional);
+  const requiredDone = required.filter(i => i.done).length;
+  const total = required.length;
+  const allRequiredDone = requiredDone === total;
+  // Wenn alles Required erledigt UND user hat dismissed: nichts zeigen
+  if (allRequiredDone && isSetupChecklistDismissed()) return "";
+  // Wenn alles Required erledigt: kompakter "Alles bereit"-Banner
+  if (allRequiredDone) {
+    const optionalOpen = items.filter(i => i.optional && !i.done).length;
+    return `
+      <div style="background:rgba(91, 165, 114, 0.1); border:1px solid var(--accent); border-radius:12px; padding:12px 16px; margin-top:14px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+        <span style="font-size:22px;">✅</span>
+        <div style="flex:1; min-width:160px;">
+          <div style="font-weight:600; color:var(--accent); font-size:14px;">Setup komplett!</div>
+          <div style="font-size:12px; color:var(--text-soft);">${optionalOpen > 0 ? `${optionalOpen} optionale Schritte sind noch offen` : `Alle empfohlenen Schritte erledigt`}</div>
+        </div>
+        <button class="btn btn-secondary" onclick="dismissSetupChecklist()" style="font-size:12px;">Ausblenden</button>
+      </div>`;
+  }
+  // Sonst: volle Checkliste anzeigen
+  const itemsHtml = items.map(item => {
+    const cls = item.done ? "done" : "open";
+    const optLabel = item.optional ? `<span style="font-size:10px; padding:1px 6px; background:var(--bg); border-radius:5px; color:var(--text-soft); margin-left:6px;">optional</span>` : "";
+    return `
+      <div style="display:flex; gap:10px; align-items:center; padding:7px 0; ${item.done ? 'opacity:0.6;' : ''}">
+        <span style="width:22px; height:22px; border-radius:50%; border:2px solid ${item.done ? 'var(--accent)' : 'var(--border)'}; background:${item.done ? 'var(--accent)' : 'transparent'}; color:${item.done ? '#fff' : 'transparent'}; display:inline-flex; align-items:center; justify-content:center; font-size:13px; flex-shrink:0;">${item.done ? '✓' : ''}</span>
+        <span style="flex:1; font-size:13px; ${item.done ? 'text-decoration:line-through;' : ''}">${esc(item.label)}${optLabel}</span>
+        ${!item.done ? `<button class="btn btn-secondary" style="font-size:11px; padding:4px 10px;" onclick="${item.action}">${esc(item.actionLabel)}</button>` : ""}
+      </div>`;
+  }).join("");
+  const pctDone = total > 0 ? Math.round(requiredDone / total * 100) : 0;
+  return `
+    <details ${requiredDone < 2 ? "open" : ""} style="background:var(--card); border:1px solid var(--border); border-radius:12px; padding:0; margin-top:14px;">
+      <summary style="cursor:pointer; padding:12px 16px; list-style:none; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+        <span style="font-size:18px;">🚀</span>
+        <span style="flex:1; min-width:140px;">
+          <strong style="font-size:14px;">Erste Schritte</strong>
+          <div style="font-size:11px; color:var(--text-soft); margin-top:2px;">${requiredDone} von ${total} erledigt</div>
+        </span>
+        <span style="width:100px; height:6px; background:var(--bg); border-radius:3px; overflow:hidden;"><span style="display:block; height:100%; background:var(--accent); width:${pctDone}%; transition: width .3s;"></span></span>
+        <span style="font-size:12px; color:var(--text-soft); min-width:38px; text-align:right;">${pctDone}%</span>
+      </summary>
+      <div style="padding:4px 16px 12px;">${itemsHtml}</div>
+    </details>`;
+}
+
+// ── Bewährungs-Timeline ────────────────────────────────────────────────────
+// Chronologische Visualisierung aller relevanten Events: BH-Termine, Therapie,
+// Sozialstunden, Zahlungen, Briefe, Stichtage. Mit Filter nach Event-Typ und
+// Auto-Scroll zum heutigen Tag.
+function collectTimelineEvents() {
+  const events = [];
+  const today = new Date(); today.setHours(0,0,0,0);
+  // Bewährungs-Start
+  const bs = state.shared?.bewaehrung_start;
+  if (bs) {
+    const d = parseDateGuess(bs);
+    if (d) events.push({ date: d, type: "bewaehrung", icon: "🏁", title: "Bewährungs-Beginn", subtitle: state.shared?.aktenzeichen ? "Az. " + state.shared.aktenzeichen : "", color: "var(--primary)" });
+  }
+  // Bewährungs-Ende
+  const be = state.shared?.bewaehrung_ende;
+  if (be) {
+    const d = parseDateGuess(be);
+    if (d) events.push({ date: d, type: "bewaehrung", icon: "🎯", title: "Bewährungs-Ende", subtitle: "Aufatmen!", color: "var(--accent)" });
+  }
+  // BH-Termine
+  (state.docs?.bhtermine?.rows?.termine || []).forEach((row, idx) => {
+    if (!row.datum) return;
+    const d = parseDateGuess(row.datum);
+    if (!d) return;
+    const past = d < today;
+    const isCancelled = row.status && /abgesagt|verpasst/i.test(row.status);
+    events.push({
+      date: d,
+      type: "bh",
+      icon: isCancelled ? "❌" : (past ? "✓" : "📅"),
+      title: "BH-Termin" + (isCancelled ? " (" + row.status + ")" : ""),
+      subtitle: row.uhrzeit ? row.uhrzeit + " Uhr" + (row.ort ? " · " + row.ort : "") : (row.ort || ""),
+      color: isCancelled ? "var(--danger)" : "var(--primary)",
+      doc: "bhtermine",
+      rowIdx: idx,
+    });
+  });
+  // Therapie
+  (state.docs?.thera?.rows?.termine || []).forEach((row, idx) => {
+    if (!row.datum) return;
+    const d = parseDateGuess(row.datum);
+    if (!d) return;
+    const past = d < today;
+    events.push({
+      date: d,
+      type: "thera",
+      icon: past ? "✓" : "🧠",
+      title: "Therapie-Termin",
+      subtitle: (row.art ? row.art : "") + (row.uhrzeit ? " · " + row.uhrzeit : ""),
+      color: "#7c3aed",
+      doc: "thera",
+      rowIdx: idx,
+    });
+  });
+  // Sozialstunden
+  (state.docs?.sozial?.rows?.eintraege || []).forEach((row, idx) => {
+    if (!row.datum) return;
+    const d = parseDateGuess(row.datum);
+    if (!d) return;
+    const stunden = row.stunden || row.dauer || "";
+    events.push({
+      date: d,
+      type: "sozial",
+      icon: "🤝",
+      title: "Sozialstunden" + (stunden ? " (" + stunden + " h)" : ""),
+      subtitle: row.taetigkeit || (state.docs.sozial?.answers?.["einrichtung.name"] || ""),
+      color: "#0ea5e9",
+      doc: "sozial",
+      rowIdx: idx,
+    });
+  });
+  // Schadens-Zahlungen
+  (state.docs?.schadens?.rows?.zahlungen || []).forEach((row, idx) => {
+    if (!row.datum) return;
+    const d = parseDateGuess(row.datum);
+    if (!d) return;
+    events.push({
+      date: d,
+      type: "zahlung",
+      icon: "💶",
+      title: "Schadens-Zahlung" + (row.betrag ? ": " + row.betrag + " €" : ""),
+      subtitle: row.empfaenger || "",
+      color: "#16a34a",
+      doc: "schadens",
+      rowIdx: idx,
+    });
+  });
+  // Verfahrenskosten-Zahlungen
+  (state.docs?.kosten?.rows?.zahlungen || []).forEach((row, idx) => {
+    if (!row.datum) return;
+    const d = parseDateGuess(row.datum);
+    if (!d) return;
+    events.push({
+      date: d,
+      type: "kosten",
+      icon: "💸",
+      title: "Verfahrenskosten" + (row.betrag ? ": " + row.betrag + " €" : ""),
+      subtitle: row.empfaenger || "",
+      color: "#d97706",
+      doc: "kosten",
+      rowIdx: idx,
+    });
+  });
+  // Brief-Historie
+  (state.briefHistory || []).forEach(b => {
+    if (!b.erstelltAm) return;
+    const d = new Date(b.erstelltAm);
+    if (isNaN(d.getTime())) return;
+    const stat = BRIEF_STATUS_LABELS[b.status] || BRIEF_STATUS_LABELS.erstellt;
+    events.push({
+      date: d,
+      type: "brief",
+      icon: "✉️",
+      title: b.title,
+      subtitle: stat.icon + " " + stat.label + (b.statusNotiz ? " · " + b.statusNotiz : ""),
+      color: "#0891b2",
+    });
+  });
+  // Zahlungs-Fristen (Verfahrenskosten)
+  const kAns = state.docs?.kosten?.answers || {};
+  ["geldstrafe.frist_zahlung", "gerichtskosten.frist_zahlung"].forEach(key => {
+    const v = kAns[key];
+    if (!v) return;
+    const d = parseDateGuess(v);
+    if (!d) return;
+    const past = d < today;
+    events.push({
+      date: d,
+      type: "frist",
+      icon: past ? "⏰" : "⚠️",
+      title: key.startsWith("geldstrafe") ? "Geldstrafe-Frist" : "Gerichtskosten-Frist",
+      subtitle: "Kassenzeichen: " + (kAns["verfahren.az_landesjustizkasse"] || "—"),
+      color: "var(--warn)",
+    });
+  });
+  // Sortieren absteigend (neueste zuerst — oder Stichtage zuerst?)
+  // Wir sortieren chronologisch aufsteigend, scrollen aber zu heute
+  events.sort((a, b) => a.date.getTime() - b.date.getTime());
+  return events;
+}
+
+function renderTimelineView() {
+  const events = collectTimelineEvents();
+  const today = new Date(); today.setHours(0,0,0,0);
+  const filter = state.timelineFilter || "all";
+  const typeLabels = {
+    all: "Alle",
+    bh: "👤 BH",
+    thera: "🧠 Therapie",
+    sozial: "🤝 Sozial",
+    zahlung: "💶 Schadens",
+    kosten: "💸 Kosten",
+    brief: "✉️ Briefe",
+    frist: "⏰ Fristen",
+    bewaehrung: "🎯 Stichtage",
+  };
+  // Filter-Knöpfe
+  const counts = {};
+  events.forEach(e => { counts[e.type] = (counts[e.type] || 0) + 1; });
+  const filterButtons = Object.entries(typeLabels).map(([key, label]) => {
+    const isAll = key === "all";
+    const count = isAll ? events.length : (counts[key] || 0);
+    if (!isAll && count === 0) return "";
+    const isActive = filter === key;
+    return `<button class="btn ${isActive ? 'btn-primary' : 'btn-secondary'}" style="font-size:12px; padding:5px 11px;" onclick="state.timelineFilter='${key}'; render();">${esc(label)} <span style="opacity:0.7;">${count}</span></button>`;
+  }).join(" ");
+
+  // Filter anwenden
+  const visible = filter === "all" ? events : events.filter(e => e.type === filter);
+
+  // Gruppieren nach Monat (für visuelle Trenner)
+  const monthsLabel = ["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
+  let lastMonth = -1, lastYear = -1;
+  let body = "";
+  if (visible.length === 0) {
+    body = `<div style="padding:40px; text-align:center; color:var(--text-soft);">
+      <div style="font-size:42px; margin-bottom:10px;">📅</div>
+      <h3>Noch keine Einträge</h3>
+      <p>Sobald du Termine, Zahlungen oder Briefe erfasst, erscheinen sie hier chronologisch.</p>
+    </div>`;
+  } else {
+    // Auch die heutige Position markieren — einen virtuellen "heute"-Marker
+    // injizieren, sodass User sofort sieht, wo er steht
+    let injectedToday = false;
+    visible.forEach(e => {
+      const y = e.date.getFullYear();
+      const m = e.date.getMonth();
+      const isToday = e.date.getTime() === today.getTime();
+      const isPast = e.date < today;
+      const dateStr = pad(e.date.getDate()) + "." + pad(e.date.getMonth()+1) + "." + e.date.getFullYear();
+      if (y !== lastYear || m !== lastMonth) {
+        body += `
+          <div style="display:flex; align-items:center; gap:10px; margin:18px 0 8px;">
+            <h3 style="margin:0; font-size:14px; color:var(--primary);">${monthsLabel[m]} ${y}</h3>
+            <div style="flex:1; height:1px; background:var(--border);"></div>
+          </div>`;
+        lastMonth = m; lastYear = y;
+      }
+      // Heute-Marker (einmal) — wenn dieses Event in der Zukunft liegt und wir noch nicht den Marker gesetzt haben
+      if (!injectedToday && !isPast && !isToday) {
+        body += `
+          <div id="timeline-today" style="display:flex; align-items:center; gap:12px; padding:8px 14px; margin:8px 0; background:var(--accent); color:#fff; border-radius:8px;">
+            <span style="font-size:18px;">📍</span>
+            <strong>Heute · ${pad(today.getDate())}.${pad(today.getMonth()+1)}.${today.getFullYear()}</strong>
+          </div>`;
+        injectedToday = true;
+      }
+      const opacity = isPast ? "0.65" : "1";
+      const borderColor = isToday ? "var(--accent)" : (isPast ? "var(--border)" : e.color);
+      body += `
+        <div style="display:flex; gap:14px; padding:10px 0; border-left:3px solid ${borderColor}; padding-left:14px; margin-left:8px; opacity:${opacity};">
+          <div style="font-size:22px; min-width:30px;">${e.icon}</div>
+          <div style="flex:1;">
+            <div style="display:flex; gap:10px; align-items:baseline; flex-wrap:wrap;">
+              <strong style="font-size:14px;">${esc(e.title)}</strong>
+              <span style="font-size:11px; color:var(--text-soft);">${esc(dateStr)}</span>
+              ${isToday ? `<span style="font-size:10px; padding:1px 6px; background:var(--accent); color:#fff; border-radius:999px;">HEUTE</span>` : ""}
+            </div>
+            ${e.subtitle ? `<div style="font-size:12px; color:var(--text-soft); margin-top:2px;">${esc(e.subtitle)}</div>` : ""}
+            ${e.doc ? `<button class="btn btn-secondary" style="font-size:11px; padding:3px 9px; margin-top:5px;" onclick="state.activeDocId='${e.doc}'; state.view='wizard'; render();">→ Im Doc anzeigen</button>` : ""}
+          </div>
+        </div>`;
+    });
+    // Wenn noch kein Heute-Marker (alle Events in Vergangenheit), füge ihn ans Ende
+    if (!injectedToday) {
+      body += `
+        <div id="timeline-today" style="display:flex; align-items:center; gap:12px; padding:8px 14px; margin:14px 0; background:var(--accent); color:#fff; border-radius:8px;">
+          <span style="font-size:18px;">📍</span>
+          <strong>Heute · ${pad(today.getDate())}.${pad(today.getMonth()+1)}.${today.getFullYear()}</strong>
+        </div>`;
+    }
+  }
+
+  // Scroll-to-today nach Render
+  setTimeout(() => {
+    const el = document.getElementById("timeline-today");
+    if (el && typeof el.scrollIntoView === "function") {
+      el.scrollIntoView({ block: "center", behavior: "smooth" });
+    }
+  }, 100);
+
+  return `
+    <div class="header">
+      <div>
+        <h1>📅 Timeline</h1>
+        <div class="sub">Chronologische Übersicht über deine Bewährungszeit</div>
+      </div>
+      <button class="btn btn-secondary" onclick="goHome()">← Zur Übersicht</button>
+    </div>
+    <div style="background:var(--card); border:1px solid var(--border); border-radius:12px; padding:12px 14px; margin-bottom:14px;">
+      <div style="font-size:12px; color:var(--text-soft); margin-bottom:8px;">Filter:</div>
+      <div style="display:flex; gap:5px; flex-wrap:wrap;">${filterButtons}</div>
+    </div>
+    <div style="background:var(--card); border:1px solid var(--border); border-radius:12px; padding:14px 20px;">
+      ${body}
+    </div>`;
+}
+
 function renderAchievementsBox() {
   const a = computeAchievements();
   // Wenn nichts erfasst ist, gar nichts zeigen — sonst wirkt es leer.
@@ -8352,25 +8926,9 @@ function renderHome() {
     }
   } catch(e) {}
 
-  // Onboarding-Vorschlag wenn keine Stammdaten
+  // Onboarding-Prompt (Legacy): durch persistente Setup-Checkliste auf Home ersetzt
+  // (siehe renderSetupChecklist). Wird nur noch beim ersten Besuch via Modal angezeigt.
   let onboardingPrompt = "";
-  try {
-    const done = localStorage.getItem(ONBOARDING_DONE_KEY) === "1";
-    const hasName = state.shared.name;
-    if (!done && !hasName) {
-      onboardingPrompt = `
-        <div style="background:rgba(91, 165, 114, 0.1); border:1px solid var(--accent); border-radius:12px; padding:14px 18px; margin-top:12px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-          <div style="flex:1; min-width:200px;">
-            <div style="font-weight:600; color:var(--accent); margin-bottom:4px;">👋 Willkommen!</div>
-            <div style="font-size:13px;">Lass uns kurz deine Stammdaten erfassen - sie werden dann automatisch in alle Dokumente übernommen.</div>
-          </div>
-          <div style="display:flex; gap:6px;">
-            <button class="btn btn-success" onclick="startOnboarding()">Stammdaten erfassen</button>
-            <button class="btn btn-secondary" onclick="skipOnboarding()" style="font-size:12px;">Später</button>
-          </div>
-        </div>`;
-    }
-  } catch(e) {}
 
   // Statistik-Karte für aktuellen Monat
   let statsCard = "";
@@ -8479,6 +9037,7 @@ function renderHome() {
         </div>
 
         <div class="action-group" title="Adressbuch & Brief-Historie">
+          <button class="btn btn-secondary" onclick="state.view='timeline'; render();" title="Chronologische Timeline aller Termine, Zahlungen und Briefe" style="font-size:13px;">📅 Timeline</button>
           <button class="btn btn-secondary" onclick="state.view='contacts'; render();" title="Adressbuch: BH, Anwalt, Therapeut, ..." style="font-size:13px;">📇 Adressbuch${state.contacts && state.contacts.length > 0 ? ` <span style="opacity:0.6; font-size:11px;">(${state.contacts.length})</span>` : ""}</button>
           <button class="btn btn-secondary" onclick="state.view='briefHistory'; render();" title="Brief-Historie - was wurde wann verschickt" style="font-size:13px;">📨 Historie${state.briefHistory && state.briefHistory.length > 0 ? ` <span style="opacity:0.6; font-size:11px;">(${state.briefHistory.length})</span>` : ""}</button>
         </div>
@@ -8506,6 +9065,7 @@ function renderHome() {
       ${state.settings.showBewaehrungProgress !== false ? bewProgress : ""}
       ${state.settings.showAchievements !== false ? renderAchievementsBox() : ""}
       ${renderKostenForecastCard()}
+      ${renderSetupChecklist()}
       ${inboxCount() > 0 ? `
         <div style="background:rgba(245, 158, 11, 0.12); border:1px solid rgba(245, 158, 11, 0.4); border-radius:10px; padding:12px 14px; margin-top:14px; display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
           <span style="font-size:13px;">📥 <strong>${inboxCount()} ${inboxCount() === 1 ? "Beleg wartet" : "Belege warten"}</strong> in der Inbox auf Einsortierung.</span>
@@ -9955,6 +10515,28 @@ function getSelectedAttachmentIds() {
   return new Set(arr);
 }
 
+// Toggle "Unterschrift unter Brief drucken" — wirkt sich auf printAnschreiben/printFormular aus
+function toggleBriefSignature() {
+  state.briefSignatureEnabled = state.briefSignatureEnabled === false ? true : false;
+  // Wenn was Anderes wird (Default ist on), kippen
+  if (state.briefSignatureEnabled === undefined) state.briefSignatureEnabled = true;
+  render();
+}
+// Liefert das HTML-Snippet für die Unterschrift unter dem Brief (in der Print-Ansicht)
+function getBriefSignatureHtml() {
+  if (state.briefSignatureEnabled === false) return "";
+  const sig = state.shared?.savedSignature;
+  if (!sig) return "";
+  const name = (state.shared?.savedSignatureName) || state.shared?.name || "";
+  const today = todayDE();
+  return `
+    <div style="margin-top:36pt; page-break-inside:avoid;">
+      <div style="font-size:11pt; margin-bottom:6pt;">${esc((state.shared?.ort || ""))}${state.shared?.ort ? ", " : ""}${esc(today)}</div>
+      <img src="${sig}" alt="Unterschrift" style="max-height:60pt; max-width:200pt; display:block; margin-bottom:4pt;" />
+      <div style="border-top:1px solid #333; padding-top:4pt; width:220pt; font-size:11pt;">${esc(name)}</div>
+    </div>`;
+}
+
 function toggleAnschreibenAttachment(id) {
   if (!state.anschreibenAttachments) state.anschreibenAttachments = {};
   if (!state.anschreibenAttachments[activeAnschreiben]) state.anschreibenAttachments[activeAnschreiben] = [];
@@ -10071,6 +10653,7 @@ async function printAnschreiben() {
       '@media print { body { margin: 1.5cm; max-width: none; } }' +
     '</style></head><body>' +
     '<div class="brief-text">' + esc(text) + '</div>' +
+    getBriefSignatureHtml() +
     (attachmentsHtml ? '<div class="attachments-area">' + attachmentsHtml + '</div>' : "") +
     '</body></html>'
   );
@@ -10146,6 +10729,7 @@ async function printFormular() {
       '<button onclick="window.close()">Schließen</button>' +
     '</div>' +
     printHtml +
+    getBriefSignatureHtml() +
     attachmentsHtml +
     '</body></html>'
   );
@@ -10434,6 +11018,7 @@ function renderAnschreibenView() {
         </div>`;
     } else {
       const text = tpl.body(d);
+      const isCustomTpl = !!tpl.isCustom;
       // Anhänge-Picker: Belege aus allen Docs + komplette Doc-Druckversionen
       const available = getAvailableAttachments();
       const selectedIds = getSelectedAttachmentIds();
@@ -10475,15 +11060,54 @@ function renderAnschreibenView() {
       }
       editorHtml = `
         <div style="background:var(--card); border:1px solid var(--border); border-radius:14px; padding:18px;">
-          <h3 style="color:var(--primary); margin-bottom:6px;">${esc(tpl.title)}</h3>
-          <div style="font-size:12px; color:var(--text-soft); margin-bottom:12px;">Vorausgefüllt mit deinen Stammdaten. Du kannst alles direkt im Feld bearbeiten. Stellen mit ____ musst du noch ausfüllen.</div>
-          <textarea id="anschreiben-textarea" style="width:100%; min-height:500px; padding:14px; border:1px solid var(--border); border-radius:8px; font-family: 'Times New Roman', serif; font-size:14px; line-height:1.6; resize:vertical; background:var(--input-bg); color:var(--text);" spellcheck="true" lang="de">${esc(text)}</textarea>
+          <h3 style="color:var(--primary); margin-bottom:6px;">${esc(tpl.title)}${isCustomTpl ? ` <span style="font-size:11px; padding:2px 8px; background:var(--primary-soft); color:var(--primary); border-radius:6px; font-weight:500; vertical-align:middle;">Eigene Vorlage</span>` : ""}</h3>
+          <div style="font-size:12px; color:var(--text-soft); margin-bottom:12px;">${isCustomTpl ? "Deine eigene Vorlage. Änderungen werden automatisch gespeichert." : "Vorausgefüllt mit deinen Stammdaten. Du kannst alles direkt im Feld bearbeiten. Stellen mit ____ musst du noch ausfüllen."}</div>
+          <textarea id="anschreiben-textarea" ${isCustomTpl ? `oninput="updateCustomTemplateText('${activeAnschreiben}', this.value)"` : ""} style="width:100%; min-height:500px; padding:14px; border:1px solid var(--border); border-radius:8px; font-family: 'Times New Roman', serif; font-size:14px; line-height:1.6; resize:vertical; background:var(--input-bg); color:var(--text);" spellcheck="true" lang="de">${esc(text)}</textarea>
+          ${(() => {
+            // Unterschrift-Auswahl: zeigt die in Stammdaten gespeicherte Signatur
+            // mit Option, sie in den Brief-Druck einzubinden (state.briefSignatureEnabled).
+            const savedSig = state.shared?.savedSignature;
+            const sigEnabled = state.briefSignatureEnabled !== false;
+            if (savedSig) {
+              return `
+                <details ${sigEnabled ? "open" : ""} style="margin-top:10px; background:var(--card); border:1px solid var(--border); border-radius:10px; padding:8px 12px;">
+                  <summary style="cursor:pointer; font-size:13px; font-weight:600; color:var(--text); list-style:none; display:flex; align-items:center; gap:8px;">
+                    <span style="font-size:16px;">✍️</span>
+                    <span style="flex:1;">Digitale Unterschrift ${sigEnabled ? '<span style="background:var(--accent); color:#fff; padding:1px 8px; border-radius:999px; font-size:11px; margin-left:4px;">aktiv</span>' : '<span style="background:var(--text-soft); color:#fff; padding:1px 8px; border-radius:999px; font-size:11px; margin-left:4px; opacity:0.7;">aus</span>'}</span>
+                  </summary>
+                  <div style="margin-top:10px; display:flex; gap:14px; align-items:center; flex-wrap:wrap;">
+                    <div style="background:#fff; padding:6px; border:1px solid var(--border); border-radius:6px; max-width:200px;">
+                      <img src="${savedSig}" alt="Unterschrift" style="max-width:180px; max-height:60px; display:block;" />
+                    </div>
+                    <div style="flex:1; min-width:200px;">
+                      <label style="display:flex; gap:8px; align-items:center; cursor:pointer; font-size:13px;">
+                        <input type="checkbox" ${sigEnabled ? "checked" : ""} onchange="toggleBriefSignature()" />
+                        <span>Unterschrift unter den Brief drucken</span>
+                      </label>
+                      <div style="font-size:11px; color:var(--text-soft); margin-top:4px;">${esc((state.shared?.savedSignatureName) || state.shared?.name || "")}</div>
+                      <button class="btn btn-secondary" style="font-size:11px; padding:3px 8px; margin-top:6px;" onclick="openSavedSignaturePad()">✏️ Unterschrift bearbeiten</button>
+                    </div>
+                  </div>
+                </details>`;
+            } else {
+              return `
+                <div style="margin-top:10px; background:var(--bg); border:1px dashed var(--border); border-radius:8px; padding:10px 14px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                  <span style="font-size:18px;">✍️</span>
+                  <div style="flex:1; min-width:180px; font-size:13px;">
+                    <strong>Digitale Unterschrift einrichten?</strong>
+                    <div style="font-size:11px; color:var(--text-soft); margin-top:2px;">Wenn du sie einmal zeichnest, kannst du sie unter jeden Brief drucken.</div>
+                  </div>
+                  <button class="btn btn-secondary" style="font-size:12px;" onclick="openSavedSignaturePad()">✏️ Jetzt einrichten</button>
+                </div>`;
+            }
+          })()}
           ${attHtml}
           <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:12px;">
             <button class="btn btn-secondary" onclick="copyAnschreibenToClipboard()">📋 In Zwischenablage</button>
             <button class="btn btn-secondary" onclick="downloadAnschreibenTxt()">💾 Als Text-Datei</button>
             <button class="btn btn-primary" onclick="printAnschreiben()">🖨 Drucken / als PDF${selectedIds.size > 0 ? ` (mit ${selectedIds.size} Anhang${selectedIds.size === 1 ? "" : "en"})` : ""}</button>
             ${state.shared.bh_email ? `<button class="btn btn-secondary" onclick="emailAnschreiben()">📧 Per Mail</button>` : ""}
+            ${isCustomTpl ? `<button class="btn btn-secondary" onclick="deleteCustomTemplate('${activeAnschreiben}')" style="margin-left:auto; color:var(--danger);">🗑 Vorlage löschen</button>` : ""}
           </div>
         </div>`;
     }
@@ -11298,12 +11922,35 @@ function closeGlobalSearch() {
   render();
 }
 function setGlobalSearchQuery(q) {
+  // Wichtig: das vollständige render() würde den Input-Cursor an den Anfang
+  // setzen (Eindruck: "rückwärts tippen"). Stattdessen nur die Ergebnisliste
+  // im Modal aktualisieren, den Input nicht anrühren.
   state.globalSearchQuery = q;
-  render();
-  setTimeout(() => {
-    const el = document.getElementById("global-search-input");
-    if (el && document.activeElement !== el) el.focus();
-  }, 0);
+  const resultsContainer = document.getElementById("global-search-results");
+  const counterEl = document.getElementById("global-search-count");
+  if (!resultsContainer) {
+    // Fallback: kein Container -> komplettes Render. Sollte normalerweise nicht passieren.
+    render();
+    return;
+  }
+  const results = runGlobalSearch(q);
+  _searchResultsCache.set(q, results);
+  let listHtml = "";
+  if (q && results.length === 0) {
+    listHtml = `<div style="padding:30px; text-align:center; color:var(--text-soft); font-size:13px;">Keine Treffer für \u201E${esc(q)}\u201C. Versuch's mit weniger oder anderen Worten.</div>`;
+  } else if (results.length > 0) {
+    listHtml = results.map((r, i) => `
+      <button onclick="selectSearchResult(${i})" style="display:block; width:100%; text-align:left; padding:10px 14px; background:transparent; border:none; border-bottom:1px solid var(--border); cursor:pointer; color:var(--text);">
+        <div style="font-size:13px; font-weight:500;">${esc(r.label)}</div>
+        <div style="font-size:11px; color:var(--text-soft); margin-top:2px;">${esc(r.sub)}</div>
+      </button>`).join("");
+  } else {
+    listHtml = `<div style="padding:30px; text-align:center; color:var(--text-soft); font-size:13px;">Tippe los, um Notizen, Belege, Doc-Felder, Briefe und Kontakte zu durchsuchen.<br><br><strong>Tipp:</strong> Strg+/ öffnet diese Suche von überall.</div>`;
+  }
+  resultsContainer.innerHTML = listHtml;
+  if (counterEl) {
+    counterEl.textContent = results.length > 0 ? results.length + " Treffer · Esc zum Schließen" : "";
+  }
 }
 function runGlobalSearch(q) {
   const norm = (s) => (s == null ? "" : String(s).toLowerCase());
@@ -11459,8 +12106,8 @@ function renderGlobalSearchModal() {
           <input type="text" id="global-search-input" value="${esc(q)}" oninput="setGlobalSearchQuery(this.value)" placeholder="Suche in Notizen, Belegen, Doc-Inhalten, Briefen, Kontakten…" style="flex:1; padding:8px 10px; border:1px solid var(--border); border-radius:6px; font-size:14px; background:var(--input-bg); color:var(--text);" autocomplete="off" />
           <button class="modal-close-btn" onclick="closeGlobalSearch()" title="Schließen (Esc)">✕</button>
         </div>
-        <div style="max-height:60vh; overflow:auto;">${listHtml}</div>
-        ${results.length > 0 ? `<div style="padding:8px 14px; border-top:1px solid var(--border); font-size:11px; color:var(--text-soft); text-align:right;">${results.length} Treffer · Esc zum Schließen</div>` : ""}
+        <div id="global-search-results" style="max-height:60vh; overflow:auto;">${listHtml}</div>
+        <div style="padding:8px 14px; border-top:1px solid var(--border); font-size:11px; color:var(--text-soft); text-align:right;"><span id="global-search-count">${results.length > 0 ? results.length + " Treffer · Esc zum Schließen" : ""}</span></div>
       </div>
     </div>`;
 }
