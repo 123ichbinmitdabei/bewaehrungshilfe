@@ -142,6 +142,43 @@
   }
   .home-hero h1 { font-size: 28px; color: var(--primary); margin-bottom: 8px; }
   .home-hero p { color: var(--text-soft); max-width: 600px; margin: 0 auto; }
+
+  /* HOME HEADER ACTIONS - gruppiert mit Trennern */
+  .home-header-actions {
+    display: flex; justify-content: flex-end; align-items: center;
+    gap: 16px; margin-bottom: 12px; flex-wrap: wrap;
+  }
+  .home-header-actions .action-group {
+    display: flex; gap: 6px; align-items: center;
+    padding-right: 16px;
+    border-right: 1px solid var(--border);
+  }
+  .home-header-actions .action-group:last-child {
+    border-right: none; padding-right: 0;
+  }
+  .home-header-actions .action-group-main .btn {
+    /* Hauptaktionen leicht hervorgehoben */
+    font-weight: 600;
+  }
+  .home-header-actions .action-group-icons {
+    gap: 4px;
+  }
+  .home-header-actions .btn-icon {
+    /* Reine Icon-Knöpfe: kompakt, quadratisch, kein Label */
+    padding: 8px 10px;
+    min-width: 38px;
+    font-size: 15px;
+    line-height: 1;
+  }
+  /* Auf schmalen Bildschirmen: Trenner ausblenden, alles untereinander stapeln */
+  @media (max-width: 720px) {
+    .home-header-actions {
+      justify-content: center; gap: 8px;
+    }
+    .home-header-actions .action-group {
+      border-right: none; padding-right: 0; flex-wrap: wrap; justify-content: center;
+    }
+  }
   .doc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
   .doc-card {
     background: var(--card); border: 1px solid var(--border); border-radius: 14px;
@@ -7715,27 +7752,35 @@ function renderHome() {
   // Calendar export hint - now part of "Nächste Termine" card (rendered via settings)
   // (Kept here for backwards compatibility - no longer used in template below)
 
-  // PIN status indicator
-  let pinStatus = "";
+  // PIN status indicator (Icon-only für die Header-Action-Gruppe)
+  let pinStatusIcon = "";
   try {
     const hasPin = !!localStorage.getItem(PIN_STORAGE_KEY);
-    pinStatus = hasPin
-      ? `<button class="btn btn-secondary" onclick="disablePin()" title="PIN-Schutz entfernen">🔒 PIN aktiv</button>`
-      : `<button class="btn btn-secondary" onclick="startPinSetup()" title="PIN-Schutz für die App einrichten">🔓 PIN einrichten</button>`;
+    pinStatusIcon = hasPin
+      ? `<button class="btn btn-secondary btn-icon" onclick="disablePin()" title="PIN-Schutz aktiv – klicken zum Entfernen">🔒</button>`
+      : `<button class="btn btn-secondary btn-icon" onclick="startPinSetup()" title="PIN-Schutz einrichten">🔓</button>`;
   } catch(e) {}
 
   return `
     <div class="home-hero">
-      <div style="display:flex; justify-content:flex-end; gap:8px; margin-bottom:8px; flex-wrap:wrap;">
-        <button class="btn btn-secondary" onclick="state.view='anschreiben'; render();" title="Briefe und Anträge erstellen">✉️ Briefe</button>
-        <button class="btn btn-secondary" onclick="state.view='settings'; render();" title="App-Einstellungen anpassen">⚙️ Einstellungen</button>
-        <button class="btn btn-secondary" onclick="state.view='help'; render();" title="Anleitung anzeigen">❓ Hilfe</button>
-        ${pinStatus}
-        <button class="btn btn-secondary" onclick="state.view='inbox'; render();" title="Belege schnell hochladen und einsortieren">📥 Beleg-Inbox${inboxCount() > 0 ? ` <span style="background:var(--warn); color:#fff; padding:0 6px; border-radius:999px; font-size:11px; margin-left:4px;">${inboxCount()}</span>` : ""}</button>
-        <button class="btn btn-secondary" onclick="startDocImport()" title="PDF hochladen und Felder automatisch ausfüllen lassen">📄 Dokument-Import</button>
-        <button class="btn btn-secondary" onclick="exportAllData()" title="Alle Daten als Backup speichern">💾 Sichern</button>
-        <button class="btn btn-secondary" onclick="triggerImport()" title="Daten aus Backup-Datei wiederherstellen">📥 Laden</button>
-        <button class="btn btn-secondary" onclick="toggleTheme()" title="${themeLabel}">${themeIcon}</button>
+      <div class="home-header-actions">
+        <div class="action-group action-group-main" title="Hauptaktionen">
+          <button class="btn btn-secondary" onclick="state.view='inbox'; render();" title="Belege schnell hochladen und einsortieren">📥 Beleg-Inbox${inboxCount() > 0 ? ` <span style="background:var(--warn); color:#fff; padding:0 6px; border-radius:999px; font-size:11px; margin-left:4px;">${inboxCount()}</span>` : ""}</button>
+          <button class="btn btn-secondary" onclick="startDocImport()" title="PDF hochladen und Felder automatisch ausfüllen lassen">📄 Dokument-Import</button>
+          <button class="btn btn-secondary" onclick="state.view='anschreiben'; render();" title="Briefe und Anträge erstellen">✉️ Briefe</button>
+        </div>
+
+        <div class="action-group" title="Daten sichern und wiederherstellen">
+          <button class="btn btn-secondary" onclick="exportAllData()" title="Alle Daten als Backup speichern">💾 Sichern</button>
+          <button class="btn btn-secondary" onclick="triggerImport()" title="Daten aus Backup-Datei wiederherstellen">📥 Laden</button>
+        </div>
+
+        <div class="action-group action-group-icons" title="App-Einstellungen">
+          <button class="btn btn-secondary btn-icon" onclick="state.view='settings'; render();" title="App-Einstellungen anpassen">⚙️</button>
+          <button class="btn btn-secondary btn-icon" onclick="state.view='help'; render();" title="Anleitung anzeigen">❓</button>
+          ${pinStatusIcon}
+          <button class="btn btn-secondary btn-icon" onclick="toggleTheme()" title="${themeLabel}">${themeIcon}</button>
+        </div>
       </div>
       <h1>📁 Bewährungshilfe-Assistent</h1>
       <p>Strukturierte Vorlagen für deine Bewährungshelferin. Klick auf eine Karte, um zu starten - du kannst jederzeit pausieren und später weitermachen.</p>
