@@ -1986,7 +1986,7 @@ const DOCS = {
       { id: "erklaerung_wirtschaft", title: "Erklärung wirtschaftliche Verhältnisse", icon: "📋", type: "info",
         hint: "Zusätzliche Angaben für das offizielle Hessen-Formular \u201EErklärung über die wirtschaftlichen Verhältnisse\u201C der Gerichtskasse. Familienstand, Kinder, Arbeitseinkommen und Sozialleistungen werden automatisch aus der EAR und den Stammdaten gezogen. Ergänze hier nur die Felder, die in der EAR nicht erfasst sind.",
         fields: [
-          { id: "arbeitgeber", label: "Arbeitgeber (Name / Firma)", type: "text", placeholder: "z.B. Mariana Cannabis e.V." },
+          { id: "arbeitgeber", label: "Arbeitgeber (Name / Firma)", type: "text", placeholder: "z.B. Muster GmbH" },
           { id: "ehe_einkommen", label: "Ehegatte: monatliches Netto-Einkommen (\u20AC)", type: "text", placeholder: "Nur ausf\u00FCllen, wenn Ehepartner:in eigenes Einkommen hat" },
           { id: "ev_geleistet", label: "Eidesstattliche Versicherung bereits geleistet?", type: "text", placeholder: "Ja / Nein - meist Nein" },
           { id: "ev_gericht", label: "Falls EV geleistet: bei welchem Gericht?", type: "text" },
@@ -5342,7 +5342,7 @@ let showArchived = false;
 function toggleShowArchived() { showArchived = !showArchived; render(); }
 
 // === VERSION INFO ===
-const APP_VERSION = "v3.37";
+const APP_VERSION = "v3.38";
 
 // === ONBOARDING ===
 let onboardingActive = false;
@@ -11154,11 +11154,20 @@ async function _doPrintAnschreiben(text, tpl) {
   if (oldContainer) oldContainer.remove();
   const container = document.createElement("div");
   container.id = "inline-print-container";
+  const signatureHtml = getBriefSignatureHtml();
   container.innerHTML =
     '<div class="brief-text">' + esc(text) + '</div>' +
-    getBriefSignatureHtml() +
+    signatureHtml +
     (attachmentsHtml ? '<div class="attachments-area">' + attachmentsHtml + '</div>' : "");
   document.body.appendChild(container);
+
+  // Diagnose: wenn der Brieftext leer ist und es weder Signatur noch Anhaenge
+  // gibt, hat der Container nichts zu drucken. Explizit melden statt leere Seite.
+  if (!(text || "").trim() && !signatureHtml && !attachmentsHtml) {
+    container.remove();
+    alert("Drucken nicht möglich: Der Brieftext ist leer. Bitte erst einen Brief erstellen oder eine Vorlage wählen.");
+    return;
+  }
 
   // Doc-Title temporär ändern damit PDF-Filename passt
   const oldTitle = document.title;

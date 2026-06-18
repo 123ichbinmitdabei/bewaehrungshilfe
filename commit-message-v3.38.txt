@@ -1,0 +1,32 @@
+v3.38: Vollstaendige Validierung + Personendaten-Audit + Cross-Browser-Check
+
+Verifizierung der v3.37-Fixes:
+  * Adressbuch-Sync-Knopf: getestet, alle 14 DATA_SYNC_GROUPS-Pfade verifiziert
+  * Zweistufiger Loesch-Klick: Contact + Template, Smoke-Tests
+  * Print-Reflow: Brief- und Doc-Druck mit requestAnimationFrame
+  * FIX: leerer Brief-Container loest jetzt explizit alert() aus
+
+Personendaten-Audit:
+  * RegEx-Scan auf Namen, Adressen, IBAN, Aktenzeichen, Telefon, Email
+  * 1 Fund gefixt (Arbeitgeber-Realname -> Muster GmbH), 5 akzeptable Platzhalter dokumentiert
+  * PERSONENDATEN_AUDIT.md mit Liste
+
+Cross-Browser-Audit:
+  * Statische Analyse iOS Safari, Chrome Android, Desktop alle
+  * CROSS_BROWSER_REPORT.md mit Kompatibilitaetsmatrix + Live-Symptomen
+  * Fixes: leerer Brief-Container alert(); confirm/prompt nur dokumentiert (fail-safe)
+  * TROUBLESHOOTING.md: Cache-Reset-Anleitung fuer Endnutzer (Desktop + Mobile)
+
+Vollstaendiger Selbsttest:
+  * smoke_v338_full.js mit 206 Asserts
+  * smoke_v338_sync.js mit 105 Asserts
+  * Alle Render-Stellen, Storage-Roundtrips, Sync-Zyklen, Druck-Pipeline
+  * Gesamt: 311/311 gruen ueber 2 Suites
+
+Roadmap v4:
+  * PDF-Annotation, Cloud-Sync, KI-Brief, Service Worker mit Versions-Hash
+  * ROADMAP_v4.md mit Aufwand- und DSGVO-Bewertung
+
+Bundle: ~788 KB
+
+Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>

@@ -286,6 +286,16 @@ Nach der Installation läuft die App im Vollbild – wie eine richtige App, auch
 
 ---
 
+## 🌐 Browser-Kompatibilität & Hilfe bei Problemen
+
+Die App läuft in allen modernen Browsern (Chrome, Edge, Firefox, Safari) auf PC, Tablet und Handy. Der Druck nutzt einen Inline-Druck-Container statt eines Pop-up-Fensters, damit er auch auf iPhone/iPad und im installierten PWA-Modus zuverlässig funktioniert.
+
+**Wenn Änderungen nicht ankommen oder der Drucken-Knopf nicht reagiert:** Das liegt meistens an einer alten, im Browser gespeicherten Version. Ein „harter Neu-Ladevorgang" (am PC `Strg+F5`, am Mac `Cmd+Umschalt+R`) behebt das in den meisten Fällen.
+
+Eine ausführliche Schritt-für-Schritt-Anleitung zum Cache-Reset für Desktop und Mobile steht in **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)**. Den vollständigen Kompatibilitäts-Bericht gibt es in **[CROSS_BROWSER_REPORT.md](CROSS_BROWSER_REPORT.md)**.
+
+---
+
 ## 🎯 Features im Überblick
 
 ### Dokument-Wizard
