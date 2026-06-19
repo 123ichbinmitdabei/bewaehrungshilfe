@@ -227,6 +227,8 @@ function loadApp() {
       "escapeIcs: escapeIcs, toIcsDate: toIcsDate, parseDateGuess: parseDateGuess," +
       "runGlobalSearch: runGlobalSearch, openGlobalSearch: openGlobalSearch," +
       "confirmAction: confirmAction, runConfirmAction: runConfirmAction, closeConfirmModal: closeConfirmModal," +
+      "confirmAsync: confirmAsync, confirmAppointment: confirmAppointment, handleSozialDone: handleSozialDone," +
+      "resetAppCache: resetAppCache," +
       "inputModal: inputModal, submitInputModal: submitInputModal, closeInputModal: closeInputModal, setInputModalValue: setInputModalValue," +
       "deleteRow: deleteRow, deleteInboxItem: deleteInboxItem, deleteSavedSignature: deleteSavedSignature," +
       "resetSettingsToDefaults: resetSettingsToDefaults, confirmPayment: confirmPayment," +

@@ -749,5 +749,5 @@ Custom License, siehe [LICENSE](LICENSE).
 
 ---
 
-**Aktuelle Version:** v3.39
+**Aktuelle Version:** v3.40
 **Letztes Update:** Juni 2026

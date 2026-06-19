@@ -1,108 +1,118 @@
 /*
- * sw.js, Service-Worker-PROTOTYP fuer den Bewaehrungshilfe-Assistenten (v3.39).
+ * sw.js, Service Worker fuer den Bewaehrungshilfe-Assistenten (produktionsreif, v3.40).
  *
  * ACHTUNG: Dieser Service Worker ist NICHT aktiv. Die Registrierung in index.html
- * ist nur auskommentiert. Aktivierung erfordert ausdrueckliche menschliche Freigabe.
- * Vor dem Scharfschalten unbedingt SW_PROPOSAL_v3.39.md lesen (Test-Plan + Kill-Switch).
+ * ist nur auskommentiert. Aktivierung erfordert ausdrueckliche menschliche Freigabe
+ * nach dem Runbook in SW_ACTIVATION_v3.40.md (Real-Browser-Test plus Kill-Switch).
  *
  * Strategie:
- *  - Network-First fuer index.html (Navigationsanfragen): immer zuerst das Netz
- *    versuchen, damit eine neue Version sofort durchkommt. Nur bei Offline aus dem
- *    Cache liefern. Das vermeidet das "alte Version haengt"-Problem.
- *  - Cache-Name traegt einen Versions-Hash: bei jedem Deploy MUSS CACHE_VERSION
- *    erhoeht werden, sonst wird der alte Cache nicht invalidiert.
- *  - activate-Handler loescht alle Caches, die nicht zur aktuellen Version gehoeren.
- *  - skipWaiting + clients.claim, damit ein Update ohne langes Warten greift. Das
- *    ist bewusst aggressiv gewaehlt, weil "schnelle Updates" hier wichtiger sind
- *    als "kein Reload waehrend der Nutzung" (Formular-App, kein Live-Stream-State).
+ *  - Cache-Name wird aus dem ?v=-Parameter der eigenen URL abgeleitet
+ *    (Registrierung: register("./sw.js?v=" + APP_VERSION)). Jeder Versionswechsel
+ *    erzeugt automatisch einen neuen Cache-Namen und damit einen "neuen" SW, ohne
+ *    dass hier eine Konstante manuell hochgezaehlt werden muss.
+ *  - Navigationsanfragen (HTML): Network-First. Immer zuerst Netz, nur bei Offline
+ *    aus dem Cache. So kommt eine neue Version sofort durch.
+ *  - install: nur ./ und ./index.html vorcachen, skipWaiting().
+ *  - activate: alle bh-cache-* Caches ausser dem aktuellen loeschen, clients.claim().
+ *  - Robust: jeder Handler in try/catch, im Zweifel ans Netz durchreichen.
+ *  - Der SW fasst NUR Netz-Ressourcen an, NIEMALS localStorage (Nutzerdaten).
  */
 
-// WICHTIG: Bei jedem Deploy hochzaehlen / auf APP_VERSION setzen.
-const CACHE_VERSION = "bh-v3.39";
-const CACHE_NAME = "bewaehrungshilfe-" + CACHE_VERSION;
+// ── Reine, testbare Logik (auch in Node via require nutzbar) ────────────────
+function deriveCacheName(locationHref) {
+  try {
+    const v = new URL(locationHref).searchParams.get("v");
+    return "bh-cache-" + (v && v.trim() ? v.trim() : "dev");
+  } catch (e) {
+    return "bh-cache-dev";
+  }
+}
+// Waehlt aus allen vorhandenen Cache-Namen die zu loeschenden aus: alle eigenen
+// (bh-cache-*) ausser dem aktuellen. Fremde Caches werden nicht angefasst.
+function selectCachesToDelete(allCacheNames, currentCacheName) {
+  return (allCacheNames || []).filter(function (n) {
+    return n !== currentCacheName && /^bh-cache-/.test(n);
+  });
+}
 
-// Minimaler Pre-Cache: nur die Einstiegsseite. Die App ist single-file, daher
-// reicht index.html. (Bewusst KEIN Aggressiv-Pre-Cache von allem.)
-const PRECACHE_URLS = ["./", "./index.html"];
+// ── Service-Worker-Laufzeit (nur im echten SW-Kontext) ──────────────────────
+if (typeof self !== "undefined" && self.addEventListener && typeof caches !== "undefined") {
+  const CACHE_NAME = deriveCacheName(self.location.href);
+  const PRECACHE_URLS = ["./", "./index.html"];
 
-self.addEventListener("install", (event) => {
-  // skipWaiting: neue Version uebernimmt sofort, ohne auf Schliessen aller Tabs zu warten.
-  self.skipWaiting();
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE_URLS)).catch((e) => {
-      // Pre-Cache-Fehler darf die Installation nicht hart abbrechen.
-      console.warn("[sw] Pre-Cache fehlgeschlagen:", e);
-    })
-  );
-});
+  self.addEventListener("install", (event) => {
+    self.skipWaiting();
+    event.waitUntil(
+      caches.open(CACHE_NAME)
+        .then((cache) => cache.addAll(PRECACHE_URLS))
+        .catch((e) => { console.warn("[sw] Pre-Cache fehlgeschlagen:", e); })
+    );
+  });
 
-self.addEventListener("activate", (event) => {
-  event.waitUntil(
-    (async () => {
-      // Alle fremden / alten Caches loeschen.
-      const keys = await caches.keys();
-      await Promise.all(
-        keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k))
-      );
-      // clients.claim: bereits offene Tabs sofort unter Kontrolle dieses SW bringen.
-      await self.clients.claim();
-    })()
-  );
-});
+  self.addEventListener("activate", (event) => {
+    event.waitUntil((async () => {
+      try {
+        const keys = await caches.keys();
+        await Promise.all(selectCachesToDelete(keys, CACHE_NAME).map((k) => caches.delete(k)));
+        await self.clients.claim();
+      } catch (e) {
+        console.warn("[sw] activate-Cleanup fehlgeschlagen:", e);
+      }
+    })());
+  });
 
-self.addEventListener("fetch", (event) => {
-  const req = event.request;
+  self.addEventListener("fetch", (event) => {
+    const req = event.request;
+    if (req.method !== "GET") return; // nur GET cachen
 
-  // Nur GET behandeln. Alles andere (z.B. POST) direkt ans Netz.
-  if (req.method !== "GET") return;
+    let url;
+    try { url = new URL(req.url); } catch (e) { return; }
+    if (url.origin !== self.location.origin) return; // externe CDNs nie cachen
 
-  const url = new URL(req.url);
+    const isNavigation =
+      req.mode === "navigate" ||
+      (req.headers.get("accept") || "").includes("text/html");
 
-  // Nur same-origin behandeln. Externe Ressourcen (CDNs fuer OCR/PDF/docx) NICHT
-  // cachen, damit keine veralteten Libs haengen bleiben.
-  if (url.origin !== self.location.origin) return;
-
-  const isNavigation =
-    req.mode === "navigate" ||
-    (req.headers.get("accept") || "").includes("text/html");
-
-  if (isNavigation) {
-    // NETWORK-FIRST fuer die HTML-Seite: neue Version kommt sofort durch.
-    event.respondWith(
-      (async () => {
+    if (isNavigation) {
+      // NETWORK-FIRST fuer HTML: neue Version kommt sofort durch.
+      event.respondWith((async () => {
         try {
           const fresh = await fetch(req);
-          const cache = await caches.open(CACHE_NAME);
-          cache.put("./index.html", fresh.clone());
+          try {
+            const cache = await caches.open(CACHE_NAME);
+            cache.put("./index.html", fresh.clone());
+          } catch (e) { /* Cache-Put-Fehler ignorieren, Antwort steht */ }
           return fresh;
         } catch (e) {
-          // Offline: aus dem Cache liefern.
           const cached = (await caches.match(req)) || (await caches.match("./index.html"));
           if (cached) return cached;
           throw e;
         }
-      })()
-    );
-    return;
-  }
+      })());
+      return;
+    }
 
-  // Fuer sonstige same-origin GET-Requests: Cache-First mit Netz-Fallback.
-  event.respondWith(
-    caches.match(req).then((cached) => cached || fetch(req))
-  );
-});
-
-// Optionaler Kill-Switch-Hook: die Seite kann postMessage({type:"SW_UNREGISTER"})
-// senden, dann deregistriert sich der SW selbst und loescht seine Caches.
-// (Details und manuelle Anleitung in SW_PROPOSAL_v3.39.md.)
-self.addEventListener("message", (event) => {
-  if (event.data && event.data.type === "SW_UNREGISTER") {
-    event.waitUntil(
-      (async () => {
-        const keys = await caches.keys();
-        await Promise.all(keys.map((k) => caches.delete(k)));
-        await self.registration.unregister();
-      })()
+    // sonstige same-origin GET: Cache-First mit Netz-Fallback.
+    event.respondWith(
+      caches.match(req).then((cached) => cached || fetch(req)).catch(() => fetch(req))
     );
-  }
-});
+  });
+
+  // Kill-Switch-Hook: Seite kann postMessage({type:"SW_UNREGISTER"}) senden.
+  self.addEventListener("message", (event) => {
+    if (event.data && event.data.type === "SW_UNREGISTER") {
+      event.waitUntil((async () => {
+        try {
+          const keys = await caches.keys();
+          await Promise.all(keys.map((k) => caches.delete(k)));
+          await self.registration.unregister();
+        } catch (e) { console.warn("[sw] Selbst-Deregistrierung fehlgeschlagen:", e); }
+      })());
+    }
+  });
+}
+
+// ── Export fuer Node-Tests (kein Effekt im SW-Kontext) ──────────────────────
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = { deriveCacheName, selectCachesToDelete };
+}

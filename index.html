@@ -96,6 +96,7 @@
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     line-height: 1.5;
     min-height: 100vh;
+    min-height: 100dvh; /* moderne Browser: dynamische Viewport-Hoehe (iOS-Adressleiste), Fallback 100vh darueber */
     /* iOS safe-area support for fullscreen PWA mode */
     padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
     -webkit-text-size-adjust: 100%;
@@ -2312,6 +2313,28 @@ function safeJsonParse(raw, fallback, label) {
   }
 }
 
+// Notfall-Reset des App-Caches (Service Worker + Netz-Cache), z.B. wenn nach einem
+// Update die alte Version haengt. Faesst NUR den Netz-Cache an, NIEMALS localStorage:
+// Nutzerdaten (Eingaben, Belege, Kontakte) bleiben vollstaendig erhalten.
+// Defensiv: fehlende serviceWorker/caches-APIs werden uebersprungen, am Ende reload.
+async function resetAppCache() {
+  try {
+    if (typeof navigator !== "undefined" && navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all((regs || []).map((r) => r.unregister()));
+    }
+  } catch (e) { console.warn("Service-Worker-Deregistrierung fehlgeschlagen:", e); }
+  try {
+    if (typeof caches !== "undefined" && caches.keys) {
+      const keys = await caches.keys();
+      await Promise.all((keys || []).map((k) => caches.delete(k)));
+    }
+  } catch (e) { console.warn("Cache-Loeschung fehlgeschlagen:", e); }
+  // localStorage wird BEWUSST nicht angefasst (Nutzerdaten bleiben erhalten).
+  try { showSaveToast("App-Cache geleert, lade neu …"); } catch (e) {}
+  try { window.location.reload(); } catch (e) { console.warn("Reload fehlgeschlagen:", e); }
+}
+
 // ============================================
 // STATE
 // ============================================
@@ -3087,7 +3110,11 @@ async function handleImportUpload(fileList) {
     const usedOcr = (text.length < 30);
     if (usedOcr) {
       // OCR-Fallback: bei Bild immer, bei PDF nur wenn keine Textebene gefunden
-      if (!confirm((isImage ? "Bilder " : "Diese PDF hat keine erkennbare Textebene (vermutlich gescannt). ") + "OCR per Tesseract.js anwenden? Beim ersten Mal werden ~15 MB Sprachdaten geladen (~30s), danach läuft's schnell.")) {
+      if (!(await confirmAsync({
+        title: "Texterkennung (OCR) anwenden?",
+        message: (isImage ? "Bilder " : "Diese PDF hat keine erkennbare Textebene (vermutlich gescannt). ") + "OCR per Tesseract.js anwenden? Beim ersten Mal werden ~15 MB Sprachdaten geladen (~30s), danach läuft's schnell.",
+        confirmLabel: "OCR starten",
+      }))) {
         state.importStaging = { step: "pickType" };
         render();
         return;
@@ -3293,7 +3320,11 @@ async function handleInboxUpload(fileList) {
         type = "image";
       } else if (file.type === "application/pdf") {
         if (file.size > 5 * 1024 * 1024) {
-          if (!confirm("Die PDF \"" + file.name + "\" ist " + (file.size/1024/1024).toFixed(1) + " MB groß und kann den lokalen Speicher schnell füllen. Trotzdem hinzufügen?")) continue;
+          if (!(await confirmAsync({
+            title: "Große PDF hinzufügen?",
+            message: "Die PDF \"" + file.name + "\" ist " + (file.size/1024/1024).toFixed(1) + " MB groß und kann den lokalen Speicher schnell füllen. Trotzdem hinzufügen?",
+            confirmLabel: "Hinzufügen",
+          }))) continue;
         }
         dataUrl = await readAsDataUrl(file);
         type = "pdf";
@@ -3429,7 +3460,11 @@ async function startOcrForDocAttachment(secId, rowIdx, attId) {
 
   // Erste Bestätigung beim ersten OCR überhaupt (kostet ~15 MB Downloads)
   if (!window.Tesseract && !window._ocrConfirmedThisSession) {
-    if (!confirm("OCR per Tesseract.js anwenden? Beim ersten Mal werden ~15 MB Sprachdaten geladen (~30s), danach läuft's schnell.")) return;
+    if (!(await confirmAsync({
+      title: "Texterkennung (OCR) anwenden?",
+      message: "OCR per Tesseract.js anwenden? Beim ersten Mal werden ~15 MB Sprachdaten geladen (~30s), danach läuft's schnell.",
+      confirmLabel: "OCR starten",
+    }))) return;
     window._ocrConfirmedThisSession = true;
   }
 
@@ -5350,7 +5385,11 @@ async function shareDocument(docId) {
     // Check if device can share files
     if (navigator.canShare && !navigator.canShare({ files: files })) {
       // Fallback: try ZIP download
-      const fallback = confirm("Datei-Teilen wird auf diesem Gerät leider nicht unterstützt.\n\nMöchtest du stattdessen alles als ZIP-Datei herunterladen?");
+      const fallback = await confirmAsync({
+        title: "Teilen nicht unterstützt",
+        message: "Datei-Teilen wird auf diesem Gerät leider nicht unterstützt.\n\nMöchtest du stattdessen alles als ZIP-Datei herunterladen?",
+        confirmLabel: "Als ZIP herunterladen",
+      });
       if (fallback) await downloadDocBundle(docId);
       return;
     }
@@ -5364,7 +5403,11 @@ async function shareDocument(docId) {
     if (e.name === "AbortError") return;
     console.error(e);
     // If too-many-files or other share-error, offer ZIP fallback
-    const fallback = confirm("Teilen fehlgeschlagen: " + (e.message || "Unbekannter Fehler") + "\n\nMöchtest du stattdessen alles als ZIP-Datei herunterladen?");
+    const fallback = await confirmAsync({
+      title: "Teilen fehlgeschlagen",
+      message: "Teilen fehlgeschlagen: " + (e.message || "Unbekannter Fehler") + "\n\nMöchtest du stattdessen alles als ZIP-Datei herunterladen?",
+      confirmLabel: "Als ZIP herunterladen",
+    });
     if (fallback) await downloadDocBundle(docId);
   }
 }
@@ -5417,7 +5460,7 @@ let showArchived = false;
 function toggleShowArchived() { showArchived = !showArchived; render(); }
 
 // === VERSION INFO ===
-const APP_VERSION = "v3.39";
+const APP_VERSION = "v3.40";
 
 // === ONBOARDING ===
 let onboardingActive = false;
@@ -5976,7 +6019,11 @@ async function handleAttachmentUpload(secId, rowIdx, fileList) {
       } else if (file.type === "application/pdf") {
         // PDFs can be large - warn if > 2 MB
         if (file.size > 2 * 1024 * 1024) {
-          if (!confirm(`Die PDF "${file.name}" ist ${(file.size/1024/1024).toFixed(1)} MB groß und kann den lokalen Speicher schnell füllen. Trotzdem hinzufügen?`)) continue;
+          if (!(await confirmAsync({
+            title: "Große PDF hinzufügen?",
+            message: `Die PDF "${file.name}" ist ${(file.size/1024/1024).toFixed(1)} MB groß und kann den lokalen Speicher schnell füllen. Trotzdem hinzufügen?`,
+            confirmLabel: "Hinzufügen",
+          }))) continue;
         }
         dataUrl = await readAsDataUrl(file);
         type = "pdf";
@@ -6540,14 +6587,18 @@ function checkNoteSuggestionsAfterTermin() {
   const lastSuggest = localStorage.getItem("bh_note_suggest_date");
   const todayStr = todayISO();
   if (lastSuggest === todayStr) return;
-  setTimeout(() => {
-    const ok = confirm(
-      `Du hast einen BH-Termin als „wahrgenommen" markiert.\n\n` +
-      `Sollen die ${openBhNotes.length} offenen Notiz(en) der Kategorie „Bei BH" als erledigt markiert werden?\n\n` +
-      openBhNotes.slice(0, 5).map(n => "• " + n.text).join("\n") +
-      (openBhNotes.length > 5 ? "\n• ..." : "")
-    );
+  setTimeout(async () => {
+    // Vorschlag pro Tag nur einmal anbieten, unabhaengig von der Antwort.
     localStorage.setItem("bh_note_suggest_date", todayStr);
+    const ok = await confirmAsync({
+      title: "Notizen als erledigt markieren?",
+      message:
+        `Du hast einen BH-Termin als „wahrgenommen" markiert.\n\n` +
+        `Sollen die ${openBhNotes.length} offenen Notiz(en) der Kategorie „Bei BH" als erledigt markiert werden?\n\n` +
+        openBhNotes.slice(0, 5).map(n => "• " + n.text).join("\n") +
+        (openBhNotes.length > 5 ? "\n• ..." : ""),
+      confirmLabel: "Als erledigt markieren",
+    });
     if (ok) {
       openBhNotes.forEach(n => { n.done = true; });
       saveNotes();
@@ -6929,7 +6980,7 @@ function _getActionRef(refId) {
 }
 
 // Handle appointment confirmation (Erledigt / Verpasst / Abgesagt)
-function confirmAppointment(refId, status, ev) {
+async function confirmAppointment(refId, status, ev) {
   if (ev) ev.stopPropagation();
   const action = _getActionRef(refId);
   if (!action) return;
@@ -6945,12 +6996,17 @@ function confirmAppointment(refId, status, ev) {
     cancelled: "abgesagt"
   }[status];
 
-  // Confirm dialog for destructive actions (missed / cancelled)
+  // Confirm dialog for destructive actions (missed / cancelled) - In-App-Modal.
   if (status === "missed" || status === "cancelled") {
     const which = status === "missed" ? "verpasst" : "abgesagt";
     const dateStr = row.datum || "(ohne Datum)";
     const docName = DOCS[docId].title;
-    if (!confirm(`Termin am ${dateStr} (${docName}) wirklich als „${which}" markieren?\n\nDas wird im Status-Feld eingetragen und der Termin verschwindet aus der Erinnerungsliste.`)) {
+    if (!(await confirmAsync({
+      title: "Termin als " + which + " markieren?",
+      message: `Termin am ${dateStr} (${docName}) wirklich als „${which}" markieren?\n\nDas wird im Status-Feld eingetragen und der Termin verschwindet aus der Erinnerungsliste.`,
+      confirmLabel: "Markieren",
+      danger: true,
+    }))) {
       return;
     }
   }
@@ -6966,36 +7022,37 @@ function confirmAppointment(refId, status, ev) {
 
   // After missed/cancelled, offer to schedule a replacement appointment
   if (status === "missed" || status === "cancelled") {
-    // Save first (so the cancelled status is persisted even if user backs out of replacement dialog)
+    // Save first (so the status is persisted even if user backs out of replacement dialog)
     saveAndRefresh(docId);
-    // Slight delay so the toast appears first, then the dialog
-    setTimeout(() => {
-      const which = status === "missed" ? "verpasst" : "abgesagt";
-      if (confirm(`Möchtest du gleich einen Ersatz-Termin anlegen?\n\nDer ${which}e Termin bleibt mit Status „${which === "verpasst" ? "verpasst" : "abgesagt"}" erhalten und ein neuer Termin wird zusätzlich angelegt.`)) {
-        openRescheduleDialog({
-          docId, sectionId, rowIdx,
-          originalRow: row,
-          mode: "create_new",
-          title: "Ersatz-Termin anlegen",
-          intro: `Trage Datum und Uhrzeit für den Ersatz-Termin ein. Der ${which}e Termin am ${row.datum || ""} bleibt mit dem Status erhalten, der neue Termin wird zusätzlich angelegt.`,
-          onConfirm: (opts) => {
-            // Create a new row only - don't touch the old (already has status)
-            const ds = state.docs[docId];
-            const newRow = { datum: opts.newDate };
-            if (opts.newTime) {
-              if (sectionId === "stunden") newRow.von = opts.newTime;
-              else newRow.uhrzeit = opts.newTime;
-            }
-            if (row.art) newRow.art = row.art;
-            if (sectionId === "stunden" && row.taetigkeit) newRow.taetigkeit = row.taetigkeit;
-            if (sectionId === "stunden" && row.bis) newRow.bis = row.bis;
-            if (sectionId === "stunden" && row.pause) newRow.pause = row.pause;
-            ds.rows[sectionId].push(newRow);
-            saveAndRefresh(docId);
+    const which = status === "missed" ? "verpasst" : "abgesagt";
+    if (await confirmAsync({
+      title: "Ersatz-Termin anlegen?",
+      message: `Möchtest du gleich einen Ersatz-Termin anlegen?\n\nDer ${which}e Termin bleibt mit Status „${which}" erhalten und ein neuer Termin wird zusätzlich angelegt.`,
+      confirmLabel: "Ersatz anlegen",
+    })) {
+      openRescheduleDialog({
+        docId, sectionId, rowIdx,
+        originalRow: row,
+        mode: "create_new",
+        title: "Ersatz-Termin anlegen",
+        intro: `Trage Datum und Uhrzeit für den Ersatz-Termin ein. Der ${which}e Termin am ${row.datum || ""} bleibt mit dem Status erhalten, der neue Termin wird zusätzlich angelegt.`,
+        onConfirm: (opts) => {
+          // Create a new row only - don't touch the old (already has status)
+          const ds = state.docs[docId];
+          const newRow = { datum: opts.newDate };
+          if (opts.newTime) {
+            if (sectionId === "stunden") newRow.von = opts.newTime;
+            else newRow.uhrzeit = opts.newTime;
           }
-        });
-      }
-    }, 250);
+          if (row.art) newRow.art = row.art;
+          if (sectionId === "stunden" && row.taetigkeit) newRow.taetigkeit = row.taetigkeit;
+          if (sectionId === "stunden" && row.bis) newRow.bis = row.bis;
+          if (sectionId === "stunden" && row.pause) newRow.pause = row.pause;
+          ds.rows[sectionId].push(newRow);
+          saveAndRefresh(docId);
+        }
+      });
+    }
     return;
   }
 
@@ -7033,17 +7090,16 @@ function exportActionToCalendar(refId, ev) {
 }
 
 // Sozial special: prompt user about auto-calculating stunden
-function handleSozialDone(docId, sectionId, rowIdx, row) {
+async function handleSozialDone(docId, sectionId, rowIdx, row) {
   const calculated = calculateNetHours(row.von, row.bis, row.pause);
-  let action = "manual";
   if (calculated !== null && calculated > 0 && row.von && row.bis) {
-    // We can calculate - ask user
+    // We can calculate - ask user (In-App-Modal). Abbrechen setzt trotzdem den Status.
+    const hStr = calculated.toLocaleString("de-DE", { maximumFractionDigits: 2 });
     const msg = `Sozialstunden-Einsatz als erledigt markieren.\n\n` +
-      `Aus deinen Eingaben (${row.von}–${row.bis}, Pause ${row.pause || 0} Min) wären das ${calculated.toLocaleString("de-DE", { maximumFractionDigits: 2 })} h netto.\n\n` +
-      `OK   = ${calculated.toLocaleString("de-DE", { maximumFractionDigits: 2 })} h automatisch eintragen\n` +
-      `Abbrechen = Nur Status setzen, Stunden später eintragen`;
-    if (confirm(msg)) {
-      row.stunden = calculated.toLocaleString("de-DE", { maximumFractionDigits: 2 });
+      `Aus deinen Eingaben (${row.von} bis ${row.bis}, Pause ${row.pause || 0} Min) wären das ${hStr} h netto.\n\n` +
+      `„Stunden eintragen" trägt ${hStr} h automatisch ein. „Abbrechen" setzt nur den Status, Stunden später eintragen.`;
+    if (await confirmAsync({ title: "Stunden automatisch eintragen?", message: msg, confirmLabel: "Stunden eintragen" })) {
+      row.stunden = hStr;
     }
   }
   row.status = "wahrgenommen";
@@ -7071,7 +7127,7 @@ function calculateNetHours(von, bis, pause) {
 }
 
 // Handle payment confirmation
-function confirmPayment(refId, status, ev) {
+async function confirmPayment(refId, status, ev) {
   if (ev) ev.stopPropagation();
   const action = _getActionRef(refId);
   if (!action) return;
@@ -7099,31 +7155,37 @@ function confirmPayment(refId, status, ev) {
     });
     return; // Speichern erfolgt in onOk; Abbrechen laesst die Zeile unveraendert
   } else if (status === "postponed") {
-    if (!confirm(`Zahlung wirklich als „verschoben" markieren?\n\nDer Eintrag bleibt erhalten und du kannst gleich ein neues Fälligkeits-Datum eintragen.`)) {
+    if (!(await confirmAsync({
+      title: "Zahlung verschieben?",
+      message: `Zahlung wirklich als „verschoben" markieren?\n\nDer Eintrag bleibt erhalten und du kannst gleich ein neues Fälligkeits-Datum eintragen.`,
+      confirmLabel: "Als verschoben markieren",
+    }))) {
       return;
     }
     row.status = "verschoben";
     saveAndRefresh(docId);
-    // Offer to schedule new payment date
-    setTimeout(() => {
-      if (confirm("Möchtest du gleich ein neues Fälligkeits-Datum eintragen?")) {
-        openRescheduleDialog({
-          docId, sectionId, rowIdx,
-          originalRow: row,
-          mode: "create_new",
-          title: "Neues Fälligkeits-Datum",
-          intro: `Trage das neue Fälligkeits-Datum für diese Zahlung ein. Der alte Eintrag bleibt mit Status „verschoben" erhalten.`,
-          onConfirm: (opts) => {
-            const ds = state.docs[docId];
-            const newRow = { datum: opts.newDate };
-            if (row.bemerkung) newRow.bemerkung = row.bemerkung;
-            if (row.art) newRow.art = row.art;
-            ds.rows[sectionId].push(newRow);
-            saveAndRefresh(docId);
-          }
-        });
-      }
-    }, 250);
+    // Offer to schedule new payment date (In-App-Modal)
+    if (await confirmAsync({
+      title: "Neues Fälligkeits-Datum?",
+      message: "Möchtest du gleich ein neues Fälligkeits-Datum eintragen?",
+      confirmLabel: "Datum eintragen",
+    })) {
+      openRescheduleDialog({
+        docId, sectionId, rowIdx,
+        originalRow: row,
+        mode: "create_new",
+        title: "Neues Fälligkeits-Datum",
+        intro: `Trage das neue Fälligkeits-Datum für diese Zahlung ein. Der alte Eintrag bleibt mit Status „verschoben" erhalten.`,
+        onConfirm: (opts) => {
+          const ds = state.docs[docId];
+          const newRow = { datum: opts.newDate };
+          if (row.bemerkung) newRow.bemerkung = row.bemerkung;
+          if (row.art) newRow.art = row.art;
+          ds.rows[sectionId].push(newRow);
+          saveAndRefresh(docId);
+        }
+      });
+    }
     return;
   }
   saveAndRefresh(docId);
@@ -8508,11 +8570,29 @@ function confirmAction(opts) {
     confirmLabel: opts.confirmLabel || "OK",
     danger: !!opts.danger,
     onConfirm: opts.onConfirm,
+    onCancel: opts.onCancel,
   };
   render();
 }
+// Promise-basierte Variante: lost true bei Bestaetigen, false bei Abbrechen.
+// Ermoeglicht "if (!(await confirmAsync(...))) return;" auch in await-Ketten und
+// Schleifen, ohne den Kontrollfluss zu zerreissen. Fail-safe: wird das Modal nie
+// beantwortet (z.B. unterdrueckt), lost das Promise nie und die destruktive
+// Folgeaktion laeuft nicht.
+function confirmAsync(opts) {
+  return new Promise((resolve) => {
+    confirmAction(Object.assign({}, opts, {
+      onConfirm: () => resolve(true),
+      onCancel: () => resolve(false),
+    }));
+  });
+}
 function closeConfirmModal() {
+  const m = state.confirmModal;
   state.confirmModal = null;
+  if (m && typeof m.onCancel === "function") {
+    try { m.onCancel(); } catch(e) { console.error("confirmAction onCancel:", e); }
+  }
   render();
 }
 function runConfirmAction() {
@@ -9865,6 +9945,12 @@ function renderSettingsView() {
         <h2>🔄 Zurücksetzen</h2>
         <p class="settings-section-desc">Setzt alle obigen Einstellungen auf Standard zurück. Deine Daten bleiben unberührt.</p>
         <button class="btn btn-secondary" onclick="resetSettingsToDefaults()" style="margin-top:8px;">↺ Auf Standard zurücksetzen</button>
+      </div>
+
+      <div class="settings-section">
+        <h2>🧹 App zurücksetzen (Cache leeren)</h2>
+        <p class="settings-section-desc">Hilft, wenn die App nach einem Update auf einer alten Version hängt oder sich seltsam verhält. Leert nur den App-Zwischenspeicher (Service Worker und Netz-Cache) und lädt frisch neu. <strong>Deine Daten bleiben erhalten</strong>, es werden keine Eingaben, Belege oder Kontakte gelöscht.</p>
+        <button class="btn btn-secondary" onclick="resetAppCache()" style="margin-top:8px;">🧹 Cache leeren und neu laden</button>
       </div>
 
       <div class="settings-section" style="background:var(--primary-soft); border-color:var(--primary-light);">
@@ -12883,9 +12969,19 @@ function triggerImport() {
       // Version compatibility check
       const fileVer = data.version || 1;
       if (fileVer > 4) {
-        if (!confirm(`Diese Sicherungsdatei wurde mit einer neueren Version der App erstellt (Version ${fileVer}, deine App: ${APP_VERSION}). Möglicherweise gehen dabei Daten verloren oder werden falsch eingelesen.\n\nTrotzdem fortfahren?`)) return;
+        if (!(await confirmAsync({
+          title: "Neuere Sicherungsversion",
+          message: `Diese Sicherungsdatei wurde mit einer neueren Version der App erstellt (Version ${fileVer}, deine App: ${APP_VERSION}). Möglicherweise gehen dabei Daten verloren oder werden falsch eingelesen.\n\nTrotzdem fortfahren?`,
+          confirmLabel: "Trotzdem fortfahren",
+          danger: true,
+        }))) return;
       }
-      if (!confirm("Achtung: Importieren überschreibt deine aktuellen Daten in diesem Browser. Fortfahren?")) return;
+      if (!(await confirmAsync({
+        title: "Daten überschreiben?",
+        message: "Achtung: Importieren überschreibt deine aktuellen Daten in diesem Browser. Fortfahren?",
+        confirmLabel: "Importieren",
+        danger: true,
+      }))) return;
       // Merge each doc
       Object.keys(data.docs).forEach(docId => {
         if (DOCS[docId]) {
@@ -16111,19 +16207,20 @@ function checkBrowserCompat() {
 
 /*
  * ===========================================================================
- * SERVICE-WORKER-REGISTRIERUNG (PROTOTYP, BEWUSST NICHT AKTIV), v3.39
+ * SERVICE-WORKER-REGISTRIERUNG (PRODUKTIONSREIF, BEWUSST NICHT AKTIV), v3.40
  * ---------------------------------------------------------------------------
  * Dieser Block ist absichtlich auskommentiert. Ein fehlerhafter Service Worker
  * kann Nutzer dauerhaft auf einer kaputten Version einsperren. Aktivierung NUR
- * nach ausdruecklicher menschlicher Freigabe und nach dem Test-Plan in
- * SW_PROPOSAL_v3.39.md (5 Schritte) inkl. Kill-Switch-Anleitung.
+ * nach ausdruecklicher menschlicher Freigabe und nach dem Runbook in
+ * SW_ACTIVATION_v3.40.md (Real-Browser-Test, 5 Schritte) inkl. Kill-Switch.
  *
- * Zum Scharfschalten: diesen Kommentarblock entfernen UND sicherstellen, dass
- * CACHE_VERSION in sw.js bei jedem Deploy auf APP_VERSION gezogen wird.
+ * Zum Scharfschalten: diesen Kommentarblock entfernen. Der Cache-Name leitet
+ * sich automatisch aus "?v=" + APP_VERSION ab (siehe sw.js), daher muss in
+ * sw.js NICHTS mehr manuell hochgezaehlt werden, nur APP_VERSION pflegen.
  *
  * if ("serviceWorker" in navigator) {
  *   window.addEventListener("load", () => {
- *     navigator.serviceWorker.register("./sw.js")
+ *     navigator.serviceWorker.register("./sw.js?v=" + APP_VERSION)
  *       .then((reg) => console.log("[sw] registriert:", reg.scope))
  *       .catch((err) => console.warn("[sw] Registrierung fehlgeschlagen:", err));
  *   });
