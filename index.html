@@ -852,7 +852,7 @@
     transition: width .5s;
   }
   /* Geschafft-Übersicht: kleine Stat-Kacheln zur sichtbaren Erfolgsbilanz.
-     Bewusst sachlich gehalten — Zahlen sprechen für sich, keine Konfetti. */
+     Bewusst sachlich gehalten, Zahlen sprechen für sich, keine Konfetti. */
   .achievements-box {
     background: linear-gradient(135deg, rgba(110, 231, 183, 0.08), var(--card));
     border: 1px solid var(--primary-light); border-radius: 12px;
@@ -992,13 +992,6 @@
   .pin-warning {
     margin-top: 14px; padding: 10px; background: rgba(251, 191, 36, 0.1);
     border-radius: 8px; font-size: 11px; color: var(--text-soft); line-height: 1.4;
-  }
-  /* Print confirmation overlay */
-  .confirm-overlay { z-index: 1100; }
-  /* Language toggle on print */
-  .lang-toggle {
-    background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3);
-    padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;
   }
   /* Settings View */
   .settings-section {
@@ -1209,13 +1202,6 @@
   @media (max-width: 700px) {
     .print-view table { font-size: 9pt; }
     .print-view td, .print-view th { padding: 3pt 4pt; }
-  }
-  .preview-zoom-wrap {
-    background: #f0f0f0; padding: 20px; border-radius: 8px;
-    overflow: auto;
-  }
-  .preview-zoom-wrap .print-view {
-    margin: 0 auto; max-width: 21cm; box-shadow: 0 4px 20px rgba(0,0,0,0.1);
   }
   /* PRINT VIEW (visible only when printing or in preview) */
   .print-view {
@@ -2153,16 +2139,16 @@ const DOCS = {
         ]
       },
       { id: "ziele", title: "Meine Ziele", icon: "🎯", type: "rows",
-        hint: "Trage hier deine persönlichen Ziele ein. Klein anfangen ist OK — auch kleine Etappen sind Fortschritt. Setze realistische Zieldaten und dokumentiere, was du dafür schon getan hast.",
+        hint: "Trage hier deine persönlichen Ziele ein. Klein anfangen ist OK, auch kleine Etappen sind Fortschritt. Setze realistische Zieldaten und dokumentiere, was du dafür schon getan hast.",
         columns: [
           { id: "bezeichnung", label: "Ziel", placeholder: "z.B. Schuldenfrei bis Ende der Bewährungszeit" },
           { id: "kategorie", label: "Bereich", placeholder: "Arbeit / Wohnen / Schulden / Therapie / Familie / Gesundheit / Privat / ..." },
-          { id: "zieldatum", label: "Zieldatum (TT.MM.JJJJ)", placeholder: "wenn bekannt — optional" },
+          { id: "zieldatum", label: "Zieldatum (TT.MM.JJJJ)", placeholder: "wenn bekannt, optional" },
           { id: "status", label: "Status", placeholder: "offen / in Arbeit / erreicht / aufgegeben" },
           { id: "warum", label: "Warum ist mir das wichtig?", type: "textarea", placeholder: "Hilft, in schwachen Momenten dranzubleiben. Sei ehrlich mit dir selbst." },
-          { id: "etappen", label: "Etappen / nächste Schritte", type: "textarea", placeholder: "Was sind die nächsten konkreten Schritte? — eine pro Zeile" },
-          { id: "fortschritt", label: "Was habe ich schon getan?", type: "textarea", placeholder: "Wird mit der Zeit länger. Auch Kleinigkeiten zählen — sammle hier deine Fortschritte." },
-          { id: "datum_erreicht", label: "Erreicht am", placeholder: "TT.MM.JJJJ — wenn das Ziel geschafft ist" },
+          { id: "etappen", label: "Etappen / nächste Schritte", type: "textarea", placeholder: "Was sind die nächsten konkreten Schritte?, eine pro Zeile" },
+          { id: "fortschritt", label: "Was habe ich schon getan?", type: "textarea", placeholder: "Wird mit der Zeit länger. Auch Kleinigkeiten zählen, sammle hier deine Fortschritte." },
+          { id: "datum_erreicht", label: "Erreicht am", placeholder: "TT.MM.JJJJ, wenn das Ziel geschafft ist" },
         ]
       },
       { id: "rueckblick", title: "Rückblick", icon: "🔭", type: "freetext",
@@ -2272,21 +2258,59 @@ const Storage = {
   hasClaude: typeof window !== "undefined" && !!window.storage,
 
   async get(key) {
-    if (this.hasLocal) { try { return localStorage.getItem(key); } catch(e){} }
-    if (this.hasClaude) { try { const r = await window.storage.get(key); return r?.value || null; } catch(e){} }
+    if (this.hasLocal) { try { return localStorage.getItem(key); } catch(e){ console.warn("Storage.get (localStorage) fehlgeschlagen:", e); } }
+    if (this.hasClaude) { try { const r = await window.storage.get(key); return r?.value || null; } catch(e){ console.warn("Storage.get (window.storage) fehlgeschlagen:", e); } }
     return memStorage[key] || null;
   },
   async set(key, val) {
-    if (this.hasLocal) { try { localStorage.setItem(key, val); return; } catch(e){} }
-    if (this.hasClaude) { try { await window.storage.set(key, val); return; } catch(e){} }
+    if (this.hasLocal) {
+      try { localStorage.setItem(key, val); return; }
+      catch(e) {
+        // Speicher voll: dem Nutzer verstaendlich melden, NICHT still scheitern.
+        // Schema/Format bleiben unveraendert, nur die Fehlerbehandlung greift.
+        if (isQuotaError(e)) { warnStorageFull(); }
+        else { console.warn("Storage.set (localStorage) fehlgeschlagen:", e); }
+        // weiter zu Fallback, damit die Daten wenigstens in der Sitzung erhalten bleiben
+      }
+    }
+    if (this.hasClaude) { try { await window.storage.set(key, val); return; } catch(e){ console.warn("Storage.set (window.storage) fehlgeschlagen:", e); } }
     memStorage[key] = val;
   },
   async del(key) {
-    if (this.hasLocal) { try { localStorage.removeItem(key); } catch(e){} }
-    if (this.hasClaude) { try { await window.storage.delete(key); } catch(e){} }
+    if (this.hasLocal) { try { localStorage.removeItem(key); } catch(e){ console.warn("Storage.del (localStorage) fehlgeschlagen:", e); } }
+    if (this.hasClaude) { try { await window.storage.delete(key); } catch(e){ console.warn("Storage.del (window.storage) fehlgeschlagen:", e); } }
     delete memStorage[key];
   }
 };
+
+// Speicher-Quota-Erkennung (browseruebergreifend) und einmaliger Nutzerhinweis.
+function isQuotaError(e) {
+  if (!e) return false;
+  return e.name === "QuotaExceededError" ||
+         e.name === "NS_ERROR_DOM_QUOTA_REACHED" ||
+         e.code === 22 || e.code === 1014;
+}
+let storageFullWarned = false;
+function warnStorageFull() {
+  console.warn("localStorage-Quota ueberschritten.");
+  if (storageFullWarned) return;
+  storageFullWarned = true;
+  try {
+    alert("Der lokale Speicher ist voll. Deine letzten Aenderungen konnten nicht dauerhaft gespeichert werden.\n\nBitte erstelle ein Backup (Daten exportieren) und loesche danach nicht mehr benoetigte Belege oder alte Eintraege, um wieder Platz zu schaffen.");
+  } catch(e) { console.error("Speicher-voll-Hinweis konnte nicht angezeigt werden:", e); }
+}
+
+// Sicheres JSON.parse fuer das Laden aus localStorage. Bei korrupten Daten wird
+// NICHT die ganze App unbrauchbar, sondern nur fuer genau diesen Key der Default
+// zurueckgegeben. Andere Keys bleiben unberuehrt. Korruption wird geloggt.
+function safeJsonParse(raw, fallback, label) {
+  if (raw == null) return fallback;
+  try { return JSON.parse(raw); }
+  catch(e) {
+    console.warn("Korrupte gespeicherte Daten" + (label ? " (" + label + ")" : "") + ", Standard wird verwendet:", e);
+    return fallback;
+  }
+}
 
 // ============================================
 // STATE
@@ -2370,6 +2394,60 @@ function autoFormatTime(s) {
   if (digits.length === 3) return `0${digits.slice(0,1)}:${digits.slice(1)}`;
   return s;
 }
+// ── Eingabe-Validierung (NUR Anzeige/Hinweis, keine Datenumformung) ─────────
+// Geben { valid, hint } zurueck. Leerer Wert gilt immer als gueltig (kein Zwang).
+// Es wird NICHTS am gespeicherten Wert geaendert, nur ein Hinweis erzeugt.
+function validateIban(s) {
+  const raw = (s == null ? "" : String(s)).trim();
+  if (!raw) return { valid: true, hint: "" };
+  const compact = raw.replace(/\s+/g, "").toUpperCase();
+  if (!/^[A-Z]{2}\d{2}[A-Z0-9]{10,30}$/.test(compact)) {
+    return { valid: false, hint: "IBAN-Format prüfen (z.B. DE.. mit 22 Stellen)." };
+  }
+  // Deutsche IBAN hat genau 22 Zeichen
+  if (compact.startsWith("DE") && compact.length !== 22) {
+    return { valid: false, hint: "Deutsche IBAN hat 22 Stellen (aktuell " + compact.length + ")." };
+  }
+  // Mod-97-Pruefung (ISO 7064)
+  const rearranged = compact.slice(4) + compact.slice(0, 4);
+  const numeric = rearranged.replace(/[A-Z]/g, c => (c.charCodeAt(0) - 55).toString());
+  let rem = 0;
+  for (let i = 0; i < numeric.length; i++) rem = (rem * 10 + (numeric.charCodeAt(i) - 48)) % 97;
+  if (rem !== 1) return { valid: false, hint: "Prüfziffer der IBAN stimmt nicht, bitte kontrollieren." };
+  return { valid: true, hint: "" };
+}
+function validateGermanDate(s) {
+  const raw = (s == null ? "" : String(s)).trim();
+  if (!raw) return { valid: true, hint: "" };
+  const m = raw.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+  if (!m) return { valid: false, hint: "Datum als TT.MM.JJJJ eintragen." };
+  const d = parseInt(m[1], 10), mo = parseInt(m[2], 10), y = parseInt(m[3], 10);
+  if (mo < 1 || mo > 12) return { valid: false, hint: "Monat zwischen 01 und 12." };
+  const daysInMonth = new Date(y, mo, 0).getDate();
+  if (d < 1 || d > daysInMonth) return { valid: false, hint: "Tag passt nicht zum Monat." };
+  if (y < 1900 || y > 2100) return { valid: false, hint: "Jahr unplausibel (1900 bis 2100)." };
+  return { valid: true, hint: "" };
+}
+function validateAmount(s) {
+  const raw = (s == null ? "" : String(s)).trim();
+  if (!raw) return { valid: true, hint: "" };
+  // Erlaubt: Ziffern, Tausenderpunkte, ein Komma als Dezimaltrenner, optionales Euro-Zeichen
+  const cleaned = raw.replace(/€/g, "").replace(/\s+/g, "");
+  if (!/^\d{1,3}(\.\d{3})*(,\d{1,2})?$|^\d+(,\d{1,2})?$/.test(cleaned)) {
+    return { valid: false, hint: "Betrag als Zahl eintragen (z.B. 1.250,00)." };
+  }
+  return { valid: true, hint: "" };
+}
+// Dispatcher anhand des Spalten-/Feldnamens. Liefert Hinweis-String ("" = ok).
+function validationHintForField(colId, value) {
+  if (!colId) return "";
+  const id = String(colId).toLowerCase();
+  if (id === "iban") return validateIban(value).hint;
+  if (id === "datum" || id.endsWith("_datum") || id.indexOf("datum") >= 0) return validateGermanDate(value).hint;
+  if (/(betrag|summe|lohn|netto|brutto|gehalt|kosten|rate|hoehe)/.test(id)) return validateAmount(value).hint;
+  return "";
+}
+
 // Compute net hours from von/bis/pause
 function computeNetHours(von, bis, pauseMin) {
   if (!von || !bis) return null;
@@ -2431,15 +2509,6 @@ function getPlatformInfo() {
   else if (os === "macos") canInstall = ["chrome", "edge", "safari"].includes(browser);
 
   return { os, browser, canInstall, standalone };
-}
-// Legacy helpers for backwards compat
-function isIosSafari() {
-  const p = getPlatformInfo();
-  return (p.os === "ios" || p.os === "ipados") && p.browser === "safari";
-}
-function isAndroidChrome() {
-  const p = getPlatformInfo();
-  return p.os === "android" && ["chrome", "samsung", "edge"].includes(p.browser);
 }
 function isStandaloneApp() {
   return getPlatformInfo().standalone;
@@ -2533,12 +2602,6 @@ async function saveNotes() {
 async function saveInbox() {
   await Storage.set(INBOX_STORAGE_KEY, JSON.stringify(state.inbox));
 }
-let inboxSaveTimer = null;
-function debouncedSaveInbox() {
-  if (inboxSaveTimer) clearTimeout(inboxSaveTimer);
-  inboxSaveTimer = setTimeout(() => { saveInbox(); inboxSaveTimer = null; }, 300);
-}
-
 // Kategorien fuer die Inbox-Routing. Jede Kategorie kennt die Doc-Sektionen,
 // in die ein Beleg dieser Art landen kann. Bei Auswahl wird der Beleg zu einer
 // bestimmten Zeile dieser Sektion einsortiert.
@@ -2595,7 +2658,7 @@ const INBOX_CATEGORIES = [
 ];
 
 // Heuristik: schaetzt anhand des Dateinamens eine wahrscheinliche Kategorie.
-// Bewusst konservativ — bei Unsicherheit wird sonstiges zurueckgegeben, damit
+// Bewusst konservativ, bei Unsicherheit wird sonstiges zurueckgegeben, damit
 // der User nicht mit falschen Vorschlaegen genervt wird.
 function suggestInboxCategory(filename) {
   const n = (filename || "").toLowerCase();
@@ -2642,7 +2705,7 @@ async function extractPdfTextFromAttachment(att, maxPages) {
 // Analysiert den extrahierten Text und schlaegt eine Kategorie + optional eine
 // konkrete Ziel-Zeile vor. Heuristik basiert auf typischen Behoerden-Phrasen.
 // Diese Methode ist bewusst konservativ: nur klare Treffer ueberschreiben den
-// Dateinamen-Vorschlag — bei Unsicherheit bleibt's bei der Datei-Heuristik.
+// Dateinamen-Vorschlag, bei Unsicherheit bleibt's bei der Datei-Heuristik.
 function analyzeInboxPdfText(text, item) {
   const t = (text || "").toLowerCase();
   if (!t) return null;
@@ -2671,12 +2734,12 @@ function analyzeInboxPdfText(text, item) {
   }
   if (dateMatches.length > 0) out.extracted.daten = dateMatches.slice(0, 5);
 
-  // Aktenzeichen-Patterns (Strafverfahren): "1 Js 9771/21", "5 Ds 123/22"
+  // Aktenzeichen-Patterns (Strafverfahren), Beispielformat: "1 Js 1234/21", "5 Ds 123/22"
   const azRe = /\b(\d{1,3}\s+(?:Js|Ds|Cs|KLs|Ks|Ls|Ns|Qs|UJs|VRs|ARs)\s+\d{1,6}\/\d{2,4})\b/gi;
   const azMatch = azRe.exec(text);
   if (azMatch) out.extracted.aktenzeichen = azMatch[1];
 
-  // Kassenzeichen (Hessen: X00001312288708X oder 00001312288708)
+  // Kassenzeichen (Hessen, Beispielformat: X0000000000000X oder 00000000000000)
   const kasseRe = /\b(X\d{10,16}X|\d{12,16})\b/g;
   const kasseMatch = kasseRe.exec(text);
   if (kasseMatch) out.extracted.kassenzeichen = kasseMatch[1];
@@ -2725,7 +2788,7 @@ function analyzeInboxPdfText(text, item) {
           candidates.push({
             docId, secId: "zahlungen", rowIdx: idx,
             score: (matchAmount ? 10 : 0) + (matchDate ? 5 : 0),
-            label: (r.datum || "?") + " · " + moneyOnly(rowAmount) + " € · " + (r.verwendungszweck || "—"),
+            label: (r.datum || "?") + " · " + moneyOnly(rowAmount) + " € · " + (r.verwendungszweck || "–"),
           });
         }
       });
@@ -2766,7 +2829,7 @@ const DOC_IMPORT_TYPES = {
       const azGerRe = /\b(\d{1,3}\s+(?:Cs|Ds|Ks|Ls|Ns|KLs)\s+\d{1,6}\/\d{2,4})\b/i;
       const azGer = azGerRe.exec(text);
       if (azGer) out.az_gericht = { value: azGer[1], label: "Aktenzeichen Gericht", target: { docId: "kosten", fieldKey: "verfahren.az_gericht" } };
-      // Tagessätze: "90 Tagessätzen zu je 30,00 €" — explicite Umlaute, da \w
+      // Tagessätze: "90 Tagessätzen zu je 30,00 €", explicite Umlaute, da \w
       // in JS-Regex per Default keine Unicode-Buchstaben matcht.
       const tsRe = /(\d{1,3})\s+Tages[a-zäöüßA-ZÄÖÜ]*\s*(?:zu\s+je\s+|à\s+|von\s+)?(\d{1,3}(?:[\.,]\d{1,2})?)/i;
       const ts = tsRe.exec(text);
@@ -2788,7 +2851,7 @@ const DOC_IMPORT_TYPES = {
         if (vom) urtDate = vom[1];
       }
       if (urtDate) out.urteilsdatum = { value: urtDate, label: "Urteilsdatum", target: { docId: "kosten", fieldKey: "verfahren.urteilsdatum" } };
-      // Tatvorwurf — Heuristik: "wegen ... ," (zwischen "wegen" und Komma/Punkt)
+      // Tatvorwurf, Heuristik: "wegen ... ," (zwischen "wegen" und Komma/Punkt)
       const tatRe = /\b(?:schuldig\s+(?:des\s+|der\s+|wegen\s+)|wegen\s+)([A-Z][^,.\n]{6,80})/;
       const tat = tatRe.exec(text);
       if (tat) out.tatvorwurf = { value: tat[1].trim(), label: "Tatvorwurf", target: { docId: "kosten", fieldKey: "verfahren.tatvorwurf" } };
@@ -2809,7 +2872,7 @@ const DOC_IMPORT_TYPES = {
       const kasseRe = /Kassenzeichen[:\s]+(X?\d{10,16}X?)/i;
       const kasse = kasseRe.exec(text);
       if (kasse) out.kassenzeichen = { value: kasse[1], label: "Kassenzeichen Landesjustizkasse", target: { docId: "kosten", fieldKey: "verfahren.az_landesjustizkasse" } };
-      // Gesamtbetrag — meist: "Gesamtsumme ... €" oder "Gesamtbetrag ... €"
+      // Gesamtbetrag, meist: "Gesamtsumme ... €" oder "Gesamtbetrag ... €"
       const totalRe = /(?:Gesamt(?:summe|betrag|forderung))\s*:?\s*(\d{1,3}(?:\.\d{3})*,\d{2})\s*(?:€|EUR)/i;
       const total = totalRe.exec(text);
       if (total) out.gesamt = { value: total[1], label: "Gerichtskosten gesamt (€)", target: { docId: "kosten", fieldKey: "gerichtskosten.betrag_gesamt" } };
@@ -2825,7 +2888,7 @@ const DOC_IMPORT_TYPES = {
       const rdRe = /(?:Datum|Stand|Rechnungsdatum)\s*:?\s*(\d{1,2}\.\d{1,2}\.\d{2,4})/i;
       const rd = rdRe.exec(text);
       if (rd) out.rechnungsdatum = { value: rd[1], label: "Datum Kostenrechnung", target: { docId: "kosten", fieldKey: "gerichtskosten.kostenrechnung_datum" } };
-      // Frist — "Zahlung bis ... " oder "Frist: ..."
+      // Frist, "Zahlung bis ... " oder "Frist: ..."
       const fristRe = /(?:Zahlung\s+bis|Frist|f[äa]llig\s+(?:am|bis))\s*:?\s*(\d{1,2}\.\d{1,2}\.\d{2,4})/i;
       const frist = fristRe.exec(text);
       if (frist) out.frist = { value: frist[1], label: "Zahlungsfrist", target: { docId: "kosten", fieldKey: "gerichtskosten.frist_zahlung" } };
@@ -2838,20 +2901,20 @@ const DOC_IMPORT_TYPES = {
     desc: "Arbeitgeber, Netto-Auszahlung, Brutto, Abrechnungsmonat",
     extract: function(text) {
       const out = {};
-      // Netto / Auszahlung — verschiedene Bezeichnungen
+      // Netto / Auszahlung, verschiedene Bezeichnungen
       const nettoRe = /(?:Auszahlungsbetrag|Auszahlung|Netto[-\s]?Verdienst|Netto[-\s]?Gehalt|Netto[-\s]?Lohn|Netto[-\s]?Bezug|Gesamt[-\s]?Netto)\s*:?\s*(\d{1,3}(?:\.\d{3})*,\d{2})\s*(?:€|EUR)?/i;
       const netto = nettoRe.exec(text);
       if (netto) {
         out.netto = { value: netto[1], label: "Netto-Verdienst (€)", target: { docId: "ear", fieldKey: "arbeit.lohn" } };
         // Auch in Kosten-Erklaerungs-Block
-        out.netto2 = { value: netto[1], label: "Arbeitseinkommen netto (in Erklärung)", target: { docId: "kosten", fieldKey: "erklaerung_wirtschaft.netto_dup" }, _info: "Synonym — wird automatisch aus EAR gezogen" };
+        out.netto2 = { value: netto[1], label: "Arbeitseinkommen netto (in Erklärung)", target: { docId: "kosten", fieldKey: "erklaerung_wirtschaft.netto_dup" }, _info: "Synonym, wird automatisch aus EAR gezogen" };
       }
       // Brutto
       const bruttoRe = /(?:Brutto[-\s]?Verdienst|Brutto[-\s]?Gehalt|Brutto[-\s]?Lohn|Gesamt[-\s]?Brutto)\s*:?\s*(\d{1,3}(?:\.\d{3})*,\d{2})\s*(?:€|EUR)?/i;
       const brutto = bruttoRe.exec(text);
-      if (brutto) out.brutto = { value: brutto[1], label: "Brutto (€) — nur Info", _info: "Wird in der App nicht direkt gespeichert" };
+      if (brutto) out.brutto = { value: brutto[1], label: "Brutto (€), nur Info", _info: "Wird in der App nicht direkt gespeichert" };
       // Arbeitgeber: capture company name ending in Rechtsform-Suffix. Heuristik
-      // mit /g — wir gehen alle Matches durch und nehmen den ersten, der nicht
+      // mit /g, wir gehen alle Matches durch und nehmen den ersten, der nicht
       // mit einem typischen Label-Wort beginnt (Lohnabrechnung, Gehaltsabrechnung
       // etc., die selbst kein Firmenname sind).
       const labelStopRe = /^(?:Lohn|Gehalt|Verdienst|Abrechnung|Arbeitgeber|Lohnabrechnung|Gehaltsabrechnung|Verdienstabrechnung|Auszahlung)/i;
@@ -2867,7 +2930,7 @@ const DOC_IMPORT_TYPES = {
           break;
         }
       }
-      // Fallback 1: explizites Label "Arbeitgeber:" / "Firma:" / "Inh.:" — bis
+      // Fallback 1: explizites Label "Arbeitgeber:" / "Firma:" / "Inh.:", bis
       // zum nächsten Stoppwort, das in Lohnabrechnungen typischerweise folgt.
       if (!agPick) {
         const labelRe = /(?:Arbeitgeber|Firma|Inh\.?|Auftraggeber|Auftragnehmer)\s*:?\s+([^\n]{2,60}?)(?=\s+(?:Brutto|Netto|Lohn|Gehalt|Abrechnung|Anschrift|Adresse|Stra[ßs]e|PLZ|Steuer|SVNr|Sozialversicher|Tel\.|Fax|E-?Mail|Krankenkasse|Bankverbindung|IBAN|BIC|Auszahlungsbetrag)|[,\n]|$)/i;
@@ -2878,7 +2941,7 @@ const DOC_IMPORT_TYPES = {
         }
       }
       // Fallback 2: nach "Beschaeftigt bei" / "Bei der Firma" / "tätig bei" /
-      // "Anstellung bei" — gleicher Ansatz mit Stoppwörtern.
+      // "Anstellung bei", gleicher Ansatz mit Stoppwörtern.
       if (!agPick) {
         const beiRe = /(?:Bei\s+(?:der\s+)?Firma|Besch(?:[äa]|ae)ftigt\s+bei|Anstellung\s+bei|t(?:[äa]|ae)tig\s+bei)\s+([^\n]{2,60}?)(?=\s+(?:Brutto|Netto|Lohn|Gehalt|Abrechnung|Anschrift|Adresse|Stra[ßs]e|PLZ|Steuer|SVNr|Tel\.|Fax|E-?Mail)|[,\n]|$)/i;
         const beiM = beiRe.exec(text);
@@ -2888,10 +2951,10 @@ const DOC_IMPORT_TYPES = {
         }
       }
       if (agPick) out.arbeitgeber = { value: agPick, label: "Arbeitgeber", target: { docId: "kosten", fieldKey: "erklaerung_wirtschaft.arbeitgeber" } };
-      // Monat — "Abrechnung für ... 2026" oder "Abrechnungsmonat: ... 2026"
+      // Monat, "Abrechnung für ... 2026" oder "Abrechnungsmonat: ... 2026"
       const monRe = /(?:Abrechnung\s+(?:f[üu]r|Monat)|Abrechnungsmonat)\s*:?\s*([A-ZÄÖÜa-zäöüß]+\s+\d{4}|\d{1,2}\/\d{4})/i;
       const mon = monRe.exec(text);
-      if (mon) out.monat = { value: mon[1], label: "Abrechnungsmonat — nur Info", _info: "Wird in der App nicht direkt gespeichert" };
+      if (mon) out.monat = { value: mon[1], label: "Abrechnungsmonat, nur Info", _info: "Wird in der App nicht direkt gespeichert" };
       return out;
     }
   },
@@ -2908,15 +2971,15 @@ const DOC_IMPORT_TYPES = {
       // KdU (Kosten der Unterkunft)
       const kduRe = /(?:Kosten\s+der\s+Unterkunft|KdU|Unterkunftskosten)[^\d]{0,30}(\d{1,3}(?:\.\d{3})*,\d{2})\s*(?:€|EUR)?/i;
       const kdu = kduRe.exec(text);
-      if (kdu) out.kdu = { value: kdu[1], label: "KdU — Kosten der Unterkunft (€)", target: { docId: "ear", fieldKey: "sozial.buergergeld_kdu" } };
+      if (kdu) out.kdu = { value: kdu[1], label: "KdU, Kosten der Unterkunft (€)", target: { docId: "ear", fieldKey: "sozial.buergergeld_kdu" } };
       // Jobcenter-Name
       const jcRe = /(Jobcenter\s+[A-ZÄÖÜ][a-zäöüß\-]{2,40})/;
       const jc = jcRe.exec(text);
-      if (jc) out.jobcenter = { value: jc[1], label: "Jobcenter — nur Info", _info: "Wird in der App nicht direkt gespeichert" };
+      if (jc) out.jobcenter = { value: jc[1], label: "Jobcenter, nur Info", _info: "Wird in der App nicht direkt gespeichert" };
       // Bewilligungszeitraum
-      const bzRe = /Bewilligungszeitraum\s*:?\s*(\d{1,2}\.\d{1,2}\.\d{2,4})\s*(?:bis|-|–|—)\s*(\d{1,2}\.\d{1,2}\.\d{2,4})/i;
+      const bzRe = /Bewilligungszeitraum\s*:?\s*(\d{1,2}\.\d{1,2}\.\d{2,4})\s*(?:bis|-|–|\u2014)\s*(\d{1,2}\.\d{1,2}\.\d{2,4})/i;
       const bz = bzRe.exec(text);
-      if (bz) out.bewilligungszeitraum = { value: bz[1] + " – " + bz[2], label: "Bewilligungszeitraum — nur Info", _info: "Wird in der App nicht direkt gespeichert" };
+      if (bz) out.bewilligungszeitraum = { value: bz[1] + " – " + bz[2], label: "Bewilligungszeitraum, nur Info", _info: "Wird in der App nicht direkt gespeichert" };
       return out;
     }
   },
@@ -2926,8 +2989,8 @@ const DOC_IMPORT_TYPES = {
     desc: "Bewährungszeit (Beginn / Ende), Aktenzeichen, zuständige BH-Stelle, Auflagen",
     extract: function(text) {
       const out = {};
-      // Bewährungszeit — "Bewährungszeit beträgt 3 Jahre" oder "von ... bis ..."
-      const bzRangeRe = /Bew[äa]hrungszeit\s+(?:von\s+)?(\d{1,2}\.\d{1,2}\.\d{2,4})\s*(?:bis|-|–|—)\s*(\d{1,2}\.\d{1,2}\.\d{2,4})/i;
+      // Bewährungszeit, "Bewährungszeit beträgt 3 Jahre" oder "von ... bis ..."
+      const bzRangeRe = /Bew[äa]hrungszeit\s+(?:von\s+)?(\d{1,2}\.\d{1,2}\.\d{2,4})\s*(?:bis|-|–|\u2014)\s*(\d{1,2}\.\d{1,2}\.\d{2,4})/i;
       const bz = bzRangeRe.exec(text);
       if (bz) {
         out.beginn = { value: bz[1], label: "Bewährungszeit Beginn", target: { shared: "bewaehrung_beginn" } };
@@ -2937,7 +3000,7 @@ const DOC_IMPORT_TYPES = {
       const azRe = /\b(\d{1,3}\s+(?:Cs|Ds|Ks|Ls|Ns|KLs|StVK|VRs)\s+\d{1,6}\/\d{2,4})\b/i;
       const az = azRe.exec(text);
       if (az) out.az_gericht = { value: az[1], label: "Aktenzeichen Gericht", target: { shared: "aktenzeichen" } };
-      // BH-Stelle — "Bewährungshelfer ... " oder "Sozialer Dienst der Justiz"
+      // BH-Stelle, "Bewährungshelfer ... " oder "Sozialer Dienst der Justiz"
       const bhRe = /(?:Bew[äa]hrungshelfer(?:in)?|Bewährungshilfe|Sozialer\s+Dienst\s+der\s+Justiz)\s*:?\s*([A-ZÄÖÜ][\w\säöüßA-ZÄÖÜ\.\-,]{4,80})/;
       const bh = bhRe.exec(text);
       if (bh) out.bh = { value: bh[1].trim().split(/\n|,/)[0].trim(), label: "Bewährungshelfer/in", target: { shared: "bewaehrungshelfer" } };
@@ -3119,7 +3182,7 @@ function renderImportView() {
       <p style="font-size:13px; color:var(--text-soft); margin-bottom:18px;">Die App liest die wichtigsten Daten automatisch aus dem PDF und schlägt vor, welche Felder in welches Dokument übernommen werden. Du bestätigst die Übernahme pro Feld.</p>
       ${cards}
       <div style="margin-top:18px; padding:12px 14px; background:var(--primary-soft); border-radius:10px; font-size:12px; color:var(--text-soft);">
-        ℹ️ <strong>So funktioniert's:</strong> Lade ein PDF einer der oben gelisteten Dokumentarten hoch — die App extrahiert den Text (alles bleibt offline) und sucht nach den typischen Formulierungen.
+        ℹ️ <strong>So funktioniert's:</strong> Lade ein PDF einer der oben gelisteten Dokumentarten hoch, die App extrahiert den Text (alles bleibt offline) und sucht nach den typischen Formulierungen.
         Eingescannte/foto-basierte PDFs ohne Textebene können leider nicht verarbeitet werden.
       </div>`;
   } else if (s.step === "upload") {
@@ -3151,7 +3214,7 @@ function renderImportView() {
         <h3 style="margin-bottom:6px;">${progress ? "OCR läuft…" : "Analysiere…"}</h3>
         <div style="font-size:13px; color:var(--text-soft);">Datei: ${esc(s.fileName || "")}</div>
         ${progress ? `<div style="font-size:14px; color:var(--primary); margin-top:14px; font-weight:600;">${esc(progress)}</div>` : ""}
-        <div style="font-size:12px; color:var(--text-soft); margin-top:10px;">${progress ? "Erste OCR-Operation lädt Sprachmodell (~15 MB) — folgende sind schneller." : "PDF.js wird einmalig geladen."}</div>
+        <div style="font-size:12px; color:var(--text-soft); margin-top:10px;">${progress ? "Erste OCR-Operation lädt Sprachmodell (~15 MB), folgende sind schneller." : "PDF.js wird einmalig geladen."}</div>
       </div>`;
   } else if (s.step === "confirm") {
     const t = DOC_IMPORT_TYPES[s.typeKey];
@@ -3184,7 +3247,7 @@ function renderImportView() {
     const yesCount = Object.values(conf).filter(Boolean).length;
     body = `
       <button class="btn btn-secondary" style="margin-bottom:14px; font-size:12px;" onclick="importBackToTypes()">← Andere Dokumentart</button>
-      <h3 style="margin-bottom:6px;">${esc(t.icon)} ${esc(t.label)} — erkannt</h3>
+      <h3 style="margin-bottom:6px;">${esc(t.icon)} ${esc(t.label)}, erkannt</h3>
       <p style="font-size:13px; color:var(--text-soft); margin-bottom:14px;">Prüfe die erkannten Werte. Du kannst sie direkt im Feld korrigieren oder einzelne Felder per Häkchen ausschließen. <strong>${yesCount} von ${keys.length}</strong> Felder werden übernommen.</p>
       ${rows}
       <div style="display:flex; gap:8px; margin-top:14px;">
@@ -3273,14 +3336,14 @@ async function analyzeNewInboxPdfs() {
     try {
       const text = await extractPdfTextFromAttachment(item, 3);
       const analysis = analyzeInboxPdfText(text, item);
-      // Re-fetch — Item koennte zwischenzeitlich entfernt worden sein
+      // Re-fetch, Item koennte zwischenzeitlich entfernt worden sein
       const cur = (state.inbox || []).find(i => i.id === item.id);
       if (!cur) continue;
       cur.analyzing = false;
       if (analysis) {
         cur.contentAnalysis = analysis;
         // Inhalts-basierte Kategorie ueberschreibt nur dann, wenn der Dateiname
-        // nichts ergeben hat (war sonstiges) — sonst respektieren wir den
+        // nichts ergeben hat (war sonstiges), sonst respektieren wir den
         // Dateinamen-Hinweis als Hauptsignal.
         if (cur.suggestedCategory === "sonstiges") cur.suggestedCategory = analysis.category;
       }
@@ -3342,12 +3405,12 @@ async function startOcrForInboxItem(inboxId) {
     }
     saveInbox();
     render();
-    showSaveToast(text && text.length > 30 ? "✓ OCR fertig — " + text.length + " Zeichen erkannt" : "OCR fertig — kein Text gefunden");
+    showSaveToast(text && text.length > 30 ? "✓ OCR fertig, " + text.length + " Zeichen erkannt" : "OCR fertig, kein Text gefunden");
   } catch (e) {
     console.error("OCR error:", e);
     const cur = (state.inbox || []).find(i => i.id === inboxId);
     if (cur) { cur.ocrRunning = false; cur.ocrProgress = null; }
-    alert("OCR fehlgeschlagen: " + e.message + "\n\nTipp: Erste OCR-Operation lädt ~15 MB an Sprachdaten — Internet nötig.");
+    alert("OCR fehlgeschlagen: " + e.message + "\n\nTipp: Erste OCR-Operation lädt ~15 MB an Sprachdaten, Internet nötig.");
     render();
   }
 }
@@ -3392,7 +3455,7 @@ async function startOcrForDocAttachment(secId, rowIdx, attId) {
     const sk = DOCS[docId] && DOCS[docId].storageKey;
     if (sk) await Storage.set(sk, JSON.stringify(ds));
     render();
-    showSaveToast(text && text.length > 30 ? "✓ OCR fertig — " + text.length + " Zeichen" : "OCR fertig — kein Text gefunden");
+    showSaveToast(text && text.length > 30 ? "✓ OCR fertig, " + text.length + " Zeichen" : "OCR fertig, kein Text gefunden");
   } catch (e) {
     console.error("OCR doc-att error:", e);
     att.ocrRunning = false;
@@ -3426,7 +3489,8 @@ function copyExtractedText() {
     ta.value = t;
     document.body.appendChild(ta);
     ta.select();
-    try { document.execCommand("copy"); showSaveToast("✓ Text kopiert"); } catch(e){}
+    try { document.execCommand("copy"); showSaveToast("✓ Text kopiert"); }
+    catch(e){ console.warn("Kopieren fehlgeschlagen:", e); alert("Kopieren nicht möglich. Bitte den Text manuell markieren und kopieren."); }
     document.body.removeChild(ta);
   }
 }
@@ -3509,9 +3573,13 @@ function inboxModalBack() {
   render();
 }
 function deleteInboxItem(inboxId) {
-  if (!confirm("Diesen Beleg endgültig löschen? Er ist dann auch nicht mehr in der Inbox.")) return;
-  removeFromInbox(inboxId);
-  render();
+  confirmAction({
+    title: "Beleg löschen?",
+    message: "Diesen Beleg endgültig löschen? Er ist dann auch nicht mehr in der Inbox.",
+    confirmLabel: "Löschen",
+    danger: true,
+    onConfirm: () => { removeFromInbox(inboxId); render(); },
+  });
 }
 function addNote() {
   const inp = document.getElementById("note-input");
@@ -3612,12 +3680,19 @@ function startPinSetup() {
   state.pinLocked = true;
   render();
 }
-async function disablePin() {
-  if (!confirm("PIN-Schutz wirklich entfernen?")) return;
-  await removePin();
-  state.pinLocked = false;
-  showSaveToast("PIN-Schutz deaktiviert");
-  render();
+function disablePin() {
+  confirmAction({
+    title: "PIN-Schutz entfernen?",
+    message: "PIN-Schutz wirklich entfernen?",
+    confirmLabel: "Entfernen",
+    danger: true,
+    onConfirm: async () => {
+      await removePin();
+      state.pinLocked = false;
+      showSaveToast("PIN-Schutz deaktiviert");
+      render();
+    },
+  });
 }
 function startPinRecovery() {
   pinRecoveryMode = true;
@@ -4023,7 +4098,7 @@ function exportAllToCalendar(docId, sectionId) {
 
 // Aggregierter ICS-Export: ALLE Termine aus ALLEN Docs in einer .ics-Datei.
 // Quellen: BH-Termine, Sozialstunden-Einsätze, Therapie-Termine, kommende
-// Bewährungs-Stichtage. Verlangt keine Args — durchläuft alle bekannten Docs.
+// Bewährungs-Stichtage. Verlangt keine Args, durchläuft alle bekannten Docs.
 function exportAllTermineToCalendar() {
   const today = new Date(); today.setHours(0,0,0,0);
   const events = [];
@@ -4077,7 +4152,7 @@ function exportAllTermineToCalendar() {
       events.push(buildIcsEvent({
         date: d, hour: 12, minute: 0, durationMinutes: 60,
         summary: "📅 Ende der Bewährungszeit",
-        description: "Aktenzeichen: " + (state.shared?.aktenzeichen || "—"),
+        description: "Aktenzeichen: " + (state.shared?.aktenzeichen || "–"),
         uid: "bew-ende-" + d.getTime() + "@bewaehrungshilfe-app",
       }));
     }
@@ -4093,7 +4168,7 @@ function exportAllTermineToCalendar() {
     events.push(buildIcsEvent({
       date: d, hour: 12, minute: 0, durationMinutes: 60,
       summary: "💸 " + label,
-      description: "Kassenzeichen: " + (kAns["verfahren.az_landesjustizkasse"] || "—"),
+      description: "Kassenzeichen: " + (kAns["verfahren.az_landesjustizkasse"] || "–"),
       uid: "kosten-" + key + "-" + d.getTime() + "@bewaehrungshilfe-app",
     }));
   });
@@ -4105,7 +4180,7 @@ function exportAllTermineToCalendar() {
   const ics = [
     "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Bewährungshilfe-Assistent//DE",
     "CALSCALE:GREGORIAN", "METHOD:PUBLISH",
-    "X-WR-CALNAME:Bewährungshilfe-Assistent — Termine",
+    "X-WR-CALNAME:Bewährungshilfe-Assistent, Termine",
     ...events,
     "END:VCALENDAR"
   ].filter(Boolean).join("\r\n");
@@ -4509,7 +4584,7 @@ async function inlinePdfPlaceholders(rootEl, onProgress) {
   try {
     await loadPdfJsLib();
   } catch (err) {
-    // No connection / blocked — leave placeholders as visible PDF-Hinweise
+    // No connection / blocked, leave placeholders as visible PDF-Hinweise
     placeholders.forEach(ph => {
       ph.classList.remove("pdf-pending");
       ph.classList.add("attachment-page");
@@ -5342,7 +5417,7 @@ let showArchived = false;
 function toggleShowArchived() { showArchived = !showArchived; render(); }
 
 // === VERSION INFO ===
-const APP_VERSION = "v3.38";
+const APP_VERSION = "v3.39";
 
 // === ONBOARDING ===
 let onboardingActive = false;
@@ -5375,9 +5450,9 @@ function finishOnboarding() {
   Storage.set(SHARED_STORAGE_KEY, JSON.stringify(state.shared));
   try { localStorage.setItem(ONBOARDING_DONE_KEY, "1"); } catch(e) {}
   // Adressbuch-BH-Eintrag aktualisieren oder anlegen (v3.33)
-  try { syncSharedToContacts(); } catch(e){}
+  try { syncSharedToContacts(); } catch(e){ console.warn("syncSharedToContacts (Onboarding) fehlgeschlagen:", e); }
   // Universal Data Sync (v3.35): alle gemappten Felder propagieren
-  try { reconcileAllSyncGroups(); } catch(e){}
+  try { reconcileAllSyncGroups(); } catch(e){ console.warn("reconcileAllSyncGroups (Onboarding) fehlgeschlagen:", e); }
   onboardingActive = false;
   showSaveToast("Stammdaten gespeichert");
   render();
@@ -5959,7 +6034,7 @@ function calcStorageUsage() {
           bytes += (localStorage.getItem(key) || "").length;
         }
       });
-    } catch(e) {}
+    } catch(e) { console.warn("Speicherverbrauch konnte nicht berechnet werden:", e); }
   }
   // Roughly 5MB limit on most browsers
   const limit = 5 * 1024 * 1024;
@@ -6034,12 +6109,10 @@ async function loadAllState() {
   for (const id of Object.keys(DOCS)) {
     const raw = await Storage.get(DOCS[id].storageKey);
     if (raw) {
-      try {
-        const data = JSON.parse(raw);
-        if (data && typeof data === "object") {
-          state.docs[id] = { ...state.docs[id], ...data };
-        }
-      } catch(e) {}
+      const data = safeJsonParse(raw, null, DOCS[id].storageKey);
+      if (data && typeof data === "object") {
+        state.docs[id] = { ...state.docs[id], ...data };
+      }
     }
     // Clamp currentIdx if it's out of bounds (schema may have changed across versions)
     const max = DOCS[id].sections.length - 1;
@@ -6057,10 +6130,8 @@ async function loadAllState() {
   // Load shared data
   const sharedRaw = await Storage.get(SHARED_STORAGE_KEY);
   if (sharedRaw) {
-    try {
-      const d = JSON.parse(sharedRaw);
-      if (d && typeof d === "object") state.shared = d;
-    } catch(e){}
+    const d = safeJsonParse(sharedRaw, null, SHARED_STORAGE_KEY);
+    if (d && typeof d === "object") state.shared = d;
   }
   // Backfill state.shared from existing doc data (in case shared was empty / from older version)
   Object.keys(SHARED_FIELD_MAP).forEach(docId => {
@@ -6082,60 +6153,48 @@ async function loadAllState() {
   // Load notes
   const notesRaw = await Storage.get(NOTES_STORAGE_KEY);
   if (notesRaw) {
-    try {
-      const parsed = JSON.parse(notesRaw);
-      if (Array.isArray(parsed)) state.notes = parsed;
-    } catch(e){}
+    const parsed = safeJsonParse(notesRaw, null, NOTES_STORAGE_KEY);
+    if (Array.isArray(parsed)) state.notes = parsed;
   }
   // Load inbox
   const inboxRaw = await Storage.get(INBOX_STORAGE_KEY);
   if (inboxRaw) {
-    try {
-      const parsed = JSON.parse(inboxRaw);
-      if (Array.isArray(parsed)) {
-        state.inbox = parsed;
-        // Falls die App geschlossen wurde mitten in einer PDF-Analyse, stehen
-        // Items noch auf analyzing=true. Nach dem Reload nochmal anwerfen.
-        if (state.inbox.some(i => i.analyzing && i.type === "pdf")) {
-          setTimeout(() => analyzeNewInboxPdfs(), 1000);
-        }
+    const parsed = safeJsonParse(inboxRaw, null, INBOX_STORAGE_KEY);
+    if (Array.isArray(parsed)) {
+      state.inbox = parsed;
+      // Falls die App geschlossen wurde mitten in einer PDF-Analyse, stehen
+      // Items noch auf analyzing=true. Nach dem Reload nochmal anwerfen.
+      if (state.inbox.some(i => i.analyzing && i.type === "pdf")) {
+        setTimeout(() => analyzeNewInboxPdfs(), 1000);
       }
-    } catch(e){}
+    }
   }
   // Load contacts (Adressbuch)
   const contactsRaw = await Storage.get(CONTACTS_STORAGE_KEY);
   if (contactsRaw) {
-    try {
-      const parsed = JSON.parse(contactsRaw);
-      if (Array.isArray(parsed)) state.contacts = parsed;
-    } catch(e){}
+    const parsed = safeJsonParse(contactsRaw, null, CONTACTS_STORAGE_KEY);
+    if (Array.isArray(parsed)) state.contacts = parsed;
   }
   // Load Brief-Historie
   const briefHistRaw = await Storage.get(BRIEF_HISTORY_KEY);
   if (briefHistRaw) {
-    try {
-      const parsed = JSON.parse(briefHistRaw);
-      if (Array.isArray(parsed)) state.briefHistory = parsed;
-    } catch(e){}
+    const parsed = safeJsonParse(briefHistRaw, null, BRIEF_HISTORY_KEY);
+    if (Array.isArray(parsed)) state.briefHistory = parsed;
   }
   // Load eigene Brief-Vorlagen
   const customTplRaw = await Storage.get(CUSTOM_TEMPLATES_KEY);
   if (customTplRaw) {
-    try {
-      const parsed = JSON.parse(customTplRaw);
-      if (parsed && typeof parsed === "object") {
-        state.customTemplates = parsed;
-        restoreCustomTemplatesIntoTemplates();
-      }
-    } catch(e){}
+    const parsed = safeJsonParse(customTplRaw, null, CUSTOM_TEMPLATES_KEY);
+    if (parsed && typeof parsed === "object") {
+      state.customTemplates = parsed;
+      restoreCustomTemplatesIntoTemplates();
+    }
   }
   // Load Termin-Vorbereitungs-Checklisten
   const prepRaw = await Storage.get(TERMIN_PREP_KEY);
   if (prepRaw) {
-    try {
-      const parsed = JSON.parse(prepRaw);
-      if (parsed && typeof parsed === "object") state.terminPrep = parsed;
-    } catch(e){}
+    const parsed = safeJsonParse(prepRaw, null, TERMIN_PREP_KEY);
+    if (parsed && typeof parsed === "object") state.terminPrep = parsed;
   }
   // Universal Data Sync: zuerst Reconcile (Doc -> shared), dann Sync (shared -> Adressbuch)
   try { reconcileAllSyncGroups(); } catch(e){ console.error("reconcile failed:", e); }
@@ -6143,27 +6202,23 @@ async function loadAllState() {
   // Load backup reminder state
   const reminderRaw = await Storage.get(BACKUP_REMINDER_KEY);
   if (reminderRaw) {
-    try {
-      const parsed = JSON.parse(reminderRaw);
-      if (parsed && typeof parsed === "object") {
-        state.lastBackupAt = parsed.lastBackupAt || null;
-        state.lastChangeAt = parsed.lastChangeAt || null;
-        state.backupReminderSnoozedUntil = parsed.backupReminderSnoozedUntil || null;
-      }
-    } catch(e){}
+    const parsed = safeJsonParse(reminderRaw, null, BACKUP_REMINDER_KEY);
+    if (parsed && typeof parsed === "object") {
+      state.lastBackupAt = parsed.lastBackupAt || null;
+      state.lastChangeAt = parsed.lastChangeAt || null;
+      state.backupReminderSnoozedUntil = parsed.backupReminderSnoozedUntil || null;
+    }
   }
   // Load user settings
   const settingsRaw = await Storage.get(SETTINGS_STORAGE_KEY);
   if (settingsRaw) {
-    try {
-      const parsed = JSON.parse(settingsRaw);
-      if (parsed && typeof parsed === "object") {
-        // Merge: keep defaults for missing keys
-        state.settings = { ...state.settings, ...parsed };
-        // Ensure hiddenDocs is array
-        if (!Array.isArray(state.settings.hiddenDocs)) state.settings.hiddenDocs = [];
-      }
-    } catch(e){}
+    const parsed = safeJsonParse(settingsRaw, null, SETTINGS_STORAGE_KEY);
+    if (parsed && typeof parsed === "object") {
+      // Merge: keep defaults for missing keys
+      state.settings = { ...state.settings, ...parsed };
+      // Ensure hiddenDocs is array
+      if (!Array.isArray(state.settings.hiddenDocs)) state.settings.hiddenDocs = [];
+    }
   }
   // Check for PIN - if set, lock immediately. Strict validation: a valid hash
   // produced by hashPin() starts with "bh_" and is at least 6 chars long. Anything
@@ -6173,7 +6228,7 @@ async function loadAllState() {
   if (pinHash && typeof pinHash === "string" && pinHash.startsWith("bh_") && pinHash.length >= 6) {
     state.pinLocked = true;
   } else if (pinHash) {
-    // Corrupt or unexpected value — clean it up so the user isn't locked out
+    // Corrupt or unexpected value, clean it up so the user isn't locked out
     console.warn("PIN-Hash war im falschen Format und wird entfernt:", pinHash);
     await Storage.del(PIN_STORAGE_KEY);
     state.pinLocked = false;
@@ -6307,31 +6362,45 @@ function openSavedSignatureEditor() {
 }
 
 function deleteSavedSignature() {
-  if (!confirm("Gespeicherte Unterschrift wirklich löschen?\n\nBereits gesetzte Unterschriften in Dokumenten bleiben erhalten - nur die Vorlage für die 1-Klick-Unterschrift wird entfernt.")) return;
-  delete state.shared.savedSignature;
-  delete state.shared.savedSignatureName;
-  Storage.set(SHARED_STORAGE_KEY, JSON.stringify(state.shared));
-  render();
-  showSaveToast("Unterschrift gelöscht");
+  confirmAction({
+    title: "Unterschrift löschen?",
+    message: "Gespeicherte Unterschrift wirklich löschen?\n\nBereits gesetzte Unterschriften in Dokumenten bleiben erhalten - nur die Vorlage für die 1-Klick-Unterschrift wird entfernt.",
+    confirmLabel: "Löschen",
+    danger: true,
+    onConfirm: () => {
+      delete state.shared.savedSignature;
+      delete state.shared.savedSignatureName;
+      Storage.set(SHARED_STORAGE_KEY, JSON.stringify(state.shared));
+      render();
+      showSaveToast("Unterschrift gelöscht");
+    },
+  });
 }
 
 function resetSettingsToDefaults() {
-  if (!confirm("Alle Einstellungen auf Standard zurücksetzen?\n\nDeine Daten bleiben unberührt - nur die Anzeige-Einstellungen werden zurückgesetzt.")) return;
-  state.settings = {
-    hiddenDocs: [],
-    backupReminderDays: 14,
-    showInstallBanner: true,
-    showBackupReminder: true,
-    showTodayOverview: true,
-    showNextAppointments: true,
-    showBewaehrungProgress: true,
-    showAchievements: true,
-    showStats: true,
-    showQuickAdd: true
-  };
-  persistSettings();
-  render();
-  showSaveToast("Einstellungen zurückgesetzt");
+  confirmAction({
+    title: "Einstellungen zurücksetzen?",
+    message: "Alle Einstellungen auf Standard zurücksetzen?\n\nDeine Daten bleiben unberührt - nur die Anzeige-Einstellungen werden zurückgesetzt.",
+    confirmLabel: "Zurücksetzen",
+    danger: true,
+    onConfirm: () => {
+      state.settings = {
+        hiddenDocs: [],
+        backupReminderDays: 14,
+        showInstallBanner: true,
+        showBackupReminder: true,
+        showTodayOverview: true,
+        showNextAppointments: true,
+        showBewaehrungProgress: true,
+        showAchievements: true,
+        showStats: true,
+        showQuickAdd: true
+      };
+      persistSettings();
+      render();
+      showSaveToast("Einstellungen zurückgesetzt");
+    },
+  });
 }
 
 async function snoozeBackupReminder() {
@@ -7012,20 +7081,23 @@ function confirmPayment(refId, status, ev) {
   const row = rows[rowIdx];
 
   if (status === "paid") {
-    // Ask user for amount (most likely they want to enter it now)
+    // Betrag abfragen ueber Eingabe-Modal (prompt() ist auf iOS/Safari unzuverlaessig).
     const docName = DOCS[docId].title;
     const dateStr = row.datum || "(ohne Datum)";
     const suggested = row.bemerkung && /\d/.test(row.bemerkung) ? row.bemerkung.match(/\d+[,\.]?\d*/)?.[0] : "";
-    const amount = prompt(`Zahlung am ${dateStr} (${docName}) als bezahlt markieren.\n\nWelchen Betrag hast du gezahlt? (€)`, suggested || "");
-    if (amount === null) return; // User cancelled
-    const cleaned = amount.trim();
-    if (!cleaned) {
-      // No amount - just set status
-      row.status = "bezahlt";
-    } else {
-      row.betrag = cleaned;
-      row.status = "bezahlt";
-    }
+    inputModal(`Zahlung am ${dateStr} (${docName}) als bezahlt markieren.\n\nWelchen Betrag hast du gezahlt? (€)`, {
+      title: "Zahlung bestätigen",
+      default: suggested || "",
+      placeholder: "z.B. 200,00",
+      okLabel: "Als bezahlt markieren",
+      onOk: (amount) => {
+        const cleaned = (amount || "").trim();
+        if (cleaned) row.betrag = cleaned;
+        row.status = "bezahlt";
+        saveAndRefresh(docId);
+      },
+    });
+    return; // Speichern erfolgt in onOk; Abbrechen laesst die Zeile unveraendert
   } else if (status === "postponed") {
     if (!confirm(`Zahlung wirklich als „verschoben" markieren?\n\nDer Eintrag bleibt erhalten und du kannst gleich ein neues Fälligkeits-Datum eintragen.`)) {
       return;
@@ -7106,7 +7178,7 @@ function renderInboxView() {
     <div style="background:var(--card); border:2px dashed var(--primary-light); border-radius:14px; padding:24px; text-align:center; margin-bottom:18px;">
       <div style="font-size:32px; margin-bottom:8px;">📥</div>
       <div style="font-weight:600; margin-bottom:4px;">Belege hier ablegen</div>
-      <div style="font-size:12px; color:var(--text-soft); margin-bottom:14px;">Foto, JPG, PNG, HEIC oder PDF — Mehrfach-Auswahl möglich</div>
+      <div style="font-size:12px; color:var(--text-soft); margin-bottom:14px;">Foto, JPG, PNG, HEIC oder PDF, Mehrfach-Auswahl möglich</div>
       <label class="btn btn-primary" style="cursor:pointer;">
         <input type="file" accept="image/*,application/pdf" multiple style="display:none" onchange="handleInboxUpload(this.files); this.value='';" />
         📂 Dateien auswählen
@@ -7201,13 +7273,13 @@ function renderInboxView() {
     ${uploadArea}
     ${listHtml}
     <div style="margin-top:16px; padding:12px 14px; background:var(--primary-soft); border-radius:10px; font-size:12px; color:var(--text-soft);">
-      💡 <strong>So funktioniert's:</strong> Lade beliebige Belege hoch — Quittungen, Bescheide, Fotos. Klick danach auf <em>Sortieren</em>, wähle die Art aus, dann die Ziel-Zeile im passenden Dokument. Der Beleg wird automatisch dorthin als Anhang verschoben.
+      💡 <strong>So funktioniert's:</strong> Lade beliebige Belege hoch, Quittungen, Bescheide, Fotos. Klick danach auf <em>Sortieren</em>, wähle die Art aus, dann die Ziel-Zeile im passenden Dokument. Der Beleg wird automatisch dorthin als Anhang verschoben.
       <br><br>📚 In einer späteren Version werden Belege automatisch anhand des Inhalts klassifiziert. Aktuell wird nur der Dateiname als Hinweis genutzt.
     </div>
   `;
 }
 
-// Sortier-Modal: zwei Schritte — Kategorie waehlen, dann Ziel-Zeile.
+// Sortier-Modal: zwei Schritte, Kategorie waehlen, dann Ziel-Zeile.
 function renderInboxModal() {
   if (!state.inboxModal) return "";
   const item = state.inbox.find(i => i.id === state.inboxModal.id);
@@ -7270,7 +7342,7 @@ function renderInboxModal() {
       targetList = `<div style="padding:14px; background:var(--bg); border-radius:8px; color:var(--text-soft); font-size:13px;">
         Es gibt noch keine passenden Einträge für diese Kategorie. Lege zuerst eine Zeile im jeweiligen Dokument an, dann kannst du den Beleg hier zuordnen.
         <br><br>
-        Tipp: ${cat.targets.map(t => esc(t.targetLabel)).join(" oder ")} — dort eine Zeile anlegen, dann zurück hierhin.
+        Tipp: ${cat.targets.map(t => esc(t.targetLabel)).join(" oder ")}, dort eine Zeile anlegen, dann zurück hierhin.
       </div>`;
     }
     body = `
@@ -7589,6 +7661,7 @@ function render() {
   if (state.globalSearchOpen) modalHtml = (modalHtml || "") + renderGlobalSearchModal();
   if (state.addCustomTplOpen) modalHtml = (modalHtml || "") + renderAddCustomTplModal();
   if (state.confirmModal) modalHtml = (modalHtml || "") + renderConfirmModal();
+  if (state.inputModal) modalHtml = (modalHtml || "") + renderInputModal();
   if (modalHtml) {
     const wrap = document.createElement("div");
     wrap.id = "modalOverlay";
@@ -7600,10 +7673,33 @@ function render() {
 }
 
 // Auto-format listeners: applied to all date/time/hours fields after every render
+// Setzt/entfernt einen dezenten Validierungs-Hinweis an einem Feld. Aendert NIE
+// den Wert, blockiert NIE die Eingabe (nur visuelles title-Tooltip + Randfarbe).
+function applyValidationHint(el, colId) {
+  if (!el) return;
+  const hint = validationHintForField(colId, el.value);
+  if (hint) {
+    el.title = hint;
+    if (el.style) el.style.borderColor = "var(--warn, #f9c74f)";
+    el.setAttribute("data-invalid", "1");
+  } else {
+    if (el.getAttribute("data-invalid")) {
+      el.title = "";
+      if (el.style) el.style.borderColor = "";
+      el.removeAttribute("data-invalid");
+    }
+  }
+}
 function attachAutoFormatListeners() {
   document.querySelectorAll("[data-rowkey]").forEach(el => {
     const parts = el.dataset.rowkey.split("|");
     const colId = parts[2];
+    // Dezente Eingabe-Validierung (nur Hinweis, kein Blockieren, keine Datenumformung)
+    if (/(datum|iban|betrag|summe|lohn|netto|brutto|gehalt|kosten|rate|hoehe)/i.test(colId)) {
+      el.addEventListener("blur", () => applyValidationHint(el, colId));
+      // initialer Check fuer bereits gefuellte Felder
+      applyValidationHint(el, colId);
+    }
     if (/^(datum)$/.test(colId)) {
       el.addEventListener("blur", e => {
         const formatted = autoFormatDate(e.target.value);
@@ -7648,7 +7744,7 @@ function attachAutoFormatListeners() {
 
 // ── Geschafft-Übersicht: sichtbare Erfolgsbilanz für den Home-Screen ───────
 // Sammelt die wichtigsten "ich habe X erledigt"-Zahlen aus allen Docs.
-// Bewusst sachlich und ehrlich gehalten — der Mehrwert ist, dass der Nutzer
+// Bewusst sachlich und ehrlich gehalten, der Mehrwert ist, dass der Nutzer
 // schwarz auf weiß sieht: ja, ich tue was, und es summiert sich.
 // ── Adressbuch (Kontakte: BH, Anwalt, Therapeut, Jobcenter, Gerichtskasse) ──
 // Storage-Key: bh_contacts_v1; Format: Array von { id, rolle, name, firma, email,
@@ -7699,7 +7795,7 @@ function updateContactField(id, field, value) {
   const fieldMap = CONTACT_SHARED_MAP[c.rolle];
   if (fieldMap && fieldMap[field]) {
     const sharedKey = fieldMap[field];
-    try { propagateFieldChange({ type: "shared", key: sharedKey }, value); } catch(e){}
+    try { propagateFieldChange({ type: "shared", key: sharedKey }, value); } catch(e){ console.warn("propagateFieldChange (Kontaktfeld) fehlgeschlagen:", e); }
   }
 }
 function deleteContact(id) {
@@ -8024,7 +8120,7 @@ function syncContactToShared(contact) {
 // shared -> Kontakt. Für jede Rolle im Mapping: Wenn die zugehörigen
 // shared-Felder Werte haben aber kein Kontakt mit dieser Rolle existiert,
 // einen anlegen. Wenn einer existiert: Werte synchronisieren (User-Änderungen
-// in Stammdaten überschreiben den Kontakt — single source of truth).
+// in Stammdaten überschreiben den Kontakt, single source of truth).
 function syncSharedToContacts() {
   if (!state.contacts) state.contacts = [];
   const s = state.shared || {};
@@ -8055,7 +8151,7 @@ function syncSharedToContacts() {
       added++;
       addedRoles.push(rolle);
     } else {
-      // shared ist die "Quelle" — alle gesetzten Werte werden übernommen
+      // shared ist die "Quelle", alle gesetzten Werte werden übernommen
       let didUpdate = false;
       Object.entries(values).forEach(([contactField, val]) => {
         if (val && contact[contactField] !== val) {
@@ -8101,15 +8197,15 @@ function manualSyncFromDocs() {
 function renderContactsView() {
   // Bei jedem Render: zuerst Adressbuch aus shared rekonstruieren - so sieht
   // der User immer aktuelle Daten, egal woher sie kamen (Doc, Onboarding, ...).
-  try { reconcileAllSyncGroups(); } catch(e){}
-  try { syncSharedToContacts(); } catch(e){}
+  try { reconcileAllSyncGroups(); } catch(e){ console.warn("reconcileAllSyncGroups (Adressbuch) fehlgeschlagen:", e); }
+  try { syncSharedToContacts(); } catch(e){ console.warn("syncSharedToContacts (Adressbuch) fehlgeschlagen:", e); }
   const contacts = state.contacts || [];
   let body = "";
   if (contacts.length === 0) {
     body = `<div style="background:var(--card); border:1px solid var(--border); border-radius:14px; padding:30px; text-align:center;">
       <div style="font-size:42px; margin-bottom:10px;">📇</div>
       <h3>Noch keine Kontakte</h3>
-      <p style="color:var(--text-soft); margin-bottom:18px;">Lege deine wichtigen Ansprechpartner an — sie werden dann in Briefen automatisch verwendet.</p>
+      <p style="color:var(--text-soft); margin-bottom:18px;">Lege deine wichtigen Ansprechpartner an, sie werden dann in Briefen automatisch verwendet.</p>
     </div>`;
   } else {
     // Gruppiere nach Rolle
@@ -8125,7 +8221,7 @@ function renderContactsView() {
         // Ist das der "primäre" Kontakt dieser Rolle und hat die Rolle ein Mapping?
         const isPrimary = list[0]?.id === c.id && !!CONTACT_SHARED_MAP[c.rolle];
         const syncBadge = isPrimary
-          ? `<div style="font-size:11px; color:var(--primary); background:var(--primary-soft); padding:4px 10px; border-radius:6px; margin-bottom:8px; display:flex; align-items:center; gap:6px;">🔗 <strong>Mit Stammdaten verknüpft</strong> — Änderungen werden in Briefe und Anträge übernommen.</div>`
+          ? `<div style="font-size:11px; color:var(--primary); background:var(--primary-soft); padding:4px 10px; border-radius:6px; margin-bottom:8px; display:flex; align-items:center; gap:6px;">🔗 <strong>Mit Stammdaten verknüpft</strong>, Änderungen werden in Briefe und Anträge übernommen.</div>`
           : "";
         cardsHtml += `
           <div style="background:var(--card); border:1px solid var(--border); border-radius:10px; padding:12px 14px; margin-bottom:8px;">
@@ -8158,7 +8254,7 @@ function renderContactsView() {
     <div class="header">
       <div>
         <h1>📇 Adressbuch</h1>
-        <div class="sub">Wichtige Ansprechpartner — werden in Briefen automatisch verwendet</div>
+        <div class="sub">Wichtige Ansprechpartner, werden in Briefen automatisch verwendet</div>
       </div>
       <button class="btn btn-secondary" onclick="goHome()">← Zur Übersicht</button>
     </div>
@@ -8185,7 +8281,7 @@ function renderContactsView() {
 // Bittet einmalig um Permission, prüft regelmäßig die nächsten Termine und
 // zeigt eine Browser-Notification 1 Stunde vorher. Persistent State im
 // localStorage: bh_notif_enabled (true/false), bh_notif_shown (Map<termId,
-// timestamp>) — damit derselbe Termin nicht wiederholt benachrichtigt wird.
+// timestamp>), damit derselbe Termin nicht wiederholt benachrichtigt wird.
 const NOTIF_ENABLED_KEY = "bh_notif_enabled";
 const NOTIF_SHOWN_KEY = "bh_notif_shown";
 const NOTIF_CHECK_INTERVAL_MS = 5 * 60 * 1000; // alle 5 Minuten prüfen
@@ -8278,13 +8374,13 @@ function checkUpcomingTermineForNotif() {
         const minutes = Math.round(diff / 60000);
         const when = minutes < 60 ? "in " + minutes + " Min" : "in " + Math.round(minutes/60) + "h";
         new Notification("⏰ " + c.title + " " + when, {
-          body: c.body || (pad(dt.getHours()) + ":" + pad(dt.getMinutes()) + " — vergiss die Unterlagen nicht!"),
+          body: c.body || (pad(dt.getHours()) + ":" + pad(dt.getMinutes()) + ", vergiss die Unterlagen nicht!"),
           icon: "/favicon.ico",
           tag: c.id,
         });
         shown[c.id] = now;
         _saveNotifShown(shown);
-      } catch(e){}
+      } catch(e){ console.warn("Termin-Benachrichtigung fehlgeschlagen:", e); }
     }
   });
 }
@@ -8392,7 +8488,7 @@ function saveCustomTemplates() {
 }
 function addCustomTemplate() {
   // prompt() ist auf vielen Browsern (insb. mobil oder mit Pop-up-Blockern)
-  // unzuverlässig — daher eigenes Modal. State: addCustomTplOpen + Pending-Titel.
+  // unzuverlässig, daher eigenes Modal. State: addCustomTplOpen + Pending-Titel.
   state.addCustomTplOpen = true;
   state.addCustomTplTitle = "";
   state.addCustomTplCat = "bh";
@@ -8403,7 +8499,7 @@ function addCustomTemplate() {
   }, 40);
 }
 // ── Generisches Bestätigungs-Modal ───────────────────────────────────────
-// Ersetzt confirm() — auf iOS-PWAs und Safari ist confirm() unzuverlässig.
+// Ersetzt confirm(), auf iOS-PWAs und Safari ist confirm() unzuverlässig.
 // State: confirmModal = { title, message, onConfirm, confirmLabel, danger }
 function confirmAction(opts) {
   state.confirmModal = {
@@ -8441,6 +8537,60 @@ function renderConfirmModal() {
         <div style="padding:14px 20px; border-top:1px solid var(--border); display:flex; gap:8px; justify-content:flex-end;">
           <button class="btn btn-secondary" onclick="closeConfirmModal()">Abbrechen</button>
           <button class="btn ${m.danger ? "btn-danger" : "btn-primary"}" onclick="runConfirmAction()" style="${m.danger ? "background:var(--danger); color:#fff;" : ""}">${esc(m.confirmLabel)}</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+// ── Generisches Eingabe-Modal ────────────────────────────────────────────
+// Ersetzt prompt(), das auf iOS-PWAs und mit Pop-up-Blockern unzuverlaessig ist.
+// State: inputModal = { title, message, value, placeholder, okLabel, onOk }
+function inputModal(message, opts) {
+  opts = opts || {};
+  state.inputModal = {
+    title: opts.title || "Eingabe",
+    message: message || "",
+    value: opts.default != null ? String(opts.default) : "",
+    placeholder: opts.placeholder || "",
+    okLabel: opts.okLabel || "OK",
+    onOk: opts.onOk,
+  };
+  render();
+  setTimeout(() => {
+    const el = document.getElementById("input-modal-field");
+    if (el) { el.focus(); if (el.select) el.select(); }
+  }, 40);
+}
+function closeInputModal() { state.inputModal = null; render(); }
+function setInputModalValue(v) { if (state.inputModal) state.inputModal.value = v; }
+function submitInputModal() {
+  const m = state.inputModal;
+  state.inputModal = null;
+  if (m && typeof m.onOk === "function") {
+    try { m.onOk(m.value); } catch(e) { console.error("inputModal onOk:", e); }
+  }
+  render();
+}
+function renderInputModal() {
+  const m = state.inputModal;
+  if (!m) return "";
+  return `
+    <div class="modal-backdrop" onclick="if(event.target===this) closeInputModal()">
+      <div class="modal" style="max-width:440px;">
+        <div style="padding:18px 20px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:10px;">
+          <span style="font-size:22px;">✏️</span>
+          <strong style="font-size:16px;">${esc(m.title)}</strong>
+        </div>
+        <div style="padding:18px 20px; font-size:14px; line-height:1.5;">
+          ${m.message ? `<div style="margin-bottom:12px; white-space:pre-line;">${esc(m.message)}</div>` : ""}
+          <input id="input-modal-field" type="text" value="${esc(m.value)}" placeholder="${esc(m.placeholder)}"
+            oninput="setInputModalValue(this.value)"
+            onkeydown="if(event.key==='Enter'){ event.preventDefault(); submitInputModal(); } else if(event.key==='Escape'){ closeInputModal(); }"
+            style="width:100%; padding:10px 12px; font-size:16px; border:1px solid var(--border); border-radius:8px; box-sizing:border-box;" />
+        </div>
+        <div style="padding:14px 20px; border-top:1px solid var(--border); display:flex; gap:8px; justify-content:flex-end;">
+          <button class="btn btn-secondary" onclick="closeInputModal()">Abbrechen</button>
+          <button class="btn btn-primary" onclick="submitInputModal()">${esc(m.okLabel)}</button>
         </div>
       </div>
     </div>`;
@@ -8501,7 +8651,7 @@ function renderAddCustomTplModal() {
           <input type="text" id="add-custom-tpl-input" value="${esc(title)}" oninput="setAddCustomTplTitle(this.value)" onkeydown="if(event.key==='Enter') confirmAddCustomTpl(); else if(event.key==='Escape') closeAddCustomTpl();" placeholder="z.B. Krankenkassen-Anfrage" style="width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:6px; font-size:14px; background:var(--input-bg); color:var(--text);" autocomplete="off" />
           <label style="display:block; font-size:13px; margin:14px 0 6px; color:var(--text-soft);">Kategorie</label>
           <select onchange="setAddCustomTplCat(this.value)" style="width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:6px; font-size:14px; background:var(--input-bg); color:var(--text);">${catOpts}</select>
-          <div style="font-size:11px; color:var(--text-soft); margin-top:10px;">💡 Du kannst den Brieftext danach im Editor frei bearbeiten — er wird automatisch gespeichert.</div>
+          <div style="font-size:11px; color:var(--text-soft); margin-top:10px;">💡 Du kannst den Brieftext danach im Editor frei bearbeiten, er wird automatisch gespeichert.</div>
         </div>
         <div style="padding:14px 20px; border-top:1px solid var(--border); display:flex; gap:8px; justify-content:flex-end;">
           <button class="btn btn-secondary" onclick="closeAddCustomTpl()">Abbrechen</button>
@@ -8659,7 +8809,7 @@ function computeKostenForecast() {
   if (gesamt <= 0) return null;
   const gezahlt = zahlungen.reduce((s, r) => s + parseMoney(r.betrag || ""), 0);
   const rest = Math.max(0, gesamt - gezahlt);
-  // Ratenhöhe — bevorzugt explizit, sonst Schnitt der letzten 3 Zahlungen
+  // Ratenhöhe, bevorzugt explizit, sonst Schnitt der letzten 3 Zahlungen
   let rateMonat = parseMoney(ans["geldstrafe.rate_hoehe"] || "") || parseMoney(ans["gerichtskosten.rate_hoehe"] || "");
   if (!rateMonat || rateMonat <= 0) {
     const recent = zahlungen.slice(-3).map(r => parseMoney(r.betrag || "")).filter(n => n > 0);
@@ -8764,7 +8914,7 @@ function computeAchievements() {
   return out;
 }
 // ── Setup-Checkliste (persistent) ─────────────────────────────────────────
-// Zeigt was schon eingerichtet ist, was noch offen — anklickbare Schritte,
+// Zeigt was schon eingerichtet ist, was noch offen, anklickbare Schritte,
 // die direkt zur passenden Stelle führen. Wenn alles erledigt: einklappbarer
 // "Alles eingerichtet" Status.
 const SETUP_CHECKLIST_KEY = "bh_setup_checklist_dismissed";
@@ -8822,7 +8972,7 @@ function computeSetupChecklist() {
   });
   // Schritt 7: PIN-Schutz aktiviert (optional, aber empfohlen)
   let hasPin = false;
-  try { hasPin = !!localStorage.getItem(PIN_STORAGE_KEY); } catch(e){}
+  try { hasPin = !!localStorage.getItem(PIN_STORAGE_KEY); } catch(e){ console.warn("PIN-Status (Checkliste) konnte nicht gelesen werden:", e); }
   items.push({
     id: "pin",
     label: "PIN-Schutz aktiviert (optional, schützt deine Daten)",
@@ -8847,10 +8997,6 @@ function isSetupChecklistDismissed() {
 }
 function dismissSetupChecklist() {
   try { localStorage.setItem(SETUP_CHECKLIST_KEY, "1"); } catch(e){}
-  render();
-}
-function unDismissSetupChecklist() {
-  try { localStorage.removeItem(SETUP_CHECKLIST_KEY); } catch(e){}
   render();
 }
 function renderSetupChecklist() {
@@ -9032,11 +9178,11 @@ function collectTimelineEvents() {
       type: "frist",
       icon: past ? "⏰" : "⚠️",
       title: key.startsWith("geldstrafe") ? "Geldstrafe-Frist" : "Gerichtskosten-Frist",
-      subtitle: "Kassenzeichen: " + (kAns["verfahren.az_landesjustizkasse"] || "—"),
+      subtitle: "Kassenzeichen: " + (kAns["verfahren.az_landesjustizkasse"] || "–"),
       color: "var(--warn)",
     });
   });
-  // Sortieren absteigend (neueste zuerst — oder Stichtage zuerst?)
+  // Sortieren absteigend (neueste zuerst, oder Stichtage zuerst?)
   // Wir sortieren chronologisch aufsteigend, scrollen aber zu heute
   events.sort((a, b) => a.date.getTime() - b.date.getTime());
   return events;
@@ -9082,7 +9228,7 @@ function renderTimelineView() {
       <p>Sobald du Termine, Zahlungen oder Briefe erfasst, erscheinen sie hier chronologisch.</p>
     </div>`;
   } else {
-    // Auch die heutige Position markieren — einen virtuellen "heute"-Marker
+    // Auch die heutige Position markieren, einen virtuellen "heute"-Marker
     // injizieren, sodass User sofort sieht, wo er steht
     let injectedToday = false;
     visible.forEach(e => {
@@ -9099,7 +9245,7 @@ function renderTimelineView() {
           </div>`;
         lastMonth = m; lastYear = y;
       }
-      // Heute-Marker (einmal) — wenn dieses Event in der Zukunft liegt und wir noch nicht den Marker gesetzt haben
+      // Heute-Marker (einmal), wenn dieses Event in der Zukunft liegt und wir noch nicht den Marker gesetzt haben
       if (!injectedToday && !isPast && !isToday) {
         body += `
           <div id="timeline-today" style="display:flex; align-items:center; gap:12px; padding:8px 14px; margin:8px 0; background:var(--accent); color:#fff; border-radius:8px;">
@@ -9161,7 +9307,7 @@ function renderTimelineView() {
 
 function renderAchievementsBox() {
   const a = computeAchievements();
-  // Wenn nichts erfasst ist, gar nichts zeigen — sonst wirkt es leer.
+  // Wenn nichts erfasst ist, gar nichts zeigen, sonst wirkt es leer.
   const hasAny = a.bhWahrgenommen + a.sozialEintraege + a.schadensZahlungen
                + a.kostenZahlungen + a.therapieBesucht > 0;
   if (!hasAny) return "";
@@ -9426,7 +9572,7 @@ function renderHome() {
           </div>`;
       }
     }
-  } catch(e) {}
+  } catch(e) { console.warn("Install-Banner konnte nicht gerendert werden:", e); }
 
   // Onboarding-Prompt (Legacy): durch persistente Setup-Checkliste auf Home ersetzt
   // (siehe renderSetupChecklist). Wird nur noch beim ersten Besuch via Modal angezeigt.
@@ -9527,7 +9673,7 @@ function renderHome() {
     pinStatusIcon = hasPin
       ? `<button class="btn btn-secondary btn-icon" onclick="disablePin()" title="PIN-Schutz aktiv – klicken zum Entfernen">🔒</button>`
       : `<button class="btn btn-secondary btn-icon" onclick="startPinSetup()" title="PIN-Schutz einrichten">🔓</button>`;
-  } catch(e) {}
+  } catch(e) { console.warn("PIN-Status konnte nicht gelesen werden:", e); }
 
   return `
     <div class="home-hero">
@@ -9668,7 +9814,7 @@ function renderSettingsView() {
                 ? `<button class="btn btn-secondary" onclick="disableNotifications()">🔕 Deaktivieren</button>
                    <span style="font-size:12px; color:var(--accent);">✓ Aktiv</span>`
                 : `<button class="btn btn-primary" onclick="enableNotifications()">🔔 Aktivieren</button>
-                   ${perm === "denied" ? `<span style="font-size:12px; color:var(--warn);">⚠ Du hast die Erlaubnis im Browser blockiert — bitte in den Browser-Einstellungen aktivieren.</span>` : ""}`
+                   ${perm === "denied" ? `<span style="font-size:12px; color:var(--warn);">⚠ Du hast die Erlaubnis im Browser blockiert, bitte in den Browser-Einstellungen aktivieren.</span>` : ""}`
               }
             </div>`;
         })()}
@@ -10522,7 +10668,7 @@ ${d.name || "(Unterschrift)"}`;
         ? d.k_behoerde_sta + (d.k_behoerde_sta_anschrift ? "\n" + d.k_behoerde_sta_anschrift : "")
         : "An die zuständige Staatsanwaltschaft\n____\n____";
       const kasseZeile = d.k_behoerde_kasse
-        ? "Nachrichtlich: " + d.k_behoerde_kasse + (d.k_behoerde_kasse_anschrift ? " — " + d.k_behoerde_kasse_anschrift.replace(/\n/g, ", ") : "")
+        ? "Nachrichtlich: " + d.k_behoerde_kasse + (d.k_behoerde_kasse_anschrift ? ", " + d.k_behoerde_kasse_anschrift.replace(/\n/g, ", ") : "")
         : "Nachrichtlich: An die Gerichts- / Landesjustizkasse";
 
       const azZeilen = [];
@@ -10785,7 +10931,7 @@ function renderErklaerungFormHtml(d, editable) {
   const hatLohn = !!lohn && lohn !== "0" && lohn !== "0,00";
   const arbeitgeber = S(d.k_arbeitgeber);
 
-  // Sozialleistungen — heuristic: ALG1 \u2192 ALG, B\u00FCrgergeld \u2192 ALG II
+  // Sozialleistungen, heuristic: ALG1 \u2192 ALG, B\u00FCrgergeld \u2192 ALG II
   const alg1 = parseMoney(S(d.ear_alg1));
   const buergergeld = parseMoney(S(d.ear_buergergeld)) + parseMoney(S(d.ear_buergergeld_kdu));
   const sozHilfe = parseMoney(S(d.ear_sozialhilfe));
@@ -10797,7 +10943,7 @@ function renderErklaerungFormHtml(d, editable) {
   const cbSonst = (sozHilfe + grundSi) > 0 && !cbAlg && !cbAlg2;
   const leistungBetrag = hatLeistung ? moneyOnly(sumLeistung) : "";
 
-  // Monatliche Ausgaben — wenn Freitext, nutze den; sonst "siehe Anhang (EAR)"
+  // Monatliche Ausgaben, wenn Freitext, nutze den; sonst "siehe Anhang (EAR)"
   let ausgabenText = S(d.k_ausgaben_freitext).trim();
   if (!ausgabenText) {
     const earAusSum = parseMoney(S(d.ear_aus_total));
@@ -11017,7 +11163,7 @@ function getSelectedAttachmentIds() {
   return new Set(arr);
 }
 
-// Toggle "Unterschrift unter Brief drucken" — wirkt sich auf printAnschreiben/printFormular aus
+// Toggle "Unterschrift unter Brief drucken", wirkt sich auf printAnschreiben/printFormular aus
 function toggleBriefSignature() {
   state.briefSignatureEnabled = state.briefSignatureEnabled === false ? true : false;
   // Wenn was Anderes wird (Default ist on), kippen
@@ -11079,7 +11225,7 @@ async function renderAttachmentForPrint(att) {
       }
     }
   } else if (att.kind === "doc") {
-    // Komplettes Dokument als HTML einbetten — nutzt die existierenden Render-
+    // Komplettes Dokument als HTML einbetten, nutzt die existierenden Render-
     // Funktionen für die Druckansicht, die auch beim normalen Drucken laufen.
     const docId = att.docId;
     const renderFnName = "renderPrint" + docId.charAt(0).toUpperCase() + docId.slice(1);
@@ -11116,7 +11262,7 @@ async function printAnschreiben() {
   if (placeholderCount > 0) {
     confirmAction({
       title: "Platzhalter im Brief?",
-      message: "Der Brief enthält noch " + placeholderCount + " Platzhalter (____) — typischerweise Stellen, die du noch ausfüllen musst.\n\nTrotzdem drucken?",
+      message: "Der Brief enthält noch " + placeholderCount + " Platzhalter (____), typischerweise Stellen, die du noch ausfüllen musst.\n\nTrotzdem drucken?",
       confirmLabel: "🖨 Trotzdem drucken",
       danger: false,
       onConfirm: () => { _doPrintAnschreiben(text, tpl); },
@@ -11126,7 +11272,7 @@ async function printAnschreiben() {
   await _doPrintAnschreiben(text, tpl);
 }
 
-// Inline-Print statt Pop-up — vermeidet Browser-Blocker und funktioniert auch
+// Inline-Print statt Pop-up, vermeidet Browser-Blocker und funktioniert auch
 // als PWA. Inhalt wird ins aktuelle Dokument injiziert; @media print blendet
 // alles andere aus. Nach dem Drucken wird der Inhalt wieder entfernt.
 async function _doPrintAnschreiben(text, tpl) {
@@ -11171,7 +11317,7 @@ async function _doPrintAnschreiben(text, tpl) {
 
   // Doc-Title temporär ändern damit PDF-Filename passt
   const oldTitle = document.title;
-  document.title = tpl.title + " — " + (state.shared?.name || "");
+  document.title = tpl.title + ", " + (state.shared?.name || "");
 
   // Force Reflow + delayed print (siehe openPrintWindow)
   void container.offsetHeight;
@@ -11201,7 +11347,7 @@ async function _doPrintAnschreiben(text, tpl) {
 async function printFormular() {
   const tpl = ANSCHREIBEN_TEMPLATES[activeAnschreiben];
   if (!tpl || !tpl.isFormular) return;
-  // Daten-Dict frisch aus aktuellem State bauen — gleich wie in renderAnschreibenView
+  // Daten-Dict frisch aus aktuellem State bauen, gleich wie in renderAnschreibenView
   const d = buildAnschreibenDataDict();
   // Druck-Version: editable=false, also Spans statt Inputs
   const printHtml = renderErklaerungFormHtml(d, false);
@@ -11235,15 +11381,26 @@ async function printFormular() {
   document.body.appendChild(container);
 
   const oldTitle = document.title;
-  document.title = (tpl?.title || "Formular") + " — " + (state.shared?.name || "");
+  document.title = (tpl?.title || "Formular") + ", " + (state.shared?.name || "");
 
-  try { window.print(); } catch(e) { alert("Drucken fehlgeschlagen: " + e.message); }
+  // Force Reflow + delayed print (gleiches Muster wie openPrintWindow / _doPrintAnschreiben),
+  // damit die Druckvorschau auf iOS/Safari/PWA nicht leer bleibt.
+  void container.offsetHeight;
+  requestAnimationFrame(() => {
+    setTimeout(() => {
+      try {
+        window.print();
+      } catch(e) {
+        alert("Drucken fehlgeschlagen: " + e.message);
+      }
+    }, 100);
+  });
 
   setTimeout(() => {
     document.title = oldTitle;
     const c = document.getElementById("inline-print-container");
     if (c) c.remove();
-  }, 500);
+  }, 2000);
 
   if (activeAnschreiben) recordBriefSent(activeAnschreiben, "drucken");
 }
@@ -11289,14 +11446,14 @@ function buildAnschreibenDataDict() {
 
 // Wird vom oninput-Handler der Formular-Inputs aufgerufen. Mapped den
 // Form-Feldnamen auf den richtigen Storage-Slot (state.shared / state.docs.*)
-// und speichert dort. Re-render ist NICHT nötig — die anderen Felder hängen
+// und speichert dort. Re-render ist NICHT nötig, die anderen Felder hängen
 // nicht direkt voneinander ab; falls doch, machen wir's beim nächsten Open.
 // Debounced über setTimeout damit nicht bei jedem Tastendruck synchron zur
 // localStorage geschrieben wird (kann auf Mobile spürbar ruckeln).
 const _erklSaveTimers = {};
 function saveErklaerungField(fieldKey, value) {
   if (!fieldKey) return;
-  // Direkt im State speichern (synchron — kein UI-Flicker)
+  // Direkt im State speichern (synchron, kein UI-Flicker)
   const mapping = {
     // Stammdaten (state.shared)
     name:        { type: "shared", key: "name" },
@@ -11436,7 +11593,7 @@ function renderAnschreibenView() {
       </div>`;
   }
 
-  // Templates nach Kategorien gruppieren — ergibt aufgeräumte UI mit Untergruppen
+  // Templates nach Kategorien gruppieren, ergibt aufgeräumte UI mit Untergruppen
   // statt 13 flachen Items in einer Liste. Aufgeklappt ist die Kategorie der
   // aktuell ausgewählten Vorlage, plus standardmaßig „bh" (häufigste).
   const tplsByCat = {};
@@ -11524,7 +11681,7 @@ function renderAnschreibenView() {
             <button class="btn btn-primary" onclick="printFormular()">🖨 Drucken / als PDF${selectedIds.size > 0 ? ` (mit ${selectedIds.size} Anhang${selectedIds.size === 1 ? "" : "en"})` : ""}</button>
             <button class="btn btn-secondary" onclick="state.view='home'; state.activeDocId='kosten'; render();">✏️ Felder ergänzen (Verfahrenskosten)</button>
           </div>
-          <div style="font-size:11px; color:var(--text-soft); margin-top:10px;">💡 Die Textfelder im Formular kannst du direkt bearbeiten — Änderungen werden automatisch in den passenden Dokumenten gespeichert (z.B. Arbeitgeber in den Verfahrenskosten). Familienstand und Sozialleistungs-Checkboxen kommen automatisch aus EAR und Verfahrenskosten.</div>
+          <div style="font-size:11px; color:var(--text-soft); margin-top:10px;">💡 Die Textfelder im Formular kannst du direkt bearbeiten, Änderungen werden automatisch in den passenden Dokumenten gespeichert (z.B. Arbeitgeber in den Verfahrenskosten). Familienstand und Sozialleistungs-Checkboxen kommen automatisch aus EAR und Verfahrenskosten.</div>
         </div>`;
     } else {
       const text = tpl.body(d);
@@ -11564,7 +11721,7 @@ function renderAnschreibenView() {
                 <div style="font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:var(--text-soft); margin:10px 0 4px;">Komplettes Dokument als Anhang einbetten</div>
                 ${docs.map(renderItem).join("")}
               ` : ""}
-              <div style="font-size:11px; color:var(--text-soft); margin-top:8px; padding:6px 8px; background:var(--bg); border-radius:6px;">💡 Ausgewählte Anhänge werden beim Drucken mit angehängt — Bilder und PDFs als Seiten, komplette Dokumente als formatierte Anlage.</div>
+              <div style="font-size:11px; color:var(--text-soft); margin-top:8px; padding:6px 8px; background:var(--bg); border-radius:6px;">💡 Ausgewählte Anhänge werden beim Drucken mit angehängt, Bilder und PDFs als Seiten, komplette Dokumente als formatierte Anlage.</div>
             </div>
           </details>`;
       }
@@ -11595,7 +11752,7 @@ function renderAnschreibenView() {
                         <span>Unterschrift unter den Brief drucken</span>
                       </label>
                       <div style="font-size:11px; color:var(--text-soft); margin-top:4px;">${esc((state.shared?.savedSignatureName) || state.shared?.name || "")}</div>
-                      <button class="btn btn-secondary" style="font-size:11px; padding:3px 8px; margin-top:6px;" onclick="openSavedSignaturePad()">✏️ Unterschrift bearbeiten</button>
+                      <button class="btn btn-secondary" style="font-size:11px; padding:3px 8px; margin-top:6px;" onclick="openSavedSignatureEditor()">✏️ Unterschrift bearbeiten</button>
                     </div>
                   </div>
                 </details>`;
@@ -11607,7 +11764,7 @@ function renderAnschreibenView() {
                     <strong>Digitale Unterschrift einrichten?</strong>
                     <div style="font-size:11px; color:var(--text-soft); margin-top:2px;">Wenn du sie einmal zeichnest, kannst du sie unter jeden Brief drucken.</div>
                   </div>
-                  <button class="btn btn-secondary" style="font-size:12px;" onclick="openSavedSignaturePad()">✏️ Jetzt einrichten</button>
+                  <button class="btn btn-secondary" style="font-size:12px;" onclick="openSavedSignatureEditor()">✏️ Jetzt einrichten</button>
                 </div>`;
             }
           })()}
@@ -11695,7 +11852,7 @@ function renderOnboardingModal() {
 function renderWizard() {
   // Vor dem Wizard-Render: Sync-Felder aus shared in das Doc übernehmen,
   // damit Werte aus Adressbuch / Stammdaten / anderen Docs sichtbar sind.
-  try { reconcileAllSyncGroups(); } catch(e){}
+  try { reconcileAllSyncGroups(); } catch(e){ console.warn("reconcileAllSyncGroups (Wizard) fehlgeschlagen:", e); }
   const doc = DOCS[state.activeDocId];
   const ds = getDocState();
   // Defensive: clamp index in case it's out of bounds
@@ -12348,7 +12505,7 @@ function openPrintWindow(pv, id) {
 
   // Doc-Title temporär ändern, damit PDF-Filename passt
   const oldTitle = document.title;
-  document.title = docTitle + " — " + (state.shared?.name || "");
+  document.title = docTitle + ", " + (state.shared?.name || "");
 
   // Force Browser-Reflow: ohne diesen werden CSS-Änderungen vor window.print()
   // teilweise nicht angewendet (insb. das neu eingefügte @media print Style-Tag).
@@ -12711,6 +12868,7 @@ async function exportAllData() {
   URL.revokeObjectURL(url);
   await markBackupDone();
   showSaveToast("Backup gespeichert");
+  return dump;
 }
 
 function triggerImport() {
@@ -12804,13 +12962,20 @@ function addRow(secId) {
   render();
 }
 function deleteRow(secId, idx) {
-  if (!confirm("Eintrag wirklich entfernen?")) return;
-  const rows = getRows(secId);
-  rows.splice(idx, 1);
-  setRows(secId, rows);
-  shiftAttachmentsAfterRowDelete(secId, idx);
-  saveActiveDoc();
-  render();
+  confirmAction({
+    title: "Eintrag entfernen?",
+    message: "Eintrag wirklich entfernen?",
+    confirmLabel: "Entfernen",
+    danger: true,
+    onConfirm: () => {
+      const rows = getRows(secId);
+      rows.splice(idx, 1);
+      setRows(secId, rows);
+      shiftAttachmentsAfterRowDelete(secId, idx);
+      saveActiveDoc();
+      render();
+    },
+  });
 }
 function toggleCheckOption(secId, optIdx) {
   const sec = DOCS[state.activeDocId].sections.find(s => s.id === secId);
@@ -12971,7 +13136,6 @@ function tdLabel(label, skipped) {
   return `<td class="label ${skipped ? "strike" : ""}">${esc(label)}</td>`;
 }
 function tdValue(val) { return `<td>${esc(val) || "&nbsp;"}</td>`; }
-function tdEmpty() { return `<td>&nbsp;</td><td>&nbsp;</td>`; }
 
 function renderPrintEAR() {
   const ans = (s, f) => valOrSkipPrint(s, f);
@@ -13153,11 +13317,6 @@ function renderPrintZeit() {
     html += `</table>`;
     return html;
   }
-  function sectionIfHasContent(num, title, secId) {
-    const t = rowsTable(secId);
-    return t ? `<h2>${num}. ${title}</h2>${t}` : "";
-  }
-
   const note = ans("anmerkung", "notes");
   const noteSection = (!note.skipped && note.value)
     ? `<h2>10. Anmerkungen / Ergänzungen</h2>${note.value.split("\n").map(l => `<p>${esc(l) || "&nbsp;"}</p>`).join("")}`
@@ -14250,7 +14409,7 @@ function renderPrintAsservate() {
 // PRINT MEINE ZIELE
 // ============================================
 // Persönliche Ziel-Übersicht: einfache, ruhige Druckansicht. Status-farbcodiert
-// so dass „erreicht" sofort sichtbar ist — das ist der Sinn des Drucks: dem
+// so dass „erreicht" sofort sichtbar ist, das ist der Sinn des Drucks: dem
 // Nutzer (oder seiner BH) die eigenen Fortschritte greifbar zeigen.
 function renderPrintZiele() {
   const ans = (s, f) => valOrSkipPrint(s, f);
@@ -14290,7 +14449,7 @@ function renderPrintZiele() {
     else if (x.includes("in arbeit")) { bg = "#dbeafe"; color = "#1e40af"; icon = "⟳ "; }
     else if (x.includes("offen")) { bg = "#fef3c7"; color = "#92400e"; icon = "○ "; }
     else if (x.includes("aufgegeben")) { bg = "#fee2e2"; color = "#991b1b"; icon = "× "; }
-    return `<span style="display:inline-block; padding:1pt 6pt; border-radius:999px; background:${bg}; color:${color}; font-size:9pt; font-weight:600;">${icon}${esc(s || "—")}</span>`;
+    return `<span style="display:inline-block; padding:1pt 6pt; border-radius:999px; background:${bg}; color:${color}; font-size:9pt; font-weight:600;">${icon}${esc(s || "–")}</span>`;
   }
 
   let zieleHtml = "";
@@ -14459,15 +14618,6 @@ function docxCell(text, opts = {}) {
     shading: opts.shade ? { fill: opts.shade, type: D.ShadingType.CLEAR } : undefined,
     margins: cellMargins,
     children: [para]
-  });
-}
-function docxBlankCell(width) {
-  const { D, borders, cellMargins } = docxBase();
-  return new D.TableCell({
-    borders,
-    width: { size: width, type: D.WidthType.DXA },
-    margins: cellMargins,
-    children: [new D.Paragraph({ children: [new D.TextRun({ text: " " })] })]
   });
 }
 function docxSignature(width) {
@@ -15446,7 +15596,7 @@ async function buildSozialDocx() {
   return await D.Packer.toBlob(doc);
 }
 
-// ---- Asservate / Beweismittel docx (landscape — gegenstaende table is wide) ----
+// ---- Asservate / Beweismittel docx (landscape, gegenstaende table is wide) ----
 async function buildAsservateDocx() {
   const { D, PAGE_W, PAGE_H, MARGIN, COLOR_SUB, COLOR_ZEILE, cellMargins } = docxBase();
   const LAND_CONTENT_W = PAGE_H - 2 * MARGIN;
@@ -15522,7 +15672,7 @@ async function buildAsservateDocx() {
     ["Widerspruch im Protokoll:", v("durchsuchung","widerspruch_protokolliert").value, v("durchsuchung","widerspruch_protokolliert").skipped],
   ];
 
-  // Gegenstaende table — landscape gives room for all 11 columns
+  // Gegenstaende table, landscape gives room for all 11 columns
   const rows = (ds.rows && ds.rows.gegenstaende) || [];
   const filtered = rows.filter(r => r.bezeichnung || r.seriennr || r.marke || r.modell);
   let gegenstaendeTbl = null;
@@ -15634,7 +15784,7 @@ async function buildAsservateDocx() {
   return await D.Packer.toBlob(doc);
 }
 
-// ---- Verfahrenskosten docx (landscape — Zahlungs-Tabelle ist breit) ----
+// ---- Verfahrenskosten docx (landscape, Zahlungs-Tabelle ist breit) ----
 async function buildKostenDocx() {
   const { D, PAGE_W, PAGE_H, MARGIN, COLOR_SUB, COLOR_ZEILE } = docxBase();
   const LAND_CONTENT_W = PAGE_H - 2 * MARGIN;
@@ -15805,7 +15955,7 @@ async function buildKostenDocx() {
   return await D.Packer.toBlob(doc);
 }
 
-// ---- BH-Termine docx (landscape — Termin-Tabelle ist breit) ----
+// ---- BH-Termine docx (landscape, Termin-Tabelle ist breit) ----
 async function buildBhtermineDocx() {
   const { D, PAGE_W, PAGE_H, MARGIN, COLOR_SUB, COLOR_ZEILE } = docxBase();
   const LAND_CONTENT_W = PAGE_H - 2 * MARGIN;
@@ -15857,7 +16007,7 @@ async function buildBhtermineDocx() {
     const trs = [new D.TableRow({ tableHeader: true, children: head.map((h, i) => docxCell(h, { width: widths[i], bold: true, shade: COLOR_SUB, size: 18 })) })];
     filteredT.forEach((r, i) => {
       const sh = i % 2 === 0 ? COLOR_ZEILE : null;
-      const notiz = [r.notiz, r.gutes].filter(Boolean).join(" — ");
+      const notiz = [r.notiz, r.gutes].filter(Boolean).join(", ");
       const cells = [r.datum || "", r.uhrzeit || "", r.art || "", r.themen || "", r.vereinbarungen || "", r.status || "", notiz];
       trs.push(new D.TableRow({ children: cells.map((c, ci) => docxCell(c || " ", { width: widths[ci], shade: sh, size: 16 })) }));
     });
@@ -15958,6 +16108,28 @@ function checkBrowserCompat() {
   // Termin-Erinnerungen anwerfen, falls vom Nutzer aktiviert
   scheduleNotifChecks();
 })();
+
+/*
+ * ===========================================================================
+ * SERVICE-WORKER-REGISTRIERUNG (PROTOTYP, BEWUSST NICHT AKTIV), v3.39
+ * ---------------------------------------------------------------------------
+ * Dieser Block ist absichtlich auskommentiert. Ein fehlerhafter Service Worker
+ * kann Nutzer dauerhaft auf einer kaputten Version einsperren. Aktivierung NUR
+ * nach ausdruecklicher menschlicher Freigabe und nach dem Test-Plan in
+ * SW_PROPOSAL_v3.39.md (5 Schritte) inkl. Kill-Switch-Anleitung.
+ *
+ * Zum Scharfschalten: diesen Kommentarblock entfernen UND sicherstellen, dass
+ * CACHE_VERSION in sw.js bei jedem Deploy auf APP_VERSION gezogen wird.
+ *
+ * if ("serviceWorker" in navigator) {
+ *   window.addEventListener("load", () => {
+ *     navigator.serviceWorker.register("./sw.js")
+ *       .then((reg) => console.log("[sw] registriert:", reg.scope))
+ *       .catch((err) => console.warn("[sw] Registrierung fehlgeschlagen:", err));
+ *   });
+ * }
+ * ===========================================================================
+ */
 </script>
 </body>
 </html>

@@ -1,0 +1,20 @@
+# Abhaengigkeiten (das Projekt ist single-file, node_modules nur fuer evtl. Tooling)
+node_modules/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS-Dateien
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor-/Temp-Dateien
+*.tmp
+*.swp
+*~
+_tmp_*
+
+# Temporaere Commit-Message-Dateien (werden ausserhalb des Repos gehalten)
+commit-message-*.txt

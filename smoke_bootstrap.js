@@ -220,7 +220,20 @@ function loadApp() {
       "renderBriefHistoryView: renderBriefHistoryView, renderSettingsView: renderSettingsView," +
       "renderHelpView: renderHelpView, renderAnschreibenView: renderAnschreibenView," +
       "renderImportView: renderImportView, renderInboxView: renderInboxView," +
-      "renderBelegeView: renderBelegeView, renderPreviewToolbar: renderPreviewToolbar }" +
+      "renderBelegeView: renderBelegeView, renderPreviewToolbar: renderPreviewToolbar," +
+      "getAnswer: getAnswer, setAnswer: setAnswer, getDocState: getDocState," +
+      "getRows: getRows, setRows: setRows," +
+      "buildIcsEvent: buildIcsEvent, buildEventFromRow: buildEventFromRow," +
+      "escapeIcs: escapeIcs, toIcsDate: toIcsDate, parseDateGuess: parseDateGuess," +
+      "runGlobalSearch: runGlobalSearch, openGlobalSearch: openGlobalSearch," +
+      "confirmAction: confirmAction, runConfirmAction: runConfirmAction, closeConfirmModal: closeConfirmModal," +
+      "inputModal: inputModal, submitInputModal: submitInputModal, closeInputModal: closeInputModal, setInputModalValue: setInputModalValue," +
+      "deleteRow: deleteRow, deleteInboxItem: deleteInboxItem, deleteSavedSignature: deleteSavedSignature," +
+      "resetSettingsToDefaults: resetSettingsToDefaults, confirmPayment: confirmPayment," +
+      "removeFromInbox: removeFromInbox, _registerActionRef: _registerActionRef," +
+      "safeJsonParse: safeJsonParse, isQuotaError: isQuotaError," +
+      "validateIban: validateIban, validateGermanDate: validateGermanDate," +
+      "validateAmount: validateAmount, validationHintForField: validationHintForField }" +
     "}; } catch(e) { __APP_ERR = e.message + '\\n' + (e.stack||''); }";
 
   js += exportBlock;

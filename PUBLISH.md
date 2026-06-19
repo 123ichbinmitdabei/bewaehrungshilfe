@@ -1,45 +1,47 @@
-# PUBLISH, v3.38
+# PUBLISH, v3.39
 
 **Live-URL:** https://123ichbinmitdabei.github.io/bewaehrungshilfe/
-**Datum:** 2026-06-18
-**Bundle:** ~788 KB (`index.html`)
+**Datum:** 2026-06-19
+**Bundle:** ~797 KB (`index.html`, 815807 Bytes)
 
-## Was in v3.38 gemacht wurde
+## Was in v3.39 gemacht wurde (Härtung und Aufräumen, keine neuen Features)
 
-### Verifikation der v3.37-Fixes (Aufgabe A)
-- Adressbuch-Sync: alle 14 `DATA_SYNC_GROUPS` zeigen auf existierende Doc-Felder, kein Mapping-Fix noetig.
-- Zweistufiger Loesch-Klick (Kontakt + Vorlage) verifiziert (Toggle + 3-Sekunden-Timeout).
-- Print-Reflow verifiziert (`void offsetHeight` + `requestAnimationFrame` + `setTimeout(100)` + try/catch + `alert()`).
-- FIX: leerer Brief-Container im Brief-Druck loest jetzt explizit `alert()` aus.
+### Paket A, Funktions-Vollaudit
+- Jeder Wizard und jede Hauptansicht im leeren und gefuellten Zustand gerendert (kein Crash).
+- Feld-Roundtrip je Wizard, Sync bidirektional (14 Gruppen plus 10 Kontakt-Rollen).
+- Pipelines: ICS/VCALENDAR, globale Suche, Achievements, Timeline, Setup-Checkliste, Backup-Export plus Re-Import-Identitaet.
+- Bericht: `FUNKTIONS_AUDIT_v3.39.md`. Test: `smoke_v339_funktion.js` (149 Asserts).
 
-### Personendaten-Audit (Aufgabe B)
-- 1 Fund gefixt: realer Arbeitgebername `Mariana Cannabis e.V.` im Platzhalter ersetzt durch `Muster GmbH`.
-- 5 akzeptable Vorkommen dokumentiert (Regex-Beispiele, Standard-Platzhalter, oeffentliche Institutionen, Deploy-URL).
-- Keine echten E-Mails, keine IBAN im Quelltext.
-- Bericht: `PERSONENDATEN_AUDIT.md`.
+### Paket B, Logik / Dead-Code / Konsistenz
+- 1 kaputter Handler gefixt, 7 tote Funktionen plus 1 Variable und 3 tote CSS-Regeln entfernt, 11 leere catch-Blöcke mit `console.warn` versehen.
+- Test: `smoke_v339_logik.js` (25 Asserts, inkl. Handler-Integritaet und em-dash-Guard).
 
-### Cross-Browser-Audit (Aufgabe C)
-- Statische Analyse iOS Safari, Chrome Android, Firefox, Desktop, Tablets.
-- Kein Service Worker, kein crypto.randomUUID, navigator.share mit Fallback, Inline-Print.
-- Offener Punkt (nur dokumentiert): 18 confirm() + 2 prompt() verbleiben (fail-safe), Migration als v3.39 vorgemerkt.
-- Live-Symptome dokumentiert (PC-Sync, Drucken Handy+PC).
-- Bericht: `CROSS_BROWSER_REPORT.md`, Endnutzer-Hilfe: `TROUBLESHOOTING.md`.
+### Paket C, Cross-Platform und Dialoge
+- `inputModal` als prompt-Ersatz, 5 destruktive confirm plus 1 prompt migriert (Invariant: keine destruktive Aktion ohne Bestaetigung).
+- `printFormular` Reflow ergaenzt, kein `window.open` mehr im Druckpfad.
+- Bericht: `CROSS_BROWSER_REPORT_v3.39.md`. Test: `smoke_v339_dialoge.js` (40 Asserts).
 
-### Vollstaendiger Selbsttest (Aufgabe D)
-- `smoke_v338_full.js`: 206 Asserts, alle gruen.
-- `smoke_v338_sync.js`: 105 Asserts, alle gruen.
-- Lauf-Harness: `smoke_bootstrap.js` (gemockte Browser-Globals), `check_js.js` (Parse-Check).
+### Paket D, Robustheit
+- Storage-Quota-Behandlung mit Nutzerhinweis, `safeJsonParse`-Lade-Guards, Eingabe-Validatoren (IBAN/Datum/Betrag, nur Hinweis).
+- Test: `smoke_v339_robust.js` (40 Asserts).
 
-### Roadmap v4 (Aufgabe E)
-- `ROADMAP_v4.md`: PDF-Annotation, E2E-Cloud-Sync, KI-Brief, plus Service Worker mit Versions-Hash.
+### Paket E, Repo-Aufräumen
+- Scratch-Datei entfernt, Work Orders nach `work-orders/`, `.gitignore` angelegt.
+
+### Paket F, Regression und Release
+- `PERSONENDATEN_AUDIT_v3.39.md` (sauber), em-dash-Scan (0 U+2014), Version-Bump v3.39.
+
+### Paket G, Service-Worker-Vorschlag (NICHT aktiviert)
+- `sw.js` Prototyp plus `SW_PROPOSAL_v3.39.md`. Registrierung in `index.html` nur auskommentiert. Aktivierung erfordert ausdrueckliche menschliche Freigabe.
 
 ## Deploy-Schritte
 1. `node check_js.js` (Parse OK).
-2. `node smoke_v338_sync.js` und `node smoke_v338_full.js` (alle gruen).
-3. `APP_VERSION = "v3.38"` gesetzt.
-4. Commit + Push auf `main`, GitHub Pages baut automatisch.
+2. `node smoke_v338_sync.js`, `node smoke_v338_full.js`, alle `node smoke_v339_*.js` (565 Asserts gruen).
+3. `APP_VERSION = "v3.39"` gesetzt, README-Footer v3.39.
+4. Commit (Message via `-F`) plus Push auf `main`, GitHub Pages baut automatisch. KEIN force-push.
 
 ## Nach dem Deploy (wichtig)
-- Auf Test-Geraeten einen Hard-Reload machen (siehe `TROUBLESHOOTING.md`), sonst bleibt am PC eventuell die alte Version aktiv.
-- Live-URL pruefen: Footer zeigt `v3.38`.
-- Drucken auf Handy und PC nach Hard-Reload erneut testen.
+- Auf Test-Geraeten Hard-Reload (siehe `TROUBLESHOOTING.md`), sonst bleibt am PC eventuell die alte Version aktiv.
+- Live-URL pruefen: Footer zeigt `v3.39`.
+- Drucken auf Handy und PC nach Hard-Reload erneut testen (alle Druckpfade haben jetzt Reflow).
+- Destruktive Aktionen (Loeschen, Reset, Zahlung-bezahlt) zeigen jetzt In-App-Modals statt nativer Dialoge.
