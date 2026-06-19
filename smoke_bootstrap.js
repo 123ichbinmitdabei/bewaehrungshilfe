@@ -228,7 +228,8 @@ function loadApp() {
       "runGlobalSearch: runGlobalSearch, openGlobalSearch: openGlobalSearch," +
       "confirmAction: confirmAction, runConfirmAction: runConfirmAction, closeConfirmModal: closeConfirmModal," +
       "confirmAsync: confirmAsync, confirmAppointment: confirmAppointment, handleSozialDone: handleSozialDone," +
-      "resetAppCache: resetAppCache," +
+      "showNextModal: showNextModal, getModalQueueLength: function(){ return modalQueue.length; }, clearModalQueue: function(){ modalQueue.length = 0; }," +
+      "resetAppCache: resetAppCache, isOwnBhCache: isOwnBhCache, isOwnBhScope: isOwnBhScope," +
       "inputModal: inputModal, submitInputModal: submitInputModal, closeInputModal: closeInputModal, setInputModalValue: setInputModalValue," +
       "deleteRow: deleteRow, deleteInboxItem: deleteInboxItem, deleteSavedSignature: deleteSavedSignature," +
       "resetSettingsToDefaults: resetSettingsToDefaults, confirmPayment: confirmPayment," +

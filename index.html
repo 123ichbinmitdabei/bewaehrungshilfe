@@ -2313,21 +2313,35 @@ function safeJsonParse(raw, fallback, label) {
   }
 }
 
+// Praedikate, damit Reset/Cleanup NUR eigene Ressourcen anfassen. Die Origin
+// 123ichbinmitdabei.github.io wird von mehreren GitHub-Pages-Projekten geteilt,
+// daher duerfen wir niemals fremde Caches/Service-Worker mit wegraeumen.
+// Gleiches Muster wie selectCachesToDelete in sw.js (Regex ^bh-cache-).
+function isOwnBhCache(name) {
+  return typeof name === "string" && /^bh-cache-/.test(name);
+}
+function isOwnBhScope(scope) {
+  return typeof scope === "string" && scope.indexOf("/bewaehrungshilfe/") !== -1;
+}
+
 // Notfall-Reset des App-Caches (Service Worker + Netz-Cache), z.B. wenn nach einem
-// Update die alte Version haengt. Faesst NUR den Netz-Cache an, NIEMALS localStorage:
-// Nutzerdaten (Eingaben, Belege, Kontakte) bleiben vollstaendig erhalten.
+// Update die alte Version haengt. Faesst NUR die EIGENEN Netz-Ressourcen an, NIEMALS
+// localStorage: Nutzerdaten (Eingaben, Belege, Kontakte) bleiben vollstaendig erhalten.
 // Defensiv: fehlende serviceWorker/caches-APIs werden uebersprungen, am Ende reload.
 async function resetAppCache() {
   try {
     if (typeof navigator !== "undefined" && navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
       const regs = await navigator.serviceWorker.getRegistrations();
-      await Promise.all((regs || []).map((r) => r.unregister()));
+      // Nur eigene Service-Worker (Scope enthaelt /bewaehrungshilfe/) deregistrieren.
+      // Konservativ: unbekannter/leerer Scope -> NICHT deregistrieren (fremde Apps schonen).
+      await Promise.all((regs || []).filter((r) => isOwnBhScope(r && r.scope)).map((r) => r.unregister()));
     }
   } catch (e) { console.warn("Service-Worker-Deregistrierung fehlgeschlagen:", e); }
   try {
     if (typeof caches !== "undefined" && caches.keys) {
       const keys = await caches.keys();
-      await Promise.all((keys || []).map((k) => caches.delete(k)));
+      // Nur eigene Caches (bh-cache-*) loeschen, fremde Caches anderer Apps bleiben unberuehrt.
+      await Promise.all((keys || []).filter(isOwnBhCache).map((k) => caches.delete(k)));
     }
   } catch (e) { console.warn("Cache-Loeschung fehlgeschlagen:", e); }
   // localStorage wird BEWUSST nicht angefasst (Nutzerdaten bleiben erhalten).
@@ -5460,7 +5474,7 @@ let showArchived = false;
 function toggleShowArchived() { showArchived = !showArchived; render(); }
 
 // === VERSION INFO ===
-const APP_VERSION = "v3.40";
+const APP_VERSION = "v3.41";
 
 // === ONBOARDING ===
 let onboardingActive = false;
@@ -8563,7 +8577,26 @@ function addCustomTemplate() {
 // ── Generisches Bestätigungs-Modal ───────────────────────────────────────
 // Ersetzt confirm(), auf iOS-PWAs und Safari ist confirm() unzuverlässig.
 // State: confirmModal = { title, message, onConfirm, confirmLabel, danger }
+// ── Modal-Nebenlaeufigkeit: leichte FIFO-Warteschlange ─────────────────────
+// Es gibt nur je einen Slot (state.confirmModal / state.inputModal). Wird ein
+// zweites Modal geoeffnet waehrend eines offen ist, wird es eingereiht statt das
+// erste still zu ueberschreiben. modalQueue ist TRANSIENT (nie nach localStorage).
+let modalQueue = [];
+function modalIsOpen() { return !!(state.confirmModal || state.inputModal); }
+// Oeffnet das naechste eingereihte Modal (FIFO), aber nur wenn gerade keines offen
+// ist. Oeffnet ueber denselben Pfad wie ein frischer Aufruf (rendert dort selbst).
+function showNextModal() {
+  if (modalIsOpen()) return;          // aktives Modal nie ueberschreiben
+  if (!modalQueue.length) return;
+  const next = modalQueue.shift();
+  if (next.kind === "confirm") confirmAction(next.args);
+  else if (next.kind === "input") inputModal(next.args.message, next.args.opts);
+}
+
 function confirmAction(opts) {
+  // Bereits ein Modal aktiv? Dann einreihen statt ueberschreiben (fail-safe).
+  if (modalIsOpen()) { modalQueue.push({ kind: "confirm", args: opts || {} }); return; }
+  opts = opts || {};
   state.confirmModal = {
     title: opts.title || "Bestätigen?",
     message: opts.message || "",
@@ -8594,6 +8627,7 @@ function closeConfirmModal() {
     try { m.onCancel(); } catch(e) { console.error("confirmAction onCancel:", e); }
   }
   render();
+  showNextModal(); // ggf. naechstes eingereihtes Modal oeffnen (falls Callback keines oeffnete)
 }
 function runConfirmAction() {
   const m = state.confirmModal;
@@ -8602,6 +8636,7 @@ function runConfirmAction() {
     try { m.onConfirm(); } catch(e) { console.error("confirmAction onConfirm:", e); }
   }
   render();
+  showNextModal();
 }
 function renderConfirmModal() {
   const m = state.confirmModal;
@@ -8627,6 +8662,8 @@ function renderConfirmModal() {
 // State: inputModal = { title, message, value, placeholder, okLabel, onOk }
 function inputModal(message, opts) {
   opts = opts || {};
+  // Bereits ein Modal aktiv? Dann einreihen statt ueberschreiben (fail-safe).
+  if (modalIsOpen()) { modalQueue.push({ kind: "input", args: { message: message, opts: opts } }); return; }
   state.inputModal = {
     title: opts.title || "Eingabe",
     message: message || "",
@@ -8641,7 +8678,7 @@ function inputModal(message, opts) {
     if (el) { el.focus(); if (el.select) el.select(); }
   }, 40);
 }
-function closeInputModal() { state.inputModal = null; render(); }
+function closeInputModal() { state.inputModal = null; render(); showNextModal(); }
 function setInputModalValue(v) { if (state.inputModal) state.inputModal.value = v; }
 function submitInputModal() {
   const m = state.inputModal;
@@ -8650,6 +8687,7 @@ function submitInputModal() {
     try { m.onOk(m.value); } catch(e) { console.error("inputModal onOk:", e); }
   }
   render();
+  showNextModal();
 }
 function renderInputModal() {
   const m = state.inputModal;

@@ -49,11 +49,12 @@ async function main() {
   var unregistered = 0;
   var deletedCaches = [];
   var reloaded = 0;
+  // Seit v3.41 deregistriert resetAppCache nur SWs mit eigenem Scope.
   ctx.navigator.serviceWorker = {
     getRegistrations: function () {
       return Promise.resolve([
-        { unregister: function () { unregistered++; return Promise.resolve(true); } },
-        { unregister: function () { unregistered++; return Promise.resolve(true); } },
+        { scope: "https://x/bewaehrungshilfe/", unregister: function () { unregistered++; return Promise.resolve(true); } },
+        { scope: "https://x/bewaehrungshilfe/", unregister: function () { unregistered++; return Promise.resolve(true); } },
       ]);
     },
   };
@@ -65,7 +66,7 @@ async function main() {
 
   await app.fns.resetAppCache();
 
-  eq(unregistered, 2, "resetAppCache deregistriert alle Service Worker");
+  eq(unregistered, 2, "resetAppCache deregistriert eigene Service Worker (Scope /bewaehrungshilfe/)");
   eq(deletedCaches.length, 2, "resetAppCache loescht alle Caches");
   ok(deletedCaches.indexOf("bh-cache-v3.39") >= 0 && deletedCaches.indexOf("bh-cache-v3.40") >= 0, "resetAppCache loescht die richtigen Cache-Namen");
   eq(reloaded, 1, "resetAppCache laedt die Seite neu");
