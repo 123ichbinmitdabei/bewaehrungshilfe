@@ -1,0 +1,211 @@
+{
+  "version": 4,
+  "appVersion": "v3.42",
+  "exportedAt": "2026-06-19T12:00:00.000Z",
+  "theme": "light",
+  "shared": {
+    "name": "Mustermann, Max",
+    "geburtsdatum": "01.01.1990",
+    "anschrift": "Beispielstraße 1, 12345 Musterstadt",
+    "telefon": "0151 0000000",
+    "email": "max.mustermann@example.com",
+    "familienstand": "ledig",
+    "aktenzeichen": "1 Js 1234/21",
+    "bewaehrungshelfer": "Erika Beispiel",
+    "bh_email": "erika.beispiel@example.org",
+    "bewaehrung_beginn": "01.03.2024",
+    "bewaehrung_ende": "28.02.2027"
+  },
+  "settings": {
+    "hiddenDocs": [],
+    "backupReminderDays": 14,
+    "showInstallBanner": true,
+    "showBackupReminder": true,
+    "showTodayOverview": true,
+    "showNextAppointments": true,
+    "showBewaehrungProgress": true,
+    "showAchievements": true,
+    "showStats": true,
+    "showQuickAdd": true
+  },
+  "docs": {
+    "ear": {
+      "answers": {
+        "arbeit.lohn": "1450,00",
+        "sozial.buergergeld": "0,00",
+        "wohnen.miete": "650,00",
+        "wohnen.strom": "70,00",
+        "personal.zeitraum": "Mai 2026"
+      },
+      "currentIdx": 0,
+      "signatures": {}
+    },
+    "zeit": {
+      "answers": {},
+      "currentIdx": 0,
+      "rows": {
+        "stationen": [
+          {
+            "von": "2018",
+            "bis": "2022",
+            "art": "Wohnung",
+            "beschreibung": "Beispielstraße 1, Musterstadt"
+          }
+        ]
+      },
+      "signatures": {}
+    },
+    "thera": {
+      "answers": {
+        "info.therapeut": "Test Therapeut"
+      },
+      "currentIdx": 0,
+      "rows": {},
+      "checks": {},
+      "signatures": {}
+    },
+    "schadens": {
+      "answers": {
+        "info.gesamt": "1200,00"
+      },
+      "currentIdx": 0,
+      "rows": {
+        "zahlungen": [
+          {
+            "datum": "10.05.2026",
+            "betrag": "100,00",
+            "zweck": "Rate Schadenswiedergutmachung",
+            "status": "bezahlt"
+          }
+        ]
+      },
+      "attachments": {},
+      "signatures": {}
+    },
+    "sozial": {
+      "answers": {},
+      "currentIdx": 0,
+      "rows": {
+        "stunden": [
+          {
+            "datum": "12.05.2026",
+            "einrichtung": "Beispiel-Verein e.V.",
+            "stunden": "4",
+            "taetigkeit": "Garten"
+          }
+        ]
+      },
+      "attachments": {},
+      "signatures": {}
+    },
+    "uebersicht": {
+      "answers": {},
+      "currentIdx": 0
+    },
+    "bhtermine": {
+      "answers": {},
+      "currentIdx": 0,
+      "rows": {
+        "termine": [
+          {
+            "datum": "20.06.2026",
+            "uhrzeit": "10:00",
+            "ort": "Bewährungshilfe Musterstadt",
+            "notiz": "Regeltermin",
+            "status": "geplant"
+          }
+        ]
+      },
+      "signatures": {}
+    },
+    "kosten": {
+      "answers": {
+        "info.gesamt": "800,00"
+      },
+      "currentIdx": 0,
+      "rows": {
+        "posten": [
+          {
+            "art": "Gerichtskosten",
+            "betrag": "800,00",
+            "glaeubiger": "Landesjustizkasse",
+            "status": "offen"
+          }
+        ]
+      },
+      "attachments": {},
+      "signatures": {}
+    },
+    "asservate": {
+      "answers": {
+        "verfahren.az": "1 Js 1234/21"
+      },
+      "currentIdx": 0,
+      "rows": {
+        "gegenstaende": [
+          {
+            "bezeichnung": "Mobiltelefon",
+            "marke": "Beispiel",
+            "seriennummer": "SN-TEST-0001",
+            "status": "beschlagnahmt"
+          }
+        ]
+      },
+      "attachments": {},
+      "signatures": {}
+    },
+    "ziele": {
+      "answers": {
+        "ziele.eins": "Schulden abbauen"
+      },
+      "currentIdx": 0,
+      "rows": {},
+      "signatures": {}
+    }
+  },
+  "notes": [
+    {
+      "id": "n_testdaten_1",
+      "text": "Beispiel-Notiz: Unterlagen für nächsten BH-Termin vorbereiten.",
+      "category": "bh",
+      "createdAt": "2026-06-01T08:00:00.000Z",
+      "done": false
+    }
+  ],
+  "inbox": [],
+  "contacts": [
+    {
+      "id": "c_testdaten_bh",
+      "rolle": "bh",
+      "name": "Erika Beispiel",
+      "firma": "Bewährungshilfe Musterstadt",
+      "email": "erika.beispiel@example.org",
+      "telefon": "030 0000000",
+      "anschrift": "Amtsweg 2, 12345 Musterstadt",
+      "notiz": ""
+    },
+    {
+      "id": "c_testdaten_anwalt",
+      "rolle": "anwalt",
+      "name": "Rechtsanwältin Test",
+      "firma": "Kanzlei Beispiel",
+      "email": "kanzlei@example.com",
+      "telefon": "030 0000001",
+      "anschrift": "Marktplatz 3, 12345 Musterstadt",
+      "notiz": ""
+    }
+  ],
+  "briefHistory": [
+    {
+      "id": "b_testdaten_1",
+      "tplKey": "ratenzahlung",
+      "title": "Antrag auf Ratenzahlung",
+      "mode": "drucken",
+      "erstelltAm": "2026-05-15T09:00:00.000Z",
+      "status": "erstellt",
+      "statusNotiz": ""
+    }
+  ],
+  "customTemplates": {},
+  "terminPrep": {}
+}

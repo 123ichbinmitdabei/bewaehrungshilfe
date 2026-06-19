@@ -118,6 +118,9 @@
     border: none; border-radius: 10px; padding: 10px 18px;
     font-size: 14px; font-weight: 600; cursor: pointer;
     transition: all .15s; font-family: inherit;
+    /* v3.42 (Paket D): Mindest-Trefferflaeche nach Apple HIG, ohne die Schrift
+       zu vergroessern. Inhalt bleibt vertikal zentriert (Button-UA-Default). */
+    min-height: 44px;
   }
   .btn-primary { background: var(--primary); color: white; }
   .btn-primary:hover { background: var(--primary-light); }
@@ -178,8 +181,10 @@
   }
   .home-header-actions .btn-icon {
     /* Reine Icon-Knöpfe: kompakt, quadratisch, kein Label */
+    /* v3.42 (Paket D): volle 44x44 Trefferflaeche, Icon-Groesse unveraendert. */
     padding: 8px 10px;
-    min-width: 38px;
+    min-width: 44px;
+    min-height: 44px;
     font-size: 15px;
     line-height: 1;
   }
@@ -1320,6 +1325,86 @@
     .print-view h2 { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     .print-view td, .print-view th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   }
+  /* === TESTMODUS START === */
+  /* v3.42 (Paket L): eigenes, isoliertes Styling fuer den Test-Modus. Komplett
+     ueber .tm- gescoped, kein Eingriff in bestehende App-Styles. In einem Schritt
+     mit dem JS-Block und dem Settings-Knopf entfernbar (gleiche Marker). */
+  #testmodusRoot {
+    max-width: 860px; margin: 0 auto; padding: 16px 16px 80px;
+  }
+  .tm-bar {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+    margin-bottom: 14px;
+  }
+  .tm-bar h1 { margin: 0; font-size: 22px; flex: 1 1 auto; }
+  .tm-hinweis {
+    background: rgba(217, 119, 6, 0.10); border: 1px solid var(--warn, #f9c74f);
+    border-radius: 10px; padding: 12px 16px; font-size: 13px; line-height: 1.5;
+    margin-bottom: 14px;
+  }
+  .tm-section {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 16px; margin-bottom: 14px;
+  }
+  .tm-summary {
+    display: flex; flex-wrap: wrap; gap: 8px; font-size: 13px; margin-bottom: 6px;
+  }
+  .tm-pill {
+    padding: 4px 10px; border-radius: 999px; font-weight: 600;
+    background: var(--primary-soft); color: var(--primary); min-height: 0;
+  }
+  .tm-pill.fehler { background: rgba(220, 38, 38, 0.12); color: var(--danger, #dc2626); }
+  .tm-pill.bestanden { background: rgba(34, 139, 84, 0.14); color: #228b54; }
+  .tm-filter { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 0; }
+  .tm-filter .btn { padding: 8px 14px; }
+  .tm-filter .btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+  .tm-progress-track { height: 8px; background: var(--border); border-radius: 999px; overflow: hidden; margin: 8px 0; }
+  .tm-progress-fill { height: 100%; background: var(--accent, #5aa06f); border-radius: 999px; transition: width .2s; }
+  .tm-case {
+    border: 1px solid var(--border); border-radius: 12px; padding: 14px;
+    margin-bottom: 12px; background: var(--card);
+  }
+  .tm-case.s-fehler { border-left: 4px solid var(--danger, #dc2626); }
+  .tm-case.s-bestanden { border-left: 4px solid #228b54; }
+  .tm-case.s-blockiert { border-left: 4px solid var(--warn, #f9c74f); }
+  .tm-case.s-uebersprungen { border-left: 4px solid var(--text-soft, #888); }
+  .tm-case-head { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; }
+  .tm-case-head .tm-id { font-size: 11px; color: var(--text-soft); font-family: monospace; }
+  .tm-case-head .tm-bereich {
+    font-size: 11px; padding: 2px 8px; border-radius: 999px;
+    background: var(--primary-soft); color: var(--primary); font-weight: 600;
+  }
+  .tm-case-head .tm-titel { font-weight: 700; font-size: 15px; flex: 1 1 100%; }
+  .tm-case ol { margin: 8px 0; padding-left: 20px; font-size: 13px; line-height: 1.5; }
+  .tm-erwartung { font-size: 13px; background: var(--bg); border-radius: 8px; padding: 8px 10px; margin: 6px 0; }
+  .tm-status-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+  .tm-status-row .btn { padding: 8px 12px; font-size: 13px; }
+  .tm-status-row .btn.sel-bestanden { background: #228b54; color: #fff; border-color: #228b54; }
+  .tm-status-row .btn.sel-fehler { background: var(--danger, #dc2626); color: #fff; border-color: var(--danger, #dc2626); }
+  .tm-status-row .btn.sel-uebersprungen { background: var(--text-soft, #888); color: #fff; }
+  .tm-status-row .btn.sel-blockiert { background: var(--warn, #f9c74f); color: #1a1a1a; }
+  .tm-case textarea {
+    width: 100%; min-height: 52px; padding: 10px; border: 1px solid var(--border);
+    border-radius: 8px; font-family: inherit; font-size: 14px; resize: vertical;
+    box-sizing: border-box;
+  }
+  .tm-thumbs { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+  .tm-thumb { position: relative; }
+  .tm-thumb img { width: 84px; height: 84px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border); }
+  .tm-thumb button {
+    position: absolute; top: -8px; right: -8px; width: 24px; height: 24px;
+    min-height: 24px; border-radius: 999px; border: none; cursor: pointer;
+    background: var(--danger, #dc2626); color: #fff; font-size: 13px; line-height: 1;
+  }
+  .tm-file-label {
+    display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+    margin-top: 8px; padding: 10px 14px; min-height: 44px; border-radius: 10px;
+    background: white; color: var(--text); border: 1px solid var(--border);
+    font-size: 13px; font-weight: 600;
+  }
+  .tm-file-label input { display: none; }
+  [data-theme="dark"] .tm-file-label { background: var(--card); }
+  /* === TESTMODUS ENDE === */
 </style>
 </head>
 <body>
@@ -5474,7 +5559,7 @@ let showArchived = false;
 function toggleShowArchived() { showArchived = !showArchived; render(); }
 
 // === VERSION INFO ===
-const APP_VERSION = "v3.41";
+const APP_VERSION = "v3.42";
 
 // === ONBOARDING ===
 let onboardingActive = false;
@@ -9990,6 +10075,14 @@ function renderSettingsView() {
         <p class="settings-section-desc">Hilft, wenn die App nach einem Update auf einer alten Version hängt oder sich seltsam verhält. Leert nur den App-Zwischenspeicher (Service Worker und Netz-Cache) und lädt frisch neu. <strong>Deine Daten bleiben erhalten</strong>, es werden keine Eingaben, Belege oder Kontakte gelöscht.</p>
         <button class="btn btn-secondary" onclick="resetAppCache()" style="margin-top:8px;">🧹 Cache leeren und neu laden</button>
       </div>
+
+      <!-- === TESTMODUS START === -->
+      <div class="settings-section">
+        <h2>🧪 Test-Modus</h2>
+        <p class="settings-section-desc">Strukturiertes Durchtesten aller Funktionen, Schritt für Schritt, mit Status, Notiz und Screenshot je Fall. Speichert nur Test-Ergebnisse und fasst deine echten Daten nicht an. Zum Testen mit Beispiel-Daten ein privates Fenster nutzen (Anleitung im Test-Modus).</p>
+        <button class="btn btn-secondary" onclick="openTestmodus()" style="margin-top:8px;">🧪 Test-Modus, strukturiertes Durchtesten</button>
+      </div>
+      <!-- === TESTMODUS ENDE === -->
 
       <div class="settings-section" style="background:var(--primary-soft); border-color:var(--primary-light);">
         <h2>💡 Tipp</h2>
@@ -16234,6 +16327,622 @@ function checkBrowserCompat() {
   }
   return true;
 }
+
+// === TESTMODUS START ===
+// v3.42 (Paket L): Eingebauter, strukturierter Test-Modus zum manuellen
+// Durchtesten aller Funktionen. HARTE REGELN (Datensicherheit):
+//   1. Speichert AUSSCHLIESSLICH unter localStorage-Keys mit Praefix "bh_test_".
+//      Liest und schreibt NIE App-Daten-Keys.
+//   2. Kein In-Place-Laden von Dummy-Daten. testdaten.json gibt es nur als
+//      Download, Import bitte im privaten Fenster.
+//   3. Kein Schema-/Backup-Format-Eingriff. tmBuildTestdaten bildet nur das
+//      vorhandene Export-Format (Version 4) nach.
+//   4. Inert: nur ueber Settings-Knopf oder #testmodus erreichbar.
+//   5. Sauber entfernbar: dieser Block, der CSS-Block und der Settings-Knopf
+//      (alle mit den Markern TESTMODUS START/ENDE). Siehe TESTMODUS_v3.42.md.
+const BH_TEST_RESULTS_KEY = "bh_test_results_v1";
+const TM_MAX_IMAGE_EDGE = 1000;
+const TM_IMAGE_QUALITY = 0.7;
+const TM_STATI = [
+  { key: "offen", label: "offen", icon: "" },
+  { key: "bestanden", label: "Bestanden", icon: "✅" },
+  { key: "fehler", label: "Fehler", icon: "❌" },
+  { key: "uebersprungen", label: "Übersprungen", icon: "⏭️" },
+  { key: "blockiert", label: "Blockiert", icon: "🚧" },
+];
+
+const TEST_CASES = [
+  // --- Stammdaten / Onboarding ---
+  { id: "stamm-1", bereich: "Stammdaten/Onboarding", titel: "Onboarding beim ersten Start",
+    schritte: ["App in einem frischen Profil oder privaten Fenster öffnen.", "Onboarding-Dialog ausfüllen (mindestens Name).", "Auf Speichern tippen."],
+    erwartung: "Onboarding erscheint nur beim ersten Start. Nach dem Speichern zeigt die Startseite die Stammdaten, kein erneutes Onboarding." },
+  { id: "stamm-2", bereich: "Stammdaten/Onboarding", titel: "Stammdaten nachträglich ändern",
+    schritte: ["EAR öffnen, Abschnitt Persönliche Angaben.", "Namen oder Anschrift ändern.", "Hard-Reload der Seite."],
+    erwartung: "Geänderter Wert ist nach dem Reload erhalten." },
+  { id: "stamm-3", bereich: "Stammdaten/Onboarding", titel: "Geteilte Felder (🔗) übernehmen",
+    schritte: ["Ein mit 🔗 markiertes Feld in einem Dokument ausfüllen.", "Ein anderes Dokument mit demselben Feld öffnen."],
+    erwartung: "Der Wert erscheint automatisch im zweiten Dokument." },
+
+  // --- Die 10 Wizards ---
+  { id: "wiz-uebersicht", bereich: "Wizards", titel: "Status-Übersicht (read-only)",
+    schritte: ["Status-Übersicht öffnen."],
+    erwartung: "Übersicht wird korrekt angezeigt und fasst die anderen Dokumente zusammen, kein Eingabefeld nötig." },
+  { id: "wiz-bhtermine", bereich: "Wizards", titel: "BH-Termine: Feld speichern und Reload",
+    schritte: ["BH-Termine öffnen.", "Einen Termin (Datum, Notiz) eintragen.", "Hard-Reload."],
+    erwartung: "Eingetragener Termin ist nach dem Reload erhalten." },
+  { id: "wiz-ear", bereich: "Wizards", titel: "EAR: Text, Zahl, Datum speichern und Reload",
+    schritte: ["EAR öffnen.", "Je ein Text-, Zahl- und Datumsfeld ausfüllen.", "Hard-Reload."],
+    erwartung: "Alle drei Werte sind nach dem Reload erhalten." },
+  { id: "wiz-schadens", bereich: "Wizards", titel: "Schadenswiedergutmachung: Zahlung und Reload",
+    schritte: ["Schadenswiedergutmachung öffnen.", "Eine Zahlung in der Tabelle eintragen.", "Hard-Reload."],
+    erwartung: "Zahlung und Fortschritt sind nach dem Reload erhalten." },
+  { id: "wiz-kosten", bereich: "Wizards", titel: "Verfahrenskosten: Feld speichern und Reload",
+    schritte: ["Verfahrenskosten öffnen.", "Einen Kostenposten und eine Zahlung eintragen.", "Hard-Reload."],
+    erwartung: "Werte sind nach dem Reload erhalten." },
+  { id: "wiz-sozial", bereich: "Wizards", titel: "Sozialstunden: Stundeneintrag und Reload",
+    schritte: ["Sozialstunden öffnen.", "Einen Stundeneintrag hinzufügen.", "Hard-Reload."],
+    erwartung: "Stundeneintrag und Summe sind nach dem Reload erhalten." },
+  { id: "wiz-thera", bereich: "Wizards", titel: "Therapie-Bestätigung: Feld und Reload",
+    schritte: ["Therapie öffnen.", "Ein Feld ausfüllen, eine Checkbox setzen.", "Hard-Reload."],
+    erwartung: "Werte sind nach dem Reload erhalten." },
+  { id: "wiz-zeit", bereich: "Wizards", titel: "Zeitstrahl: Eintrag und Reload",
+    schritte: ["Zeitstrahl öffnen.", "Eine Station (z.B. Wohnung) eintragen.", "Hard-Reload."],
+    erwartung: "Station ist nach dem Reload erhalten." },
+  { id: "wiz-asservate", bereich: "Wizards", titel: "Asservate: Gegenstand und Reload",
+    schritte: ["Asservate öffnen.", "Einen Gegenstand mit Bezeichnung eintragen.", "Hard-Reload."],
+    erwartung: "Gegenstand ist nach dem Reload erhalten." },
+  { id: "wiz-ziele", bereich: "Wizards", titel: "Ziele: Eintrag und Reload",
+    schritte: ["Ziele öffnen.", "Ein Ziel eintragen.", "Hard-Reload."],
+    erwartung: "Ziel ist nach dem Reload erhalten." },
+
+  // --- Adressbuch und Sync ---
+  { id: "adr-1", bereich: "Adressbuch/Sync", titel: "Kontakt anlegen",
+    schritte: ["Adressbuch öffnen.", "Neuen Kontakt mit einer Rolle anlegen."],
+    erwartung: "Neuer Kontakt erscheint in der Liste." },
+  { id: "adr-2", bereich: "Adressbuch/Sync", titel: "Kontakt-Feld speichern und Reload",
+    schritte: ["Bei einem Kontakt Name und Telefon eintragen.", "Hard-Reload, Adressbuch öffnen."],
+    erwartung: "Kontaktdaten sind nach dem Reload erhalten." },
+  { id: "adr-3", bereich: "Adressbuch/Sync", titel: "Sync Stammdaten nach Adressbuch",
+    schritte: ["Stammdaten ändern (z.B. Bewährungshelfer/in).", "Adressbuch öffnen."],
+    erwartung: "Der geänderte Wert ist im passenden Kontakt sichtbar." },
+  { id: "adr-4", bereich: "Adressbuch/Sync", titel: "Sync Adressbuch nach Dokument",
+    schritte: ["Im Adressbuch ein gemapptes Feld ändern.", "Ein Dokument öffnen, das dieses Feld nutzt."],
+    erwartung: "Das Dokument zeigt den aktualisierten Wert." },
+
+  // --- Briefe und Vorlagen ---
+  { id: "brief-1", bereich: "Briefe/Vorlagen", titel: "Anschreiben öffnen und Vorlage wählen",
+    schritte: ["Bereich Briefe öffnen.", "Eine Vorlage auswählen."],
+    erwartung: "Brieftext der Vorlage wird angezeigt." },
+  { id: "brief-2", bereich: "Briefe/Vorlagen", titel: "Platzhalter aus Stammdaten gefüllt",
+    schritte: ["Eine Vorlage mit Platzhaltern wählen."],
+    erwartung: "Name, Anschrift, Aktenzeichen sind aus den Stammdaten eingesetzt." },
+  { id: "brief-3", bereich: "Briefe/Vorlagen", titel: "Eigene Vorlage anlegen",
+    schritte: ["Eigene Vorlage anlegen (Titel und Text).", "Speichern."],
+    erwartung: "Eigene Vorlage erscheint in der Vorlagenliste und bleibt nach Reload erhalten." },
+  { id: "brief-4", bereich: "Briefe/Vorlagen", titel: "Brief-Historie nach Erstellen",
+    schritte: ["Einen Brief drucken oder teilen.", "Brief-Historie öffnen."],
+    erwartung: "Ein Eintrag mit Titel und Datum erscheint in der Historie." },
+
+  // --- Signatur ---
+  { id: "sig-1", bereich: "Signatur", titel: "Unterschrift per Pad zeichnen",
+    schritte: ["In einem Dokument das Unterschriftsfeld öffnen.", "Mit Maus oder Finger zeichnen.", "Speichern."],
+    erwartung: "Gezeichnete Unterschrift wird übernommen und angezeigt." },
+  { id: "sig-2", bereich: "Signatur", titel: "Unterschrift als Bild hochladen",
+    schritte: ["Im Unterschriftsbereich ein Bild hochladen."],
+    erwartung: "Das hochgeladene Bild wird als Unterschrift verwendet." },
+  { id: "sig-3", bereich: "Signatur", titel: "Gespeicherte Unterschrift per 1-Klick",
+    schritte: ["Eine Unterschrift speichern.", "In einem anderen Dokument die gespeicherte Unterschrift mit einem Klick einsetzen."],
+    erwartung: "Die gespeicherte Unterschrift wird ohne erneutes Zeichnen eingefügt." },
+
+  // --- Drucken ---
+  { id: "print-1", bereich: "Drucken", titel: "Brief drucken",
+    schritte: ["Einen Brief öffnen.", "Auf Drucken / als PDF tippen."],
+    erwartung: "Druckvorschau mit Brieftext erscheint, keine leere Seite." },
+  { id: "print-2", bereich: "Drucken", titel: "Formular (EAR) drucken",
+    schritte: ["EAR-Vorschau öffnen.", "Drucken."],
+    erwartung: "Druckvorschau mit ausgefülltem Formular, keine leere Seite." },
+  { id: "print-3", bereich: "Drucken", titel: "Dokument mit Tabelle drucken",
+    schritte: ["Ein Tabellen-Dokument (z.B. Schadens) öffnen.", "Drucken."],
+    erwartung: "Druckvorschau mit Tabelle, keine leere Seite." },
+  { id: "print-4", bereich: "Drucken", titel: "Druck mit ausgewählten Anhängen",
+    schritte: ["Ein Dokument mit Belegen öffnen.", "Belege mitdrucken aktivieren.", "Drucken."],
+    erwartung: "Anhänge erscheinen als zusätzliche Seiten." },
+  { id: "print-5", bereich: "Drucken", titel: "Leeren Brief drucken",
+    schritte: ["Einen leeren Brief drucken."],
+    erwartung: "Hinweis erscheint, statt einer leeren Seite." },
+
+  // --- Inbox / Belege / OCR ---
+  { id: "inbox-1", bereich: "Inbox/Belege/OCR", titel: "Beleg in die Inbox laden",
+    schritte: ["Beleg-Inbox öffnen.", "Ein Bild oder PDF hinzufügen."],
+    erwartung: "Beleg erscheint in der Inbox-Liste." },
+  { id: "inbox-2", bereich: "Inbox/Belege/OCR", titel: "Beleg einem Dokument zuordnen",
+    schritte: ["Einen Inbox-Beleg einem Dokument/Abschnitt zuordnen."],
+    erwartung: "Beleg erscheint als Anhang im Zieldokument." },
+  { id: "inbox-3", bereich: "Inbox/Belege/OCR", titel: "Beleg löschen (Dialog)",
+    schritte: ["Beleg löschen antippen.", "Dialog einmal abbrechen, einmal bestätigen."],
+    erwartung: "Abbrechen behält den Beleg, Bestätigen löscht ihn." },
+  { id: "inbox-4", bereich: "Inbox/Belege/OCR", titel: "OCR Texterkennung",
+    schritte: ["Bei einem Bild-Beleg OCR starten."],
+    erwartung: "Erkannter Text wird angezeigt, App bleibt stabil." },
+
+  // --- Backup Export und Re-Import ---
+  { id: "backup-1", bereich: "Backup", titel: "Daten exportieren",
+    schritte: ["Einstellungen oder Startseite, Daten exportieren."],
+    erwartung: "Eine JSON-Sicherungsdatei wird heruntergeladen." },
+  { id: "backup-2", bereich: "Backup", titel: "Re-Import im privaten Fenster",
+    schritte: ["Privates Fenster öffnen, App laden.", "Sicherungsdatei importieren."],
+    erwartung: "Import-Bestätigung erscheint, Daten werden geladen." },
+  { id: "backup-3", bereich: "Backup", titel: "Identitäts-Stichprobe nach Import",
+    schritte: ["Nach dem Import Name, ein Doc-Feld und einen Kontakt prüfen."],
+    erwartung: "Werte stimmen mit dem Original überein." },
+
+  // --- Timeline ---
+  { id: "time-1", bereich: "Timeline", titel: "Timeline öffnen",
+    schritte: ["Timeline-/Verlaufsansicht öffnen."],
+    erwartung: "Ereignisse werden chronologisch angezeigt." },
+  { id: "time-2", bereich: "Timeline", titel: "Termin erscheint in der Timeline",
+    schritte: ["Einen Termin anlegen.", "Timeline öffnen."],
+    erwartung: "Der Termin taucht in der Timeline auf." },
+
+  // --- Setup-Checkliste ---
+  { id: "setup-1", bereich: "Setup-Checkliste", titel: "Checkliste auf der Startseite",
+    schritte: ["Startseite öffnen.", "Einen Checklisten-Punkt erledigen."],
+    erwartung: "Fortschritt der Checkliste aktualisiert sich." },
+
+  // --- Achievements ---
+  { id: "ach-1", bereich: "Achievements", titel: "Erreichtes wird angezeigt",
+    schritte: ["Startseite öffnen, Bereich Was du geschafft hast."],
+    erwartung: "Erreichte Meilensteine werden korrekt dargestellt." },
+
+  // --- Suche ---
+  { id: "search-1", bereich: "Suche", titel: "Globale Suche öffnen",
+    schritte: ["Globale Suche öffnen.", "Einen Begriff eingeben, der vorkommt."],
+    erwartung: "Passende Treffer werden gelistet." },
+  { id: "search-2", bereich: "Suche", titel: "Treffer anklicken",
+    schritte: ["Einen Suchtreffer anklicken."],
+    erwartung: "Die App navigiert an die richtige Stelle." },
+
+  // --- Kalender / ICS ---
+  { id: "ics-1", bereich: "Kalender/ICS", titel: "Termin als ICS exportieren",
+    schritte: ["Bei einem Termin auf Kalender/ICS tippen."],
+    erwartung: "Eine ICS-Datei wird erzeugt und heruntergeladen." },
+  { id: "ics-2", bereich: "Kalender/ICS", titel: "ICS in Kalender importierbar",
+    schritte: ["Die ICS-Datei in eine Kalender-App importieren."],
+    erwartung: "Der Termin erscheint mit Datum und Titel im Kalender." },
+
+  // --- Eingabe-Validierung ---
+  { id: "valid-1", bereich: "Validierung", titel: "Falsche IBAN",
+    schritte: ["Eine ungültige IBAN eingeben (z.B. DE00...)."],
+    erwartung: "Dezenter Hinweis (Rand/Tooltip), Eingabe NICHT blockiert, Wert bleibt." },
+  { id: "valid-2", bereich: "Validierung", titel: "Unmögliches Datum",
+    schritte: ["Ein unmögliches Datum eingeben (z.B. 31.02.2026)."],
+    erwartung: "Hinweis erscheint, Wert bleibt erhalten und wird nicht korrigiert." },
+  { id: "valid-3", bereich: "Validierung", titel: "Betrag als Text",
+    schritte: ["In einem Geldfeld Text eingeben (z.B. zwölf)."],
+    erwartung: "Hinweis erscheint, Wert bleibt unverändert." },
+
+  // --- Dialoge (bestätigen und abbrechen) ---
+  { id: "dlg-1", bereich: "Dialoge", titel: "Tabellen-Zeile löschen",
+    schritte: ["Eine Tabellenzeile löschen.", "Einmal abbrechen, einmal bestätigen."],
+    erwartung: "Abbrechen behält die Zeile, Bestätigen löscht sie." },
+  { id: "dlg-2", bereich: "Dialoge", titel: "Einstellungen zurücksetzen",
+    schritte: ["Einstellungen zurücksetzen.", "Einmal abbrechen, einmal bestätigen."],
+    erwartung: "Abbrechen lässt Einstellungen unverändert, Bestätigen setzt sie zurück." },
+  { id: "dlg-3", bereich: "Dialoge", titel: "Zahlung als bezahlt markieren",
+    schritte: ["Eine Zahlung als bezahlt markieren.", "Betrag im Eingabe-Modal bestätigen."],
+    erwartung: "Nach Bestätigung gilt die Zahlung als bezahlt, Abbrechen ändert nichts." },
+  { id: "dlg-4", bereich: "Dialoge", titel: "Sozialstunden-Einsatz erledigt",
+    schritte: ["Einen Sozialstunden-Einsatz als erledigt markieren."],
+    erwartung: "Bestätigen trägt die Stunden automatisch ein, Abbrechen setzt nur den Status." },
+
+  // --- Modal-Nebenläufigkeit ---
+  { id: "modal-1", bereich: "Modal-Nebenläufigkeit", titel: "Zwei Dialoge nacheinander",
+    schritte: ["Einen Dialog öffnen und offen lassen.", "Einen zweiten Dialog auslösen.", "Ersten beantworten."],
+    erwartung: "Der erste Dialog wird nicht still überschrieben, der zweite erscheint erst danach." },
+
+  // --- Reset-Button ---
+  { id: "reset-1", bereich: "Reset", titel: "Cache leeren und neu laden",
+    schritte: ["Einstellungen, Cache leeren und neu laden."],
+    erwartung: "App lädt neu." },
+  { id: "reset-2", bereich: "Reset", titel: "Daten nach Reset prüfen",
+    schritte: ["Nach dem Reset Eingaben, Belege und Kontakte prüfen."],
+    erwartung: "Alle Daten sind noch da (localStorage unberührt)." },
+
+  // --- Touch-Targets / UI ---
+  { id: "ui-1", bereich: "UI/Touch", titel: "Sekundäre Buttons gut tippbar",
+    schritte: ["Mehrere sekundäre Buttons auf dem Smartphone antippen."],
+    erwartung: "Buttons sind bequem mit dem Finger treffbar (mind. 44 px Höhe)." },
+  { id: "ui-2", bereich: "UI/Touch", titel: "Icon-Buttons in der Kopfzeile",
+    schritte: ["Die Icon-Buttons in der Startseiten-Kopfzeile antippen."],
+    erwartung: "Jeder Icon-Button ist mind. 44x44 px und gut treffbar." },
+  { id: "ui-3", bereich: "UI/Touch", titel: "Dark-Mode umschalten",
+    schritte: ["Zwischen hell und dunkel umschalten."],
+    erwartung: "Layout und Branding bleiben intakt, Texte lesbar." },
+
+  // --- PWA / Offline ---
+  { id: "pwa-1", bereich: "PWA/Offline", titel: "App installieren",
+    schritte: ["App zum Home-Bildschirm hinzufügen / installieren."],
+    erwartung: "App-Icon erscheint, App startet eigenständig." },
+  { id: "pwa-2", bereich: "PWA/Offline", titel: "Im Vollbild starten",
+    schritte: ["Die installierte App öffnen."],
+    erwartung: "App läuft im Vollbild ohne Browserleiste." },
+  { id: "pwa-3", bereich: "PWA/Offline", titel: "Offline öffnen",
+    schritte: ["Nur falls der Service Worker aktiviert wurde: Flugmodus, App öffnen."],
+    erwartung: "App lädt aus dem Cache. Hinweis: in v3.42 ist der SW standardmäßig NICHT aktiv, dann entfällt der Punkt." },
+
+  // --- Datensicherheit / PIN ---
+  { id: "pin-1", bereich: "Datensicherheit/PIN", titel: "PIN setzen",
+    schritte: ["Einen PIN-Schutz einrichten.", "App neu laden."],
+    erwartung: "App fragt beim Start nach dem PIN." },
+  { id: "pin-2", bereich: "Datensicherheit/PIN", titel: "PIN entfernen (Dialog)",
+    schritte: ["PIN-Schutz entfernen.", "Dialog einmal abbrechen, einmal bestätigen."],
+    erwartung: "Abbrechen behält den PIN, Bestätigen entfernt ihn." },
+];
+
+let tmState = { open: false, filter: "alle", results: {} };
+
+// Reine Hilfsfunktion: Zielmasse nach dem laengsten Rand begrenzen. Testbar
+// ohne Canvas (Paket M).
+function tmScaledSize(w, h, maxEdge) {
+  maxEdge = maxEdge || TM_MAX_IMAGE_EDGE;
+  w = Math.max(1, Math.round(w || 0));
+  h = Math.max(1, Math.round(h || 0));
+  const longest = Math.max(w, h);
+  if (longest <= maxEdge) return { width: w, height: h };
+  const f = maxEdge / longest;
+  return { width: Math.max(1, Math.round(w * f)), height: Math.max(1, Math.round(h * f)) };
+}
+
+function tmSafeParse(raw, fb) {
+  if (raw == null) return fb;
+  try { return JSON.parse(raw); }
+  catch (e) { console.warn("Testmodus: korrupte Ergebnisse, Standard wird verwendet:", e); return fb; }
+}
+function tmLoadResults() {
+  let raw = null;
+  try { raw = localStorage.getItem(BH_TEST_RESULTS_KEY); } catch (e) { console.warn("Testmodus: Lesen fehlgeschlagen:", e); }
+  const parsed = tmSafeParse(raw, {});
+  return (parsed && typeof parsed === "object") ? parsed : {};
+}
+function tmPersist() {
+  try { localStorage.setItem(BH_TEST_RESULTS_KEY, JSON.stringify(tmState.results)); return true; }
+  catch (e) {
+    if (typeof isQuotaError === "function" && isQuotaError(e)) { if (typeof warnStorageFull === "function") warnStorageFull(); }
+    else { console.warn("Testmodus: Speichern fehlgeschlagen:", e); }
+    return false;
+  }
+}
+function tmGet(id) {
+  const r = tmState.results[id];
+  if (r && typeof r === "object") {
+    if (!Array.isArray(r.bilder)) r.bilder = [];
+    if (typeof r.status !== "string") r.status = "offen";
+    if (typeof r.notiz !== "string") r.notiz = "";
+    return r;
+  }
+  return { status: "offen", notiz: "", bilder: [] };
+}
+function tmNowIso() { try { return new Date().toISOString(); } catch (e) { return ""; } }
+function tmSetStatus(id, status) {
+  const r = tmGet(id); r.status = status; r.updatedAt = tmNowIso();
+  tmState.results[id] = r; tmPersist(); tmRender();
+}
+function tmSetNote(id, val) {
+  // Sofort persistieren, aber NICHT neu rendern, damit der Fokus im Textfeld bleibt.
+  const r = tmGet(id); r.notiz = String(val == null ? "" : val); r.updatedAt = tmNowIso();
+  tmState.results[id] = r; tmPersist();
+}
+function tmDownscaleImage(file) {
+  return new Promise((resolve, reject) => {
+    try {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error("Datei konnte nicht gelesen werden"));
+      reader.onload = () => {
+        const dataUrl = reader.result;
+        try {
+          const img = new Image();
+          img.onerror = () => resolve(dataUrl); // Fallback: Original behalten
+          img.onload = () => {
+            try {
+              const size = tmScaledSize(img.width || img.naturalWidth || 0, img.height || img.naturalHeight || 0, TM_MAX_IMAGE_EDGE);
+              const canvas = document.createElement("canvas");
+              canvas.width = size.width; canvas.height = size.height;
+              const ctx = canvas.getContext && canvas.getContext("2d");
+              if (!ctx || !canvas.toDataURL) { resolve(dataUrl); return; }
+              ctx.drawImage(img, 0, 0, size.width, size.height);
+              resolve(canvas.toDataURL("image/jpeg", TM_IMAGE_QUALITY));
+            } catch (e) { resolve(dataUrl); }
+          };
+          img.src = dataUrl;
+        } catch (e) { resolve(dataUrl); }
+      };
+      reader.readAsDataURL(file);
+    } catch (e) { reject(e); }
+  });
+}
+async function tmAddImages(id, inputEl) {
+  const files = inputEl && inputEl.files ? Array.prototype.slice.call(inputEl.files) : [];
+  if (!files.length) return;
+  const r = tmGet(id);
+  for (const f of files) {
+    if (!/^image\//.test(f.type || "")) continue;
+    try { const dataUrl = await tmDownscaleImage(f); r.bilder.push({ name: f.name || "Bild", dataUrl: dataUrl }); }
+    catch (e) { console.warn("Testmodus: Bild übersprungen:", e); }
+  }
+  r.updatedAt = tmNowIso();
+  tmState.results[id] = r;
+  tmPersist();
+  if (inputEl) { try { inputEl.value = ""; } catch (e) {} }
+  tmRender();
+}
+function tmRemoveImage(id, idx) {
+  const r = tmGet(id);
+  if (r.bilder && idx >= 0 && idx < r.bilder.length) { r.bilder.splice(idx, 1); r.updatedAt = tmNowIso(); tmState.results[id] = r; tmPersist(); tmRender(); }
+}
+function tmSummary() {
+  const counts = { total: TEST_CASES.length, offen: 0, bestanden: 0, fehler: 0, uebersprungen: 0, blockiert: 0 };
+  TEST_CASES.forEach((c) => {
+    const st = (tmState.results[c.id] && tmState.results[c.id].status) || "offen";
+    if (counts[st] === undefined) counts.offen++; else counts[st]++;
+  });
+  counts.beantwortet = counts.total - counts.offen;
+  return counts;
+}
+function tmBuildExportJson() {
+  return {
+    typ: "bewaehrungshilfe-testbericht",
+    appVersion: APP_VERSION,
+    erstelltAm: tmNowIso(),
+    zusammenfassung: tmSummary(),
+    faelle: TEST_CASES.map((c) => {
+      const r = tmState.results[c.id] || {};
+      return {
+        id: c.id, bereich: c.bereich, titel: c.titel,
+        status: r.status || "offen", notiz: r.notiz || "",
+        bilder: Array.isArray(r.bilder) ? r.bilder.map((b) => ({ name: b.name, dataUrl: b.dataUrl })) : [],
+        aktualisiert: r.updatedAt || null,
+      };
+    }),
+  };
+}
+function tmStatusText(st) {
+  const m = TM_STATI.find((s) => s.key === st);
+  return m ? (m.icon ? m.icon + " " + m.label : m.label) : "offen";
+}
+function tmBuildHtmlReport() {
+  const sum = tmSummary();
+  const esc2 = (typeof esc === "function") ? esc : function (s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); };
+  function caseBlock(c) {
+    const r = tmState.results[c.id] || {};
+    const st = r.status || "offen";
+    const bilder = Array.isArray(r.bilder) ? r.bilder : [];
+    const imgs = bilder.map((b) => '<div class="img"><img src="' + esc2(b.dataUrl) + '" alt="' + esc2(b.name || "Bild") + '"><div class="cap">' + esc2(b.name || "") + "</div></div>").join("");
+    const steps = (c.schritte || []).map((s) => "<li>" + esc2(s) + "</li>").join("");
+    return '<div class="case s-' + esc2(st) + '">' +
+      '<div class="ch"><span class="cid">' + esc2(c.id) + '</span> <span class="cb">' + esc2(c.bereich) + '</span> <span class="cs">' + esc2(tmStatusText(st)) + "</span></div>" +
+      "<h3>" + esc2(c.titel) + "</h3>" +
+      "<ol>" + steps + "</ol>" +
+      '<p class="erw"><strong>Erwartung:</strong> ' + esc2(c.erwartung) + "</p>" +
+      (r.notiz ? '<p class="note"><strong>Notiz:</strong> ' + esc2(r.notiz) + "</p>" : "") +
+      (imgs ? '<div class="imgs">' + imgs + "</div>" : "") +
+      "</div>";
+  }
+  // Fehler und Blockierte zuerst (zum Abarbeiten), dann alle nach Bereich gruppiert.
+  const problemCases = TEST_CASES.filter((c) => { const st = (tmState.results[c.id] || {}).status; return st === "fehler" || st === "blockiert"; });
+  const bereiche = [];
+  TEST_CASES.forEach((c) => { if (bereiche.indexOf(c.bereich) === -1) bereiche.push(c.bereich); });
+  let body = "";
+  if (problemCases.length) {
+    body += '<h2 class="prob">Zuerst korrigieren (Fehler und Blockierte): ' + problemCases.length + "</h2>";
+    body += problemCases.map(caseBlock).join("");
+  }
+  bereiche.forEach((b) => {
+    body += "<h2>" + esc2(b) + "</h2>";
+    body += TEST_CASES.filter((c) => c.bereich === b).map(caseBlock).join("");
+  });
+  const style = "body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:900px;margin:0 auto;padding:24px;color:#1a1a1a;}" +
+    "h1{font-size:22px;}h2{font-size:17px;margin-top:28px;border-bottom:1px solid #ddd;padding-bottom:4px;}h2.prob{color:#dc2626;}h3{font-size:15px;margin:6px 0;}" +
+    ".sum{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0;}" +
+    ".sum span{padding:4px 10px;border-radius:999px;background:#eef;font-size:13px;font-weight:600;}" +
+    ".sum .f{background:#fde2e2;color:#dc2626;}.sum .ok{background:#dcf0e4;color:#228b54;}" +
+    ".case{border:1px solid #ddd;border-radius:10px;padding:12px 14px;margin:10px 0;}" +
+    ".case.s-fehler{border-left:4px solid #dc2626;}.case.s-bestanden{border-left:4px solid #228b54;}.case.s-blockiert{border-left:4px solid #f9c74f;}.case.s-uebersprungen{border-left:4px solid #999;}" +
+    ".ch{font-size:12px;color:#666;}.cid{font-family:monospace;}.cb{background:#eef;padding:1px 6px;border-radius:999px;}.cs{font-weight:700;}" +
+    "ol{font-size:13px;line-height:1.5;}.erw{font-size:13px;background:#f6f6f6;padding:6px 8px;border-radius:6px;}.note{font-size:13px;}" +
+    ".imgs{display:flex;flex-wrap:wrap;gap:8px;}.img img{max-width:240px;border:1px solid #ccc;border-radius:6px;}.cap{font-size:11px;color:#666;}";
+  return "<!doctype html><html lang=\"de\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">" +
+    "<title>Test-Bericht " + esc2(APP_VERSION) + "</title><style>" + style + "</style></head><body>" +
+    "<h1>Test-Bericht Bewährungshilfe-Assistent " + esc2(APP_VERSION) + "</h1>" +
+    '<div class="sum">' +
+      "<span>Gesamt: " + sum.total + "</span>" +
+      '<span class="ok">Bestanden: ' + sum.bestanden + "</span>" +
+      '<span class="f">Fehler: ' + sum.fehler + "</span>" +
+      "<span>Blockiert: " + sum.blockiert + "</span>" +
+      "<span>Übersprungen: " + sum.uebersprungen + "</span>" +
+      "<span>Offen: " + sum.offen + "</span>" +
+    "</div>" +
+    "<p style=\"font-size:12px;color:#666;\">Erstellt: " + esc2(tmNowIso()) + "</p>" +
+    body + "</body></html>";
+}
+// Synthetische Dummy-Daten als gueltiges Backup (Format Version 4, NICHT geaendert).
+// Ausschliesslich erfundene Daten (Max Mustermann, example.com, oeffentliche Test-IBAN).
+function tmBuildTestdaten() {
+  return {
+    version: 4,
+    appVersion: APP_VERSION,
+    exportedAt: "2026-06-19T12:00:00.000Z",
+    theme: "light",
+    shared: {
+      name: "Mustermann, Max",
+      geburtsdatum: "01.01.1990",
+      anschrift: "Beispielstraße 1, 12345 Musterstadt",
+      telefon: "0151 0000000",
+      email: "max.mustermann@example.com",
+      familienstand: "ledig",
+      aktenzeichen: "1 Js 1234/21",
+      bewaehrungshelfer: "Erika Beispiel",
+      bh_email: "erika.beispiel@example.org",
+      bewaehrung_beginn: "01.03.2024",
+      bewaehrung_ende: "28.02.2027",
+    },
+    settings: {
+      hiddenDocs: [], backupReminderDays: 14, showInstallBanner: true,
+      showBackupReminder: true, showTodayOverview: true, showNextAppointments: true,
+      showBewaehrungProgress: true, showAchievements: true, showStats: true, showQuickAdd: true,
+    },
+    docs: {
+      ear: { answers: { "arbeit.lohn": "1450,00", "sozial.buergergeld": "0,00", "wohnen.miete": "650,00", "wohnen.strom": "70,00", "personal.zeitraum": "Mai 2026" }, currentIdx: 0, signatures: {} },
+      zeit: { answers: {}, currentIdx: 0, rows: { stationen: [{ von: "2018", bis: "2022", art: "Wohnung", beschreibung: "Beispielstraße 1, Musterstadt" }] }, signatures: {} },
+      thera: { answers: { "info.therapeut": "Test Therapeut" }, currentIdx: 0, rows: {}, checks: {}, signatures: {} },
+      schadens: { answers: { "info.gesamt": "1200,00" }, currentIdx: 0, rows: { zahlungen: [{ datum: "10.05.2026", betrag: "100,00", zweck: "Rate Schadenswiedergutmachung", status: "bezahlt" }] }, attachments: {}, signatures: {} },
+      sozial: { answers: {}, currentIdx: 0, rows: { stunden: [{ datum: "12.05.2026", einrichtung: "Beispiel-Verein e.V.", stunden: "4", taetigkeit: "Garten" }] }, attachments: {}, signatures: {} },
+      uebersicht: { answers: {}, currentIdx: 0 },
+      bhtermine: { answers: {}, currentIdx: 0, rows: { termine: [{ datum: "20.06.2026", uhrzeit: "10:00", ort: "Bewährungshilfe Musterstadt", notiz: "Regeltermin", status: "geplant" }] }, signatures: {} },
+      kosten: { answers: { "info.gesamt": "800,00" }, currentIdx: 0, rows: { posten: [{ art: "Gerichtskosten", betrag: "800,00", glaeubiger: "Landesjustizkasse", status: "offen" }] }, attachments: {}, signatures: {} },
+      asservate: { answers: { "verfahren.az": "1 Js 1234/21" }, currentIdx: 0, rows: { gegenstaende: [{ bezeichnung: "Mobiltelefon", marke: "Beispiel", seriennummer: "SN-TEST-0001", status: "beschlagnahmt" }] }, attachments: {}, signatures: {} },
+      ziele: { answers: { "ziele.eins": "Schulden abbauen" }, currentIdx: 0, rows: {}, signatures: {} },
+    },
+    notes: [
+      { id: "n_testdaten_1", text: "Beispiel-Notiz: Unterlagen für nächsten BH-Termin vorbereiten.", category: "bh", createdAt: "2026-06-01T08:00:00.000Z", done: false },
+    ],
+    inbox: [],
+    contacts: [
+      { id: "c_testdaten_bh", rolle: "bh", name: "Erika Beispiel", firma: "Bewährungshilfe Musterstadt", email: "erika.beispiel@example.org", telefon: "030 0000000", anschrift: "Amtsweg 2, 12345 Musterstadt", notiz: "" },
+      { id: "c_testdaten_anwalt", rolle: "anwalt", name: "Rechtsanwältin Test", firma: "Kanzlei Beispiel", email: "kanzlei@example.com", telefon: "030 0000001", anschrift: "Marktplatz 3, 12345 Musterstadt", notiz: "" },
+    ],
+    briefHistory: [
+      { id: "b_testdaten_1", tplKey: "ratenzahlung", title: "Antrag auf Ratenzahlung", mode: "drucken", erstelltAm: "2026-05-15T09:00:00.000Z", status: "erstellt", statusNotiz: "" },
+    ],
+    customTemplates: {},
+    terminPrep: {},
+  };
+}
+function tmDownload(filename, content, mime) {
+  try {
+    const blob = new Blob([content], { type: mime || "application/octet-stream" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch (e) { console.error("Testmodus: Download fehlgeschlagen:", e); try { alert("Download fehlgeschlagen: " + e.message); } catch (_) {} }
+}
+function tmExportJson() { tmDownload("bh_testbericht.json", JSON.stringify(tmBuildExportJson(), null, 2), "application/json"); }
+function tmExportHtml() { tmDownload("bh_testbericht.html", tmBuildHtmlReport(), "text/html"); }
+function tmDownloadTestdaten() { tmDownload("testdaten.json", JSON.stringify(tmBuildTestdaten(), null, 2), "application/json"); }
+async function tmClearResults() {
+  let ok = false;
+  try {
+    ok = await confirmAsync({ title: "Test-Ergebnisse löschen?", message: "Alle erfassten Status, Notizen und Bilder dieses Test-Laufs werden gelöscht. Deine echten App-Daten sind davon nicht betroffen.", confirmLabel: "Löschen", danger: true });
+  } catch (e) { ok = false; }
+  if (!ok) return;
+  tmState.results = {};
+  try { localStorage.removeItem(BH_TEST_RESULTS_KEY); } catch (e) { console.warn("Testmodus: Löschen fehlgeschlagen:", e); }
+  tmRender();
+}
+function tmSetFilter(f) { tmState.filter = f; tmRender(); }
+function tmPassFilter(id) {
+  const st = (tmState.results[id] || {}).status || "offen";
+  if (tmState.filter === "alle") return true;
+  if (tmState.filter === "offen") return st === "offen";
+  if (tmState.filter === "fehler") return st === "fehler";
+  if (tmState.filter === "bestanden") return st === "bestanden";
+  return true;
+}
+function tmCaseHtml(c) {
+  const esc2 = (typeof esc === "function") ? esc : function (s) { return String(s == null ? "" : s); };
+  const r = tmState.results[c.id] || {};
+  const st = r.status || "offen";
+  const steps = (c.schritte || []).map((s) => "<li>" + esc2(s) + "</li>").join("");
+  const statusBtns = TM_STATI.filter((s) => s.key !== "offen").map((s) => {
+    const active = st === s.key ? (" sel-" + s.key) : "";
+    return '<button class="btn btn-secondary' + active + '" onclick="tmSetStatus(\'' + c.id + "','" + s.key + '\')">' + (s.icon ? s.icon + " " : "") + esc2(s.label) + "</button>";
+  }).join("");
+  const bilder = Array.isArray(r.bilder) ? r.bilder : [];
+  const thumbs = bilder.map((b, i) => '<div class="tm-thumb"><img src="' + esc2(b.dataUrl) + '" alt="' + esc2(b.name || "Bild") + '"><button title="Bild entfernen" onclick="tmRemoveImage(\'' + c.id + "'," + i + ')">✕</button></div>').join("");
+  return '<div class="tm-case s-' + esc2(st) + '">' +
+    '<div class="tm-case-head"><span class="tm-id">' + esc2(c.id) + '</span><span class="tm-bereich">' + esc2(c.bereich) + '</span><span class="tm-titel">' + esc2(c.titel) + "</span></div>" +
+    "<ol>" + steps + "</ol>" +
+    '<div class="tm-erwartung"><strong>Erwartung:</strong> ' + esc2(c.erwartung) + "</div>" +
+    '<div class="tm-status-row">' + statusBtns + "</div>" +
+    '<textarea placeholder="Notiz (optional)" oninput="tmSetNote(\'' + c.id + '\', this.value)">' + esc2(r.notiz || "") + "</textarea>" +
+    '<label class="tm-file-label">📷 Screenshot anhängen<input type="file" accept="image/*" multiple onchange="tmAddImages(\'' + c.id + "', this)\"></label>" +
+    (thumbs ? '<div class="tm-thumbs">' + thumbs + "</div>" : "") +
+    "</div>";
+}
+function tmViewHtml() {
+  const esc2 = (typeof esc === "function") ? esc : function (s) { return String(s == null ? "" : s); };
+  const sum = tmSummary();
+  const pct = sum.total ? Math.round((sum.beantwortet / sum.total) * 100) : 0;
+  const filterBtn = (key, label) => '<button class="btn btn-secondary' + (tmState.filter === key ? " active" : "") + '" onclick="tmSetFilter(\'' + key + '\')">' + esc2(label) + "</button>";
+  const cases = TEST_CASES.filter((c) => tmPassFilter(c.id)).map(tmCaseHtml).join("");
+  return '<div class="tm-bar"><h1>🧪 Test-Modus</h1>' +
+      '<button class="btn btn-secondary" onclick="closeTestmodus()">← Zurück zur App</button></div>' +
+    '<div class="tm-hinweis"><strong>Test-Modus.</strong> Speichert nur Test-Ergebnisse (unter <code>bh_test_</code>-Schlüsseln) und fasst deine echten Daten nicht an. ' +
+      'Zum Testen mit Beispiel-Daten bitte ein <strong>privates Fenster</strong> nutzen: 1. Privates Fenster öffnen, 2. die App-Adresse laden, 3. unten „Dummy-Testdaten herunterladen" und im privaten Fenster importieren, 4. testen, 5. <strong>vor dem Schließen</strong> die Ergebnisse exportieren (privates Fenster verliert beim Schließen seinen Speicher).</div>' +
+    '<div class="tm-section">' +
+      '<div class="tm-summary">' +
+        '<span class="tm-pill">Beantwortet: ' + sum.beantwortet + " / " + sum.total + "</span>" +
+        '<span class="tm-pill bestanden">Bestanden: ' + sum.bestanden + "</span>" +
+        '<span class="tm-pill fehler">Fehler: ' + sum.fehler + "</span>" +
+        '<span class="tm-pill">Blockiert: ' + sum.blockiert + "</span>" +
+        '<span class="tm-pill">Übersprungen: ' + sum.uebersprungen + "</span>" +
+        '<span class="tm-pill">Offen: ' + sum.offen + "</span>" +
+      "</div>" +
+      '<div class="tm-progress-track"><div class="tm-progress-fill" style="width:' + pct + '%"></div></div>' +
+      '<div class="tm-filter">' + filterBtn("alle", "Alle") + filterBtn("offen", "Offen") + filterBtn("fehler", "Fehler") + filterBtn("bestanden", "Bestanden") + "</div>" +
+    "</div>" +
+    '<div class="tm-section">' +
+      "<h2 style=\"margin-top:0;\">Auswertung und Beispiel-Daten</h2>" +
+      '<div style="display:flex; flex-wrap:wrap; gap:8px;">' +
+        '<button class="btn btn-primary" onclick="tmExportJson()">⬇️ Ergebnisse als JSON</button>' +
+        '<button class="btn btn-primary" onclick="tmExportHtml()">⬇️ Bericht als HTML</button>' +
+        '<button class="btn btn-secondary" onclick="tmDownloadTestdaten()">📦 Dummy-Testdaten herunterladen</button>' +
+        '<button class="btn btn-secondary" onclick="tmClearResults()">🗑️ Ergebnisse löschen</button>' +
+      "</div>" +
+      '<p style="font-size:12px; color:var(--text-soft); margin:10px 0 0;">Screenshots sind der grösste Speicher-Posten und werden beim Anhängen automatisch verkleinert. Bei vollem Speicher bitte Ergebnisse exportieren und sparsam mit Bildern sein.</p>' +
+    "</div>" +
+    '<div class="tm-section" style="background:transparent; border:none; padding:0;">' + cases + "</div>";
+}
+function tmRender() {
+  const root = document.getElementById("testmodusRoot");
+  if (!root) return;
+  root.innerHTML = tmViewHtml();
+}
+function openTestmodus() {
+  tmState.results = tmLoadResults();
+  tmState.open = true;
+  const app = document.getElementById("app"); if (app && app.style) app.style.display = "none";
+  const pv = document.getElementById("printView"); if (pv && pv.classList) { try { pv.classList.remove("show", "landscape-mode"); } catch (e) {} }
+  let root = document.getElementById("testmodusRoot");
+  if (!root) { root = document.createElement("div"); root.id = "testmodusRoot"; document.body.appendChild(root); }
+  tmRender();
+  try { if (window.location && window.location.hash !== "#testmodus") window.location.hash = "testmodus"; } catch (e) {}
+  try { window.scrollTo(0, 0); } catch (e) {}
+}
+function closeTestmodus() {
+  tmState.open = false;
+  const root = document.getElementById("testmodusRoot"); if (root && root.remove) root.remove();
+  const app = document.getElementById("app"); if (app && app.style) app.style.display = "";
+  try {
+    if (window.location && /#testmodus/.test(window.location.hash)) {
+      if (typeof history !== "undefined" && history.replaceState) history.replaceState(null, "", window.location.pathname + window.location.search);
+      else window.location.hash = "";
+    }
+  } catch (e) {}
+  try { render(); } catch (e) {}
+}
+function handleTestmodusHash() {
+  let h = "";
+  try { h = (window.location && window.location.hash) || ""; } catch (e) {}
+  if (/^#testmodus/.test(h)) { if (!tmState.open) openTestmodus(); }
+  else if (tmState.open) { closeTestmodus(); }
+}
+try {
+  window.addEventListener("hashchange", function () { try { handleTestmodusHash(); } catch (e) { console.warn("Testmodus-Hash:", e); } });
+  window.addEventListener("load", function () { try { handleTestmodusHash(); } catch (e) { console.warn("Testmodus-Hash:", e); } });
+} catch (e) { console.warn("Testmodus: Event-Listener konnten nicht gesetzt werden:", e); }
+// === TESTMODUS ENDE ===
 
 (async () => {
   if (!checkBrowserCompat()) return;

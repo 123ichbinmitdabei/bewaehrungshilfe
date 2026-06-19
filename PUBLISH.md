@@ -1,30 +1,31 @@
-# PUBLISH, v3.41
+# PUBLISH, v3.42
 
 **Live-URL:** https://123ichbinmitdabei.github.io/bewaehrungshilfe/
 **Datum:** 2026-06-19
-**Bundle:** ~804 KB (`index.html`, 823577 Bytes)
+**Bundle:** `index.html` (Single-File, plus `sw.js` separat und NICHT registriert)
 
-## Was in v3.41 gemacht wurde (Robustheits-Nachzug)
+## Was in v3.42 gemacht wurde
 
-Zwei gezielte GELB-Fixes, die das Dialog- und Reset-System absichern, bevor der Service Worker jemals aktiviert wird. Kein Eingriff in Storage-Schema, Backup-Format oder Auth.
+### Paket D, Touch-Targets (kosmetisch, GELB)
+- `.btn` mit `min-height: 44px`, Kopf-Icon-Buttons auf 44x44. Schrift und Branding unveraendert, kleiner Diff. Mini-Check im Smoke.
 
-### J1, Reset-Button auf eigene App begrenzt
-- `resetAppCache` löscht nur eigene Caches (`bh-cache-*`) und deregistriert nur Service Worker mit Scope `/bewaehrungshilfe/`. Fremde Pages-Projekte derselben Origin bleiben unberührt. `localStorage` weiterhin nie angefasst. Test: `smoke_v341_reset.js` (24).
-
-### J2, Modal-Nebenläufigkeit (FIFO-Warteschlange)
-- Ein zweites Modal während eines offenen wird eingereiht statt still überschrieben. Fail-safe und `confirmAsync` bleiben intakt, kein destruktiver Pfad ohne Bestätigung. Test: `smoke_v341_modal.js` (34).
+### Paket L, eingebauter Test-Modus (GRUEN, isoliert)
+- Strukturierter Test-Durchlauf, erreichbar ueber Einstellungen und `#testmodus`. Eigene Vollbild-Ansicht.
+- 62 Test-Faelle ueber alle Bereiche, je Fall Status, Notiz und Screenshots (auto-verkleinert), Sofort-Persistenz unter `bh_test_`-Keys, Fortschritt und Filter.
+- Export als JSON und als lesbarer HTML-Bericht (Fehler zuerst). Dummy-Daten als Download (`testdaten.json`), kein In-Place-Laden.
+- HARTE REGELN eingehalten: nur `bh_test_`-Keys, kein Schema-/Backup-Format-Eingriff, sauber entfernbar (Marker). Details in `TESTMODUS_v3.42.md`.
 
 ## Was live geht / was NICHT
-- **Live:** die beiden Robustheits-Fixes, die Tests, die Doku, Version v3.41.
-- **NICHT live:** die Service-Worker-Registrierung (bleibt auskommentiert, Aktivierung nur nach `SW_ACTIVATION_v3.40.md`).
+- **Live:** Touch-Targets, Test-Modus, `testdaten.json`, Tests, Doku, Version v3.42.
+- **NICHT live:** die Service-Worker-Registrierung bleibt auskommentiert (Aktivierung nur nach `SW_ACTIVATION_v3.40.md`).
 
 ## Deploy-Schritte
 1. `node check_js.js` (Parse OK).
-2. `node smoke_v338_sync.js`, `node smoke_v338_full.js`, alle `node smoke_v339_*.js`, `node smoke_v340_*.js`, `node smoke_v341_*.js` (677 Asserts gruen).
-3. `APP_VERSION = "v3.41"` gesetzt, README-Footer v3.41.
-4. Commit (Message via `-F`) plus `git push origin main`, NUR bei grünem Gate. KEIN force-push. SW-Registrierung bleibt auskommentiert.
+2. Voll-Gate: `node smoke_v338_sync.js`, `node smoke_v338_full.js`, alle `node smoke_v339_*.js`, `smoke_v340_*.js`, `smoke_v341_*.js`, `smoke_v342_*.js` (732 Asserts gruen).
+3. `APP_VERSION = "v3.42"` gesetzt, README-Footer v3.42.
+4. Commit (Message via `-F`) plus `git push origin main`, NUR bei gruenem Gate. KEIN force-push. SW-Registrierung bleibt auskommentiert.
 
 ## Nach dem Deploy (wichtig)
-- Auf Test-Geräten Hard-Reload (siehe `TROUBLESHOOTING.md`); Footer muss `v3.41` zeigen.
-- `TESTPLAN_v3.41_NACHTRAG.md` durchgehen: Reset-Button (Nutzerdaten bleiben, fremde Apps unberührt) und zwei Modals nacheinander (erstes verschwindet nicht).
+- Auf Test-Geraeten Hard-Reload; Footer muss `v3.42` zeigen.
+- Test-Modus oeffnen (Einstellungen oder `#testmodus`), mit `testdaten.json` im privaten Fenster gegentesten (siehe `TESTMODUS_v3.42.md`).
 - Service Worker erst nach `SW_ACTIVATION_v3.40.md` aktivieren, nicht vorher.

@@ -285,10 +285,13 @@ mod("Personendaten");
 (function () {
   var html = fs.readFileSync(path.join(__dirname, "index.html"), "utf8");
   ok(html.indexOf("Mariana Cannabis") === -1, "Kein Arbeitgeber-Realname 'Mariana Cannabis' im Quelltext");
-  // Keine echten Emails (ausser CSS @media/@page) in Template-Bodies
+  // Keine echten Emails (ausser CSS @media/@page). Reservierte Beispiel-Domains
+  // (RFC 2606: example.com/.org/.net) sind ausdruecklich erlaubt, z.B. fuer die
+  // synthetischen Dummy-Daten des Test-Modus (v3.42). Sie sind keine realen Daten.
   var emailMatches = (html.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g) || [])
-    .filter(function (m) { return m.indexOf("@media") === -1 && m.indexOf("@page") === -1 && m.indexOf("@keyframes") === -1; });
-  eq(emailMatches.length, 0, "Keine hardcoded E-Mail-Adressen im Quelltext");
+    .filter(function (m) { return m.indexOf("@media") === -1 && m.indexOf("@page") === -1 && m.indexOf("@keyframes") === -1; })
+    .filter(function (m) { return !/@example\.(com|org|net)$/.test(m); });
+  eq(emailMatches.length, 0, "Keine hardcoded echten E-Mail-Adressen im Quelltext (reservierte example-Domains erlaubt)");
   // Keine IBAN
   ok(!/\bDE\d{20}\b/.test(html), "Keine hardcoded IBAN im Quelltext");
 })();

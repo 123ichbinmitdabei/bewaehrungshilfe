@@ -239,11 +239,21 @@ function loadApp() {
       "validateAmount: validateAmount, validationHintForField: validationHintForField }" +
     "}; } catch(e) { __APP_ERR = e.message + '\\n' + (e.stack||''); }";
 
+  // Separat (eigener try/catch), damit ein fehlender Testmodus-Symbolname NIE
+  // die bestehenden Smoke-Tests bricht. Nur smoke_v342 nutzt __APP.testmodus.
+  exportBlock += "\n;try { if (__APP) { __APP.testmodus = {" +
+    "TEST_CASES: TEST_CASES, TM_STATI: TM_STATI, BH_TEST_RESULTS_KEY: BH_TEST_RESULTS_KEY," +
+    "tmScaledSize: tmScaledSize, tmBuildExportJson: tmBuildExportJson, tmBuildHtmlReport: tmBuildHtmlReport," +
+    "tmBuildTestdaten: tmBuildTestdaten, tmSummary: tmSummary, tmSetStatus: tmSetStatus, tmSetNote: tmSetNote," +
+    "tmLoadResults: tmLoadResults, tmGetState: function(){ return tmState; }, tmSetState: function(s){ tmState = s; }" +
+    "}; } } catch(e) { __APP_TM_ERR = e.message + '\\n' + (e.stack||''); }";
+
   js += exportBlock;
 
   var ctx = makeContext();
   ctx.__APP = null;
   ctx.__APP_ERR = null;
+  ctx.__APP_TM_ERR = null;
   // Hilfsfunktion fuer resetState (Default-State Klon)
   ctx.makeDefaultStateForSmoke = function () {
     return {
